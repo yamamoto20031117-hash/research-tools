@@ -132,19 +132,59 @@ function handleFiles(files){
 }
 
 function readFile(file){
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const data=parseSmartLab(e.target.result);
-    if(data&&data.x.length>0){
-      const idx=fileList.length;
-      const label=file.name.replace(/\.txt$/i,'');
-      fileList.push({name:file.name, label, color:COLORS[idx%COLORS.length], x:data.x, y:data.y, peaks:[]});
-      updateUI();
-    } else {
-      alert('データを読み取れませんでした: '+file.name);
-    }
-  };
-  reader.readAsText(file);
+  // Shift-JIS → UTF-8 の順で試す（Rigaku SmartLabはShift-JISが多い）
+  const encodings=['shift_jis','utf-8','euc-jp','iso-8859-1'];
+  let tryIdx=0;
+
+  function tryRead(){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const data=parseSmartLab(e.target.result);
+      if(data&&data.x.length>10){
+        const idx=fileList.length;
+        const label=file.name.replace(/\.txt$/i,'');
+        fileList.push({name:file.name, label, color:COLORS[idx%COLORS.length], x:data.x, y:data.y, peaks:[]});
+        updateUI();
+      } else {
+        tryIdx++;
+        if(tryIdx<encodings.length){
+          tryRead();
+        } else {
+          // 最終手段: バイナリとして読んでASCII部分だけ抽出
+          const binReader=new FileReader();
+          binReader.onload=ev=>{
+            const arr=new Uint8Array(ev.target.result);
+            let text='';
+            for(let i=0;i<arr.length;i++){
+              const b=arr[i];
+              if(b===0x09) text+='\t';
+              else if(b===0x0A) text+='\n';
+              else if(b===0x0D) continue;
+              else if(b>=0x20&&b<=0x7E) text+=String.fromCharCode(b);
+              else text+=' ';
+            }
+            const data=parseSmartLab(text);
+            if(data&&data.x.length>0){
+              const idx2=fileList.length;
+              const label2=file.name.replace(/\.txt$/i,'');
+              fileList.push({name:file.name, label:label2, color:COLORS[idx2%COLORS.length], x:data.x, y:data.y, peaks:[]});
+              updateUI();
+            } else {
+              alert('データを読み取れませんでした: '+file.name);
+            }
+          };
+          binReader.readAsArrayBuffer(file);
+        }
+      }
+    };
+    reader.onerror=()=>{
+      tryIdx++;
+      if(tryIdx<encodings.length) tryRead();
+      else alert('ファイルの読み込みに失敗しました: '+file.name);
+    };
+    reader.readAsText(file, encodings[tryIdx]);
+  }
+  tryRead();
 }
 
 function parseSmartLab(text){
@@ -153,10 +193,11 @@ function parseSmartLab(text){
   for(const line of lines){
     const trimmed=line.trim();
     if(!trimmed) continue;
-    const parts=trimmed.split('\t');
+    // タブ、カンマ、複数スペースのいずれかで区切り
+    const parts=trimmed.split(/[\t,]+|\s{2,}/).map(s=>s.trim()).filter(s=>s);
     if(parts.length>=2){
       const a=parseFloat(parts[0]), b=parseFloat(parts[1]);
-      if(!isNaN(a)&&!isNaN(b)){x.push(a);y.push(b);}
+      if(!isNaN(a)&&!isNaN(b)&&a>=0&&a<=180){x.push(a);y.push(b);}
     }
   }
   return {x,y};
