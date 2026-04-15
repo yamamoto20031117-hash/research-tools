@@ -6,24 +6,95 @@
 <title>Research Tools — 研究ツール集</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;
+  body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo','Hiragino Sans',sans-serif;
     min-height:100vh;display:flex;flex-direction:column;align-items:center}
   header{width:100%;padding:48px 24px 32px;text-align:center;
     background:linear-gradient(180deg,rgba(88,166,255,0.08) 0%,transparent 100%)}
   header h1{font-size:2rem;color:#fff;letter-spacing:0.04em;margin-bottom:8px}
   header p{color:#888;font-size:.95rem}
-  .tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;
-    padding:32px 24px;max-width:1000px;width:100%}
+  main{max-width:900px;width:100%;padding:0 24px 32px}
+
+  /* ツールカード */
+  .tool-section{margin-top:28px}
   .card{background:rgba(20,25,40,0.85);border:1px solid rgba(88,166,255,0.1);border-radius:12px;
-    padding:24px;transition:border-color .2s,transform .15s;cursor:pointer;text-decoration:none;color:inherit}
-  .card:hover{border-color:rgba(88,166,255,0.4);transform:translateY(-2px)}
-  .card .icon{font-size:2rem;margin-bottom:12px}
+    padding:24px;transition:border-color .2s;color:inherit;display:block}
+  .card:hover{border-color:rgba(88,166,255,0.4)}
+  .card-top{display:flex;align-items:flex-start;gap:16px}
+  .card .icon{font-size:2rem;flex-shrink:0}
   .card h2{font-size:1.15rem;color:#fff;margin-bottom:8px}
   .card p{font-size:.85rem;color:#999;line-height:1.6}
   .card .tags{margin-top:12px;display:flex;gap:6px;flex-wrap:wrap}
   .tag{font-size:.7rem;padding:2px 8px;border-radius:10px;background:rgba(88,166,255,0.1);color:#58a6ff}
+  .launch{display:inline-block;margin-top:12px;padding:6px 18px;background:#58a6ff;color:#0a0e17;
+    border-radius:6px;font-size:.82rem;font-weight:bold;text-decoration:none;transition:.15s}
+  .launch:hover{background:#7db8ff}
+
+  /* ===== 2ch風スレッド板 ===== */
+  .board{background:rgba(15,18,28,0.9);border:1px solid rgba(88,166,255,0.08);border-radius:8px;
+    margin-top:12px;overflow:hidden}
+  .board-header{background:rgba(88,166,255,0.06);padding:10px 16px;display:flex;align-items:center;
+    justify-content:space-between;cursor:pointer;user-select:none}
+  .board-header h3{font-size:.85rem;color:#58a6ff;font-weight:normal}
+  .board-header .count{font-size:.72rem;color:#666}
+  .board-header .toggle-arrow{color:#58a6ff;font-size:.8rem;transition:transform .2s}
+  .board-header .toggle-arrow.closed{transform:rotate(-90deg)}
+  .board-body{max-height:600px;overflow-y:auto;scrollbar-width:thin}
+  .board-body.collapsed{display:none}
+
+  .thread-list{padding:8px}
+  .thread-item{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;
+    transition:background .12s;display:flex;justify-content:space-between;align-items:center}
+  .thread-item:hover{background:rgba(88,166,255,0.05)}
+  .thread-item .t-title{color:#ddd;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .thread-item .t-meta{font-size:.68rem;color:#666;white-space:nowrap;margin-left:12px}
+  .thread-item .t-count{background:rgba(88,166,255,0.15);color:#58a6ff;font-size:.65rem;
+    padding:1px 6px;border-radius:8px;margin-left:6px}
+
+  .thread-view{display:none;padding:12px 16px}
+  .thread-view .tv-back{color:#58a6ff;font-size:.78rem;cursor:pointer;margin-bottom:10px;display:inline-block}
+  .thread-view .tv-title{color:#fff;font-size:.95rem;margin-bottom:12px;padding-bottom:8px;
+    border-bottom:1px solid rgba(255,255,255,0.08)}
+
+  .res{margin-bottom:10px;padding:8px 10px;background:rgba(20,24,36,0.6);border-radius:4px;
+    border-left:3px solid rgba(88,166,255,0.2)}
+  .res .res-header{font-size:.7rem;color:#666;margin-bottom:4px}
+  .res .res-header .res-num{color:#58a6ff;font-weight:bold}
+  .res .res-header .res-name{color:#4a9}
+  .res .res-body{font-size:.82rem;color:#ccc;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+  .post-form{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.06)}
+  .post-form .pf-row{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+  .post-form input[type=text]{flex:1;background:#0e1220;border:1px solid #2a3040;border-radius:4px;
+    padding:6px 10px;color:#ddd;font-size:.8rem}
+  .post-form input[type=text]:focus{outline:none;border-color:#58a6ff}
+  .post-form textarea{width:100%;background:#0e1220;border:1px solid #2a3040;border-radius:4px;
+    padding:8px 10px;color:#ddd;font-size:.8rem;resize:vertical;min-height:60px;font-family:inherit}
+  .post-form textarea:focus{outline:none;border-color:#58a6ff}
+  .post-form button{padding:6px 18px;background:#58a6ff;color:#0a0e17;border:none;border-radius:4px;
+    font-size:.8rem;font-weight:bold;cursor:pointer;transition:.15s}
+  .post-form button:hover{background:#7db8ff}
+  .post-form .cancel-btn{background:transparent;color:#888;border:1px solid #2a3040}
+  .post-form .pf-hint{font-size:.68rem;color:#555;margin-top:4px}
+
+  .new-thread-btn{display:block;width:100%;padding:8px;text-align:center;background:transparent;
+    border:1px dashed rgba(88,166,255,0.2);border-radius:4px;color:#58a6ff;font-size:.78rem;
+    cursor:pointer;margin:8px 0;transition:.15s}
+  .new-thread-btn:hover{background:rgba(88,166,255,0.05);border-color:#58a6ff}
+  .new-thread-form{display:none;padding:0}
+
+  .setup-notice{padding:16px;text-align:center;color:#666;font-size:.78rem;border-bottom:1px solid rgba(255,255,255,0.04)}
+  .setup-notice a{color:#58a6ff}
+
   footer{margin-top:auto;padding:24px;color:#555;font-size:.75rem;text-align:center}
   footer a{color:#58a6ff;text-decoration:none}
+
+  @media (max-width:600px){
+    header{padding:32px 16px 20px}
+    header h1{font-size:1.5rem}
+    main{padding:0 12px 24px}
+    .card{padding:16px}
+    .card-top{flex-direction:column;gap:8px}
+  }
 </style>
 </head>
 <body>
@@ -33,35 +104,361 @@
   <p>材料科学・物性物理の研究支援ツール</p>
 </header>
 
-<div class="tools">
+<main>
 
-  <a class="card" href="/tmd-viewer/">
-    <div class="icon">🔬</div>
-    <h2>TMD 結晶構造ビューア</h2>
-    <p>層状遷移金属ダイカルコゲナイド（TMD）のインターカレーション構造を3Dで可視化。13種類のTMD材料、分子挿入、回転最適化、四面体配位などに対応。CIF/XYZファイルの読み込みも可能。</p>
-    <div class="tags">
-      <span class="tag">Three.js</span>
-      <span class="tag">TMD</span>
-      <span class="tag">インターカレーション</span>
-      <span class="tag">結晶構造</span>
+<!-- ===== TMD 結晶構造ビューア ===== -->
+<div class="tool-section" data-tool="tmd-viewer">
+  <div class="card">
+    <div class="card-top">
+      <div class="icon">&#128300;</div>
+      <div>
+        <h2>TMD 結晶構造ビューア</h2>
+        <p>層状遷移金属ダイカルコゲナイド（TMD）のインターカレーション構造を3Dで可視化。13種類のTMD材料、分子挿入、回転最適化、四面体配位などに対応。CIF/XYZファイルの読み込みも可能。</p>
+        <div class="tags">
+          <span class="tag">Three.js</span><span class="tag">TMD</span>
+          <span class="tag">インターカレーション</span><span class="tag">結晶構造</span>
+        </div>
+        <a class="launch" href="/tmd-viewer/">ツールを開く &#8594;</a>
+      </div>
     </div>
-  </a>
+  </div>
 
-  <!-- 将来のツールはここに追加 -->
-  <!--
-  <a class="card" href="/tool-name/">
-    <div class="icon">⚛️</div>
-    <h2>ツール名</h2>
-    <p>説明文</p>
-    <div class="tags"><span class="tag">タグ</span></div>
-  </a>
-  -->
-
+  <!-- スレッド板 -->
+  <div class="board" id="board-tmd-viewer">
+    <div class="board-header" onclick="toggleBoard('tmd-viewer')">
+      <h3>&#128172; スレッド板</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="count" id="count-tmd-viewer">0 スレッド</span>
+        <span class="toggle-arrow" id="arrow-tmd-viewer">&#9660;</span>
+      </div>
+    </div>
+    <div class="board-body" id="body-tmd-viewer">
+      <div class="thread-list" id="threads-tmd-viewer"></div>
+      <button class="new-thread-btn" id="ntbtn-tmd-viewer" onclick="showNewThread('tmd-viewer')">+ 新しいスレッドを立てる</button>
+      <div class="new-thread-form" id="newform-tmd-viewer">
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="nt-name-tmd-viewer" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <div class="pf-row"><input type="text" id="nt-title-tmd-viewer" placeholder="スレッドタイトル" maxlength="80"></div>
+          <textarea id="nt-body-tmd-viewer" placeholder="本文を入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button class="cancel-btn" onclick="hideNewThread('tmd-viewer')">キャンセル</button>
+            <button onclick="createThread('tmd-viewer')">スレッドを立てる</button>
+          </div>
+        </div>
+      </div>
+      <div class="thread-view" id="view-tmd-viewer">
+        <span class="tv-back" onclick="backToList('tmd-viewer')">&#8592; スレッド一覧に戻る</span>
+        <div class="tv-title" id="vtitle-tmd-viewer"></div>
+        <div id="replies-tmd-viewer"></div>
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="rp-name-tmd-viewer" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <textarea id="rp-body-tmd-viewer" placeholder="レスを入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button onclick="postReply('tmd-viewer')">書き込む</button>
+          </div>
+          <div class="pf-hint">名前欄が空の場合「名無しさん」になります</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+
+<!-- ===== XRD データプロッター ===== -->
+<div class="tool-section" data-tool="xrd-plotter">
+  <div class="card">
+    <div class="card-top">
+      <div class="icon">&#128200;</div>
+      <div>
+        <h2>XRD データプロッター</h2>
+        <p>粉末X線回折（XRD）データを自動でグラフ化。複数ファイルの重ね描き、ピーク自動検出、d値計算に対応。Rigaku .ras形式にも対応。</p>
+        <div class="tags">
+          <span class="tag">XRD</span><span class="tag">Chart.js</span>
+          <span class="tag">ピーク検出</span><span class="tag">Rigaku</span>
+        </div>
+        <a class="launch" href="/xrd-plotter/">ツールを開く &#8594;</a>
+      </div>
+    </div>
+  </div>
+  <div class="board" id="board-xrd-plotter">
+    <div class="board-header" onclick="toggleBoard('xrd-plotter')">
+      <h3>&#128172; スレッド板</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="count" id="count-xrd-plotter">0 スレッド</span>
+        <span class="toggle-arrow" id="arrow-xrd-plotter">&#9660;</span>
+      </div>
+    </div>
+    <div class="board-body" id="body-xrd-plotter">
+      <div class="thread-list" id="threads-xrd-plotter"></div>
+      <button class="new-thread-btn" id="ntbtn-xrd-plotter" onclick="showNewThread('xrd-plotter')">+ 新しいスレッドを立てる</button>
+      <div class="new-thread-form" id="newform-xrd-plotter">
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="nt-name-xrd-plotter" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <div class="pf-row"><input type="text" id="nt-title-xrd-plotter" placeholder="スレッドタイトル" maxlength="80"></div>
+          <textarea id="nt-body-xrd-plotter" placeholder="本文を入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button class="cancel-btn" onclick="hideNewThread('xrd-plotter')">キャンセル</button>
+            <button onclick="createThread('xrd-plotter')">スレッドを立てる</button>
+          </div>
+        </div>
+      </div>
+      <div class="thread-view" id="view-xrd-plotter">
+        <span class="tv-back" onclick="backToList('xrd-plotter')">&#8592; スレッド一覧に戻る</span>
+        <div class="tv-title" id="vtitle-xrd-plotter"></div>
+        <div id="replies-xrd-plotter"></div>
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="rp-name-xrd-plotter" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <textarea id="rp-body-xrd-plotter" placeholder="レスを入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button onclick="postReply('xrd-plotter')">書き込む</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SQUID 磁化データプロッター ===== -->
+<div class="tool-section" data-tool="squid-plotter">
+  <div class="card">
+    <div class="card-top">
+      <div class="icon">&#129532;</div>
+      <div>
+        <h2>SQUID 磁化データプロッター</h2>
+        <p>SQUID/PPMSの磁化測定データを自動でグラフ化。M-T、M-H、χ-T、1/χ-Tの各プロットモードに対応。Quantum Design .dat形式を自動認識。</p>
+        <div class="tags">
+          <span class="tag">SQUID</span><span class="tag">PPMS</span>
+          <span class="tag">磁化測定</span><span class="tag">Chart.js</span>
+        </div>
+        <a class="launch" href="/squid-plotter/">ツールを開く &#8594;</a>
+      </div>
+    </div>
+  </div>
+  <div class="board" id="board-squid-plotter">
+    <div class="board-header" onclick="toggleBoard('squid-plotter')">
+      <h3>&#128172; スレッド板</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="count" id="count-squid-plotter">0 スレッド</span>
+        <span class="toggle-arrow" id="arrow-squid-plotter">&#9660;</span>
+      </div>
+    </div>
+    <div class="board-body" id="body-squid-plotter">
+      <div class="thread-list" id="threads-squid-plotter"></div>
+      <button class="new-thread-btn" id="ntbtn-squid-plotter" onclick="showNewThread('squid-plotter')">+ 新しいスレッドを立てる</button>
+      <div class="new-thread-form" id="newform-squid-plotter">
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="nt-name-squid-plotter" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <div class="pf-row"><input type="text" id="nt-title-squid-plotter" placeholder="スレッドタイトル" maxlength="80"></div>
+          <textarea id="nt-body-squid-plotter" placeholder="本文を入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button class="cancel-btn" onclick="hideNewThread('squid-plotter')">キャンセル</button>
+            <button onclick="createThread('squid-plotter')">スレッドを立てる</button>
+          </div>
+        </div>
+      </div>
+      <div class="thread-view" id="view-squid-plotter">
+        <span class="tv-back" onclick="backToList('squid-plotter')">&#8592; スレッド一覧に戻る</span>
+        <div class="tv-title" id="vtitle-squid-plotter"></div>
+        <div id="replies-squid-plotter"></div>
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="rp-name-squid-plotter" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <textarea id="rp-body-squid-plotter" placeholder="レスを入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button onclick="postReply('squid-plotter')">書き込む</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 将来のツール: tool-sectionをコピーして追加 -->
+
+</main>
 
 <footer>
   <p>Built with Claude &amp; Three.js — <a href="https://github.com/yamamoto20031117-hash" target="_blank">GitHub</a></p>
 </footer>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<script>
+// =====================================================
+//  Firebase 設定
+//  1. https://console.firebase.google.com でプロジェクト作成
+//  2. Realtime Database を有効化（リージョン: asia-southeast1 推奨）
+//  3. ルールを { "rules": { ".read": true, ".write": true } } に設定
+//  4. 下の firebaseConfig を自分の値に差し替え
+// =====================================================
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "000000000000",
+  appId: "YOUR_APP_ID"
+};
+
+let db=null, firebaseReady=false;
+try{
+  if(firebaseConfig.apiKey!=="YOUR_API_KEY"){
+    firebase.initializeApp(firebaseConfig);
+    db=firebase.database();
+    firebaseReady=true;
+  }
+}catch(e){console.warn('Firebase init failed:',e);}
+
+// =====================================================
+//  ローカルストレージ fallback
+// =====================================================
+function getLocal(toolId){try{return JSON.parse(localStorage.getItem('rt-'+toolId)||'[]');}catch(e){return [];}}
+function setLocal(toolId,d){localStorage.setItem('rt-'+toolId,JSON.stringify(d));}
+
+// =====================================================
+//  板UI
+// =====================================================
+function toggleBoard(t){
+  document.getElementById('body-'+t).classList.toggle('collapsed');
+  document.getElementById('arrow-'+t).classList.toggle('closed');
+}
+function showNewThread(t){document.getElementById('newform-'+t).style.display='block';}
+function hideNewThread(t){document.getElementById('newform-'+t).style.display='none';}
+function backToList(t){
+  document.getElementById('view-'+t).style.display='none';
+  document.getElementById('threads-'+t).style.display='block';
+  document.getElementById('ntbtn-'+t).style.display='block';
+  if(firebaseReady&&window['_unsub_'+t]){window['_unsub_'+t]();window['_unsub_'+t]=null;}
+}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// =====================================================
+//  レンダリング
+// =====================================================
+function renderList(t,threads){
+  const el=document.getElementById('threads-'+t);
+  document.getElementById('count-'+t).textContent=threads.length+' スレッド';
+  if(!threads.length){el.innerHTML='<div style="padding:20px;text-align:center;color:#555;font-size:.8rem">まだスレッドがありません</div>';return;}
+  threads.sort((a,b)=>(b.lastActivity||b.created)-(a.lastActivity||a.created));
+  el.innerHTML=threads.map(th=>{
+    const d=new Date(th.lastActivity||th.created);
+    const ds=d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'})+' '+d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+    const rc=(th.replies?Object.keys(th.replies).length:0)+1;
+    return `<div class="thread-item" onclick="openThread('${t}','${th.id}')"><span class="t-title">${esc(th.title)}</span><span class="t-meta">${ds}<span class="t-count">${rc}</span></span></div>`;
+  }).join('');
+}
+
+function renderThread(t,th){
+  document.getElementById('vtitle-'+t).textContent=th.title;
+  const el=document.getElementById('replies-'+t);
+  let posts=[{name:th.name||'名無しさん',body:th.body,time:th.created}];
+  if(th.replies){
+    const rArr=Array.isArray(th.replies)?th.replies:Object.values(th.replies);
+    posts=posts.concat(rArr);
+  }
+  el.innerHTML=posts.map((r,i)=>{
+    const d=new Date(r.time);
+    const ds=d.toLocaleDateString('ja-JP')+' '+d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    return `<div class="res"><div class="res-header"><span class="res-num">${i+1}</span> <span class="res-name">${esc(r.name||'名無しさん')}</span> ${ds}</div><div class="res-body">${esc(r.body)}</div></div>`;
+  }).join('');
+  // 最下部にスクロール
+  el.scrollTop=el.scrollHeight;
+}
+
+// =====================================================
+//  CRUD
+// =====================================================
+function loadThreads(t){
+  if(firebaseReady){
+    db.ref('boards/'+t+'/threads').on('value',snap=>{
+      const d=snap.val()||{};
+      const arr=Object.entries(d).map(([id,v])=>({id,...v}));
+      window['_threads_'+t]=arr;
+      renderList(t,arr);
+    });
+  }else{
+    const arr=getLocal(t);
+    window['_threads_'+t]=arr;
+    renderList(t,arr);
+  }
+}
+
+function createThread(t){
+  const title=document.getElementById('nt-title-'+t).value.trim();
+  const name=document.getElementById('nt-name-'+t).value.trim();
+  const body=document.getElementById('nt-body-'+t).value.trim();
+  if(!title||!body){alert('タイトルと本文を入力してください');return;}
+  const now=Date.now();
+
+  if(firebaseReady){
+    db.ref('boards/'+t+'/threads').push().set({title,name:name||'名無しさん',body,created:now,lastActivity:now})
+      .then(()=>{document.getElementById('nt-title-'+t).value='';document.getElementById('nt-body-'+t).value='';hideNewThread(t);});
+  }else{
+    const arr=getLocal(t);
+    arr.push({id:'t'+now,title,name:name||'名無しさん',body,created:now,lastActivity:now,replies:[]});
+    setLocal(t,arr);
+    document.getElementById('nt-title-'+t).value='';document.getElementById('nt-body-'+t).value='';
+    hideNewThread(t);loadThreads(t);
+  }
+}
+
+function openThread(t,id){
+  const arr=window['_threads_'+t]||[];
+  const th=arr.find(x=>x.id===id);
+  if(!th)return;
+  window['_curThread_'+t]=id;
+  document.getElementById('threads-'+t).style.display='none';
+  document.getElementById('ntbtn-'+t).style.display='none';
+  document.getElementById('newform-'+t).style.display='none';
+  document.getElementById('view-'+t).style.display='block';
+  renderThread(t,th);
+
+  if(firebaseReady){
+    const ref=db.ref('boards/'+t+'/threads/'+id);
+    const cb=ref.on('value',snap=>{const u=snap.val();if(u)renderThread(t,{...u,id});});
+    window['_unsub_'+t]=()=>ref.off('value',cb);
+  }
+}
+
+function postReply(t){
+  const id=window['_curThread_'+t];if(!id)return;
+  const name=document.getElementById('rp-name-'+t).value.trim();
+  const body=document.getElementById('rp-body-'+t).value.trim();
+  if(!body){alert('本文を入力してください');return;}
+  const now=Date.now();
+
+  if(firebaseReady){
+    const tRef=db.ref('boards/'+t+'/threads/'+id);
+    tRef.once('value').then(snap=>{
+      const d=snap.val();
+      const replies=d.replies?Object.values(d.replies):[];
+      replies.push({name:name||'名無しさん',body,time:now});
+      return tRef.update({replies,lastActivity:now});
+    }).then(()=>{document.getElementById('rp-body-'+t).value='';});
+  }else{
+    const arr=getLocal(t);
+    const th=arr.find(x=>x.id===id);
+    if(th){if(!th.replies)th.replies=[];th.replies.push({name:name||'名無しさん',body,time:now});th.lastActivity=now;setLocal(t,arr);renderThread(t,th);}
+    document.getElementById('rp-body-'+t).value='';
+  }
+}
+
+// =====================================================
+//  初期化
+// =====================================================
+document.addEventListener('DOMContentLoaded',()=>{
+  if(!firebaseReady){
+    document.querySelectorAll('.board-body').forEach(b=>{
+      const n=document.createElement('div');n.className='setup-notice';
+      n.innerHTML='&#128270; ローカルモード（このブラウザのみ保存）<br><small>全ユーザー共有にするには <a href="https://console.firebase.google.com" target="_blank">Firebase</a> を設定</small>';
+      b.prepend(n);
+    });
+  }
+  loadThreads('tmd-viewer');
+  loadThreads('xrd-plotter');
+  loadThreads('squid-plotter');
+});
+</script>
 </body>
 </html>

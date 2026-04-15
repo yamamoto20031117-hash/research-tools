@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XRD データプロッター</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;min-height:100vh}
+  .top-bar{background:rgba(8,11,18,0.95);backdrop-filter:blur(10px);padding:10px 20px;display:flex;
+    align-items:center;gap:14px;border-bottom:1px solid rgba(88,166,255,0.1);flex-wrap:wrap}
+  .top-bar a{color:#58a6ff;text-decoration:none;font-size:.85rem}
+  .top-bar h1{font-size:1rem;color:#fff;flex:1}
+  .btn{padding:5px 14px;border:1px solid #2a3040;background:transparent;color:#888;border-radius:4px;
+    cursor:pointer;font-size:.8rem;transition:.15s}
+  .btn:hover{border-color:#58a6ff;color:#58a6ff}
+  .btn-primary{background:#58a6ff;color:#0a0e17;border-color:#58a6ff;font-weight:bold}
+  .btn-primary:hover{background:#7db8ff}
+
+  .container{max-width:1200px;margin:0 auto;padding:20px}
+  .drop-zone{border:2px dashed rgba(88,166,255,0.25);border-radius:12px;padding:48px 24px;text-align:center;
+    margin-bottom:20px;transition:border-color .2s,background .2s;cursor:pointer}
+  .drop-zone:hover,.drop-zone.active{border-color:#58a6ff;background:rgba(88,166,255,0.03)}
+  .drop-zone h2{color:#58a6ff;font-size:1.1rem;margin-bottom:8px}
+  .drop-zone p{color:#666;font-size:.85rem}
+
+  .chart-wrap{background:rgba(15,18,28,0.8);border:1px solid rgba(88,166,255,0.1);border-radius:8px;
+    padding:16px;margin-bottom:20px;position:relative;display:none}
+  .chart-wrap canvas{width:100%!important;max-height:500px}
+  .chart-toolbar{display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
+  .chart-toolbar label{font-size:.78rem;color:#aaa}
+  .chart-toolbar input,.chart-toolbar select{background:#0e1220;border:1px solid #2a3040;border-radius:4px;
+    padding:4px 8px;color:#ddd;font-size:.78rem}
+  .chart-toolbar input:focus,.chart-toolbar select:focus{outline:none;border-color:#58a6ff}
+  .chart-toolbar input[type=color]{width:28px;height:28px;padding:0;border-radius:4px;cursor:pointer}
+
+  .data-table{display:none;max-height:300px;overflow:auto;background:rgba(15,18,28,0.8);
+    border:1px solid rgba(88,166,255,0.1);border-radius:8px;padding:12px;margin-bottom:20px}
+  .data-table table{width:100%;border-collapse:collapse;font-size:.75rem;font-family:monospace}
+  .data-table th{background:rgba(88,166,255,0.1);color:#58a6ff;padding:4px 8px;text-align:left;position:sticky;top:0}
+  .data-table td{padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.04);color:#bbb}
+
+  .multi-list{display:none;margin-bottom:16px}
+  .multi-item{display:flex;align-items:center;gap:8px;padding:6px 12px;background:rgba(20,24,36,0.6);
+    border-radius:4px;margin-bottom:4px;font-size:.8rem}
+  .multi-item .mi-name{flex:1;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .multi-item input[type=color]{width:22px;height:22px;border:none;cursor:pointer;background:transparent}
+  .multi-item .mi-remove{color:#666;cursor:pointer;font-size:.9rem}
+  .multi-item .mi-remove:hover{color:#ff6666}
+
+  .peak-list{display:none;margin-bottom:20px;background:rgba(15,18,28,0.8);border:1px solid rgba(88,166,255,0.1);
+    border-radius:8px;padding:12px}
+  .peak-list h3{font-size:.85rem;color:#58a6ff;margin-bottom:8px}
+  .peak-list table{width:100%;font-size:.75rem}
+  .peak-list th{color:#888;text-align:left;padding:2px 6px}
+  .peak-list td{padding:2px 6px;color:#ddd}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="/">&#8592; Research Tools</a>
+  <h1>XRD データプロッター</h1>
+  <button class="btn" onclick="toggleTable()">データ表示</button>
+  <button class="btn" onclick="detectPeaks()">ピーク検出</button>
+  <button class="btn btn-primary" onclick="exportPNG()">PNG保存</button>
+</div>
+
+<div class="container">
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <h2>XRDデータファイルをドロップ</h2>
+    <p>対応形式: .xy .csv .txt .dat .ras（複数ファイル対応 → 重ね描き）</p>
+    <input type="file" id="fileInput" multiple accept=".xy,.csv,.txt,.dat,.ras,.XY,.CSV,.TXT,.DAT,.RAS" style="display:none">
+  </div>
+
+  <div class="multi-list" id="multiList"></div>
+
+  <div class="chart-wrap" id="chartWrap">
+    <div class="chart-toolbar">
+      <label>X軸: 2&#952; (°)</label>
+      <label>X範囲:</label>
+      <input type="number" id="xMin" placeholder="min" style="width:60px" onchange="updateRange()">
+      <input type="number" id="xMax" placeholder="max" style="width:60px" onchange="updateRange()">
+      <label>線幅:</label>
+      <input type="range" id="lineWidth" min="0.5" max="5" step="0.5" value="1.5" oninput="updateStyle()">
+      <label>Y軸:</label>
+      <select id="yScale" onchange="updateYScale()">
+        <option value="linear">リニア</option>
+        <option value="log">対数</option>
+        <option value="sqrt">平方根</option>
+      </select>
+      <label><input type="checkbox" id="chkNorm" onchange="updateNorm()"> 規格化</label>
+      <label><input type="checkbox" id="chkGrid" checked onchange="updateGrid()"> グリッド</label>
+    </div>
+    <canvas id="chart"></canvas>
+  </div>
+
+  <div class="peak-list" id="peakList">
+    <h3>検出ピーク</h3>
+    <table><thead><tr><th>#</th><th>2&#952; (°)</th><th>強度</th><th>d値 (&#197;)</th></tr></thead>
+    <tbody id="peakBody"></tbody></table>
+  </div>
+
+  <div class="data-table" id="dataTable">
+    <table><thead><tr><th>2&#952; (°)</th><th>Intensity</th></tr></thead>
+    <tbody id="tableBody"></tbody></table>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const COLORS=['#58a6ff','#ff6b6b','#44cc88','#ffcc44','#cc66ff','#ff8844','#66cccc','#ff66aa'];
+let datasets=[];
+let chart=null;
+let rawData={}; // filename -> {x,y}
+
+// ===== ファイル読み込み =====
+const dropZone=document.getElementById('dropZone');
+const fileInput=document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('active');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('active'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('active');handleFiles(e.dataTransfer.files);});
+fileInput.addEventListener('change',e=>handleFiles(e.target.files));
+
+function handleFiles(files){
+  for(const f of files) readFile(f);
+}
+
+function readFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const text=e.target.result;
+    const data=parseXRD(text, file.name);
+    if(data&&data.x.length>0){
+      rawData[file.name]=data;
+      addDataset(file.name, data);
+    } else {
+      alert('データを読み取れませんでした: '+file.name);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseXRD(text, filename){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  const ext=filename.split('.').pop().toLowerCase();
+
+  // RAS形式（RigakuSmartlab）
+  if(ext==='ras'||lines.some(l=>l.startsWith('*RAS_'))){
+    return parseRAS(lines);
+  }
+
+  // 汎用: 数値2カラム
+  const x=[], y=[];
+  for(const line of lines){
+    const trimmed=line.trim();
+    if(!trimmed||trimmed.startsWith('#')||trimmed.startsWith('!')||trimmed.startsWith('*')||/^[a-zA-Z]/.test(trimmed)) continue;
+    // カンマ、タブ、スペース区切り
+    const parts=trimmed.split(/[\s,;\t]+/).map(Number).filter(n=>!isNaN(n));
+    if(parts.length>=2){x.push(parts[0]);y.push(parts[1]);}
+  }
+  return {x,y};
+}
+
+function parseRAS(lines){
+  const x=[],y=[];
+  let inData=false, startAngle=0, stepAngle=0;
+  for(const line of lines){
+    if(line.startsWith('*RAS_SCAN_START_ANGLE')) startAngle=parseFloat(line.split('"')[1]||0);
+    if(line.startsWith('*RAS_SCAN_STEP_SIZE')) stepAngle=parseFloat(line.split('"')[1]||0.02);
+    if(line.startsWith('*RAS_INT_START')){inData=true;continue;}
+    if(line.startsWith('*RAS_INT_END')){inData=false;continue;}
+    if(inData){
+      const v=parseFloat(line.trim());
+      if(!isNaN(v)){
+        x.push(startAngle+x.length*stepAngle);
+        y.push(v);
+      }
+    }
+  }
+  return {x,y};
+}
+
+// ===== チャート =====
+function initChart(){
+  if(chart) return;
+  const ctx=document.getElementById('chart').getContext('2d');
+  chart=new Chart(ctx,{
+    type:'line',
+    data:{datasets:[]},
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      animation:false,
+      interaction:{mode:'nearest',intersect:false},
+      plugins:{
+        legend:{display:true,labels:{color:'#aaa',font:{size:11}}},
+        tooltip:{
+          callbacks:{
+            label:ctx=>`2θ=${ctx.parsed.x.toFixed(3)}° I=${ctx.parsed.y.toFixed(1)}`
+          }
+        }
+      },
+      scales:{
+        x:{type:'linear',title:{display:true,text:'2θ (°)',color:'#888'},ticks:{color:'#666'},grid:{color:'rgba(255,255,255,0.05)'}},
+        y:{type:'linear',title:{display:true,text:'Intensity',color:'#888'},ticks:{color:'#666'},grid:{color:'rgba(255,255,255,0.05)'},beginAtZero:true}
+      }
+    }
+  });
+  document.getElementById('chart').parentElement.style.height='500px';
+}
+
+function addDataset(name, data){
+  initChart();
+  const colorIdx=datasets.length % COLORS.length;
+  const color=COLORS[colorIdx];
+  const points=data.x.map((x,i)=>({x,y:data.y[i]}));
+
+  const ds={
+    label:name,
+    data:points,
+    borderColor:color,
+    backgroundColor:'transparent',
+    borderWidth:1.5,
+    pointRadius:0,
+    pointHitRadius:5,
+    tension:0
+  };
+  datasets.push({name,color,ds});
+  chart.data.datasets.push(ds);
+  chart.update();
+
+  document.getElementById('chartWrap').style.display='block';
+  updateMultiList();
+
+  // X範囲自動設定
+  const allX=Object.values(rawData).flatMap(d=>d.x);
+  document.getElementById('xMin').value=Math.floor(Math.min(...allX));
+  document.getElementById('xMax').value=Math.ceil(Math.max(...allX));
+}
+
+function updateMultiList(){
+  const el=document.getElementById('multiList');
+  if(datasets.length<=1){el.style.display='none';return;}
+  el.style.display='block';
+  el.innerHTML=datasets.map((d,i)=>
+    `<div class="multi-item">
+      <input type="color" value="${d.color}" onchange="changeColor(${i},this.value)">
+      <span class="mi-name">${d.name}</span>
+      <span class="mi-remove" onclick="removeDataset(${i})">&times;</span>
+    </div>`
+  ).join('');
+}
+
+function changeColor(idx, color){
+  datasets[idx].color=color;
+  datasets[idx].ds.borderColor=color;
+  chart.update();
+}
+
+function removeDataset(idx){
+  const name=datasets[idx].name;
+  delete rawData[name];
+  datasets.splice(idx,1);
+  chart.data.datasets.splice(idx,1);
+  chart.update();
+  updateMultiList();
+  if(datasets.length===0) document.getElementById('chartWrap').style.display='none';
+}
+
+function updateRange(){
+  const xMin=parseFloat(document.getElementById('xMin').value);
+  const xMax=parseFloat(document.getElementById('xMax').value);
+  if(!isNaN(xMin)) chart.options.scales.x.min=xMin; else delete chart.options.scales.x.min;
+  if(!isNaN(xMax)) chart.options.scales.x.max=xMax; else delete chart.options.scales.x.max;
+  chart.update();
+}
+
+function updateStyle(){
+  const w=parseFloat(document.getElementById('lineWidth').value);
+  chart.data.datasets.forEach(ds=>{ds.borderWidth=w;});
+  chart.update();
+}
+
+function updateYScale(){
+  const mode=document.getElementById('yScale').value;
+  if(mode==='log'){
+    chart.options.scales.y.type='logarithmic';
+  }else if(mode==='sqrt'){
+    // sqrt: transform data
+    chart.options.scales.y.type='linear';
+    chart.data.datasets.forEach((ds,i)=>{
+      const orig=rawData[datasets[i].name];
+      ds.data=orig.x.map((x,j)=>({x,y:Math.sqrt(Math.max(0,orig.y[j]))}));
+    });
+    chart.options.scales.y.title.text='√Intensity';
+  }else{
+    chart.options.scales.y.type='linear';
+    chart.data.datasets.forEach((ds,i)=>{
+      const orig=rawData[datasets[i].name];
+      ds.data=orig.x.map((x,j)=>({x,y:orig.y[j]}));
+    });
+    chart.options.scales.y.title.text='Intensity';
+  }
+  chart.update();
+}
+
+function updateNorm(){
+  const norm=document.getElementById('chkNorm').checked;
+  chart.data.datasets.forEach((ds,i)=>{
+    const orig=rawData[datasets[i].name];
+    const maxY=norm?Math.max(...orig.y):1;
+    ds.data=orig.x.map((x,j)=>({x,y:orig.y[j]/maxY}));
+  });
+  chart.options.scales.y.title.text=norm?'Normalized':'Intensity';
+  chart.update();
+}
+
+function updateGrid(){
+  const show=document.getElementById('chkGrid').checked;
+  chart.options.scales.x.grid.display=show;
+  chart.options.scales.y.grid.display=show;
+  chart.update();
+}
+
+// ===== ピーク検出 =====
+function detectPeaks(){
+  if(datasets.length===0) return;
+  const data=rawData[datasets[0].name];
+  const x=data.x, y=data.y;
+  const n=y.length;
+  const peaks=[];
+
+  // 移動平均でスムージング
+  const win=Math.max(3, Math.floor(n/200));
+  const sy=y.map((_,i)=>{
+    let s=0,c=0;
+    for(let j=Math.max(0,i-win);j<=Math.min(n-1,i+win);j++){s+=y[j];c++;}
+    return s/c;
+  });
+
+  // ローカルマキシマ検出
+  const threshold=Math.max(...sy)*0.02;
+  for(let i=2;i<n-2;i++){
+    if(sy[i]>sy[i-1]&&sy[i]>sy[i+1]&&sy[i]>sy[i-2]&&sy[i]>sy[i+2]&&sy[i]>threshold){
+      // 近くのピークとマージ
+      if(peaks.length>0&&Math.abs(x[i]-peaks[peaks.length-1].x)<0.3){
+        if(sy[i]>peaks[peaks.length-1].y){peaks[peaks.length-1]={x:x[i],y:y[i]};}
+      }else{
+        peaks.push({x:x[i],y:y[i]});
+      }
+    }
+  }
+
+  // d値計算 (Braggの法則: d = λ/(2sinθ), λ=1.5406Å Cu-Kα)
+  const lambda=1.5406;
+  const tbody=document.getElementById('peakBody');
+  tbody.innerHTML=peaks.map((p,i)=>{
+    const theta=p.x*Math.PI/360;
+    const d=lambda/(2*Math.sin(theta));
+    return `<tr><td>${i+1}</td><td>${p.x.toFixed(3)}</td><td>${p.y.toFixed(1)}</td><td>${d.toFixed(4)}</td></tr>`;
+  }).join('');
+  document.getElementById('peakList').style.display='block';
+}
+
+// ===== データテーブル =====
+function toggleTable(){
+  const el=document.getElementById('dataTable');
+  if(el.style.display==='block'){el.style.display='none';return;}
+  if(datasets.length===0) return;
+  const data=rawData[datasets[0].name];
+  const tbody=document.getElementById('tableBody');
+  tbody.innerHTML=data.x.slice(0,500).map((x,i)=>
+    `<tr><td>${x.toFixed(4)}</td><td>${data.y[i].toFixed(2)}</td></tr>`
+  ).join('');
+  if(data.x.length>500) tbody.innerHTML+=`<tr><td colspan="2" style="color:#666;text-align:center">...${data.x.length-500}行省略</td></tr>`;
+  el.style.display='block';
+}
+
+// ===== PNG書き出し =====
+function exportPNG(){
+  if(!chart) return;
+  const a=document.createElement('a');
+  a.download='xrd-plot.png';
+  a.href=chart.toBase64Image();
+  a.click();
+}
+</script>
+</body>
+</html>

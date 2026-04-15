@@ -2,11 +2,12 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>TMD 結晶構造ビューア — 1T / 2H + インターカレーション</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{background:#080b12;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-serif;color:#ccc}
+  body{background:#080b12;overflow:hidden;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;color:#ccc;
+    -webkit-tap-highlight-color:transparent;touch-action:none;-ms-touch-action:none}
   #canvas{display:block;width:100vw;height:100vh}
 
   #bar{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:8px 14px;
@@ -28,6 +29,10 @@
   .pm button{width:20px;height:20px;background:#181d27;color:#888;border:1px solid #2a3040;
     border-radius:3px;cursor:pointer;font-size:.72rem;line-height:1;padding:0;transition:.12s}
   .pm button:hover{border-color:#58a6ff;color:#58a6ff}
+  .col-pick{width:24px;height:24px;border:1px solid #2a3040;border-radius:4px;padding:0;cursor:pointer;
+    background:transparent;-webkit-appearance:none;appearance:none}
+  .col-pick::-webkit-color-swatch-wrapper{padding:1px}
+  .col-pick::-webkit-color-swatch{border:none;border-radius:3px}
   .btn{padding:3px 9px;border:1px solid #2a3040;background:transparent;color:#888;
     border-radius:4px;cursor:pointer;font-size:.78rem;transition:.15s}
   .btn.active{background:#1a3050;color:#58a6ff;border-color:#58a6ff}
@@ -81,11 +86,64 @@
     border-radius:8px;padding:8px 12px;font-size:.74rem;color:#ccc;display:none;max-width:200px;line-height:1.6}
   #ilayer-dist-panel .ild-title{color:#ffcc44;font-weight:bold;font-size:.72rem;margin-bottom:4px}
   #ilayer-dist-panel .ild-row{color:#ddd;font-variant-numeric:tabular-nums}
+
+  /* ツールバー折りたたみボタン（常に表示） */
+  #bar-toggle{position:fixed;top:4px;right:8px;z-index:30;background:rgba(8,11,18,0.92);
+    backdrop-filter:blur(10px);border:1px solid #2a3040;border-radius:6px;padding:5px 12px;
+    font-size:.78rem;color:#888;cursor:pointer;transition:.15s}
+  #bar-toggle:hover{color:#58a6ff;border-color:#58a6ff}
+  #bar.collapsed{display:none!important}
+
+  /* === スマホ横持ち (高さ500px以下 かつ 横長) === */
+  @media (max-height:500px) and (orientation:landscape){
+    #bar{font-size:.68rem;gap:6px;padding:4px 8px;max-height:100vh;overflow-y:auto;
+      -webkit-overflow-scrolling:touch;scrollbar-width:thin}
+    #bar h1{font-size:.78rem;margin-right:2px}
+    .g{gap:2px}
+    .g label{font-size:.64rem}
+    .g select{min-width:70px;font-size:.68rem;padding:1px 2px}
+    .g input[type=range]{width:60px}
+    .g .num-in{width:34px;font-size:.66rem}
+    .pm button{width:18px;height:18px;font-size:.64rem}
+    .btn{padding:2px 6px;font-size:.68rem}
+    #info-wrap{top:36px;right:8px;max-width:180px}
+    #info{font-size:.66rem;max-height:200px;padding:8px 10px}
+    #legend{font-size:.66rem;padding:4px 10px;gap:8px;bottom:6px}
+    .dot{width:9px;height:9px}
+    #hint{font-size:.6rem;bottom:32px}
+    #ilayer-dist-panel{bottom:36px;left:8px;font-size:.66rem}
+    #mode-status{bottom:60px;font-size:.66rem;padding:4px 10px}
+    #opt-panel{bottom:36px;right:8px;font-size:.66rem;min-width:180px}
+    #dist-label{font-size:.72rem;padding:3px 8px}
+  }
+
+  /* === スマホ縦持ち === */
+  @media (max-width:600px) and (orientation:portrait){
+    #bar{font-size:.68rem;gap:6px;padding:4px 8px;max-height:60vh;overflow-y:auto;
+      -webkit-overflow-scrolling:touch;scrollbar-width:thin}
+    #bar h1{font-size:.82rem}
+    .g{gap:2px}
+    .g select{min-width:74px;font-size:.7rem}
+    .g input[type=range]{width:70px}
+    .g .num-in{width:36px;font-size:.68rem}
+    .pm button{width:18px;height:18px}
+    .btn{padding:2px 7px;font-size:.7rem}
+    #info-wrap{top:40px;right:8px;max-width:180px}
+    #legend{font-size:.68rem;gap:8px}
+  }
+
+  /* Windows用スクロールバーのスタイル */
+  #bar::-webkit-scrollbar{width:4px}
+  #bar::-webkit-scrollbar-track{background:transparent}
+  #bar::-webkit-scrollbar-thumb{background:#2a3040;border-radius:2px}
+  #bar::-webkit-scrollbar-thumb:hover{background:#58a6ff}
 </style>
 </head>
 <body>
 
+<button id="bar-toggle" onclick="toggleBar()">&#9776; メニュー</button>
 <div id="bar">
+  <a href="/" style="color:#58a6ff;text-decoration:none;font-size:.82rem;margin-right:4px" title="Research Tools トップへ">&#8592;</a>
   <h1>TMD 結晶構造</h1>
   <div class="g">
     <label>物質</label>
@@ -109,6 +167,7 @@
       </optgroup>
     </select>
   </div>
+
   <div class="g">
     <label>層間</label>
     <input type="range" id="sl-gap" min="1.0" max="5.0" step="0.1" value="1.0">
@@ -196,6 +255,13 @@
   <div class="g"><input type="checkbox" id="chk-bg" checked><label for="chk-bg">背景透過</label></div>
   <div class="g"><button class="btn btn-snap" onclick="takeScreenshot()">&#128247; 撮影</button></div>
   <div class="g"><button class="btn" id="btn-opt" onclick="runOptimize()" style="background:#1a1a2a;border-color:#8855cc;color:#bb88ff">&#9883; 向き最適化</button></div>
+  <div class="g"><button class="btn" id="btn-undo" onclick="doUndo()" disabled title="元に戻す (Ctrl+Z)" style="background:#1a1a1a;border-color:#aa6622;color:#dd9944">&#8630; 戻す</button></div>
+  <div class="g">
+    <label id="lbl-col-m">金属色</label>
+    <input type="color" id="col-m" class="col-pick" value="#2e8bc0" title="金属原子の色">
+    <label id="lbl-col-x">配位子色</label>
+    <input type="color" id="col-x" class="col-pick" value="#d48a00" title="カルコゲン原子の色">
+  </div>
 </div>
 
 <div id="info-wrap">
@@ -226,6 +292,26 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 // =====================================================
+//  ツールバー折りたたみ（スマホ対応）
+// =====================================================
+function toggleBar(){
+  const bar=document.getElementById('bar');
+  const btn=document.getElementById('bar-toggle');
+  bar.classList.toggle('collapsed');
+  btn.textContent=bar.classList.contains('collapsed')?'\u2630 メニュー':'\u2715 閉じる';
+}
+// スマホ（タッチデバイス or 小さい画面）ではデフォルトでバーを閉じる
+document.addEventListener('DOMContentLoaded',()=>{
+  const isMobile=('ontouchstart' in window||navigator.maxTouchPoints>0)&&window.innerWidth<=1024;
+  if(isMobile){
+    const bar=document.getElementById('bar');
+    const btn=document.getElementById('bar-toggle');
+    bar.classList.add('collapsed');
+    btn.textContent='\u2630 メニュー';
+  }
+});
+
+// =====================================================
 //  TMD Material Database
 // =====================================================
 const DB = {
@@ -243,8 +329,12 @@ const DB = {
   NbS2:  { m:'Nb', x:'S',  defPhase:'2H', a:3.310, c1T:5.97,  c2H:11.94, bond:2.47 },
   PtTe2: { m:'Pt', x:'Te', defPhase:'1T', a:4.002, c1T:5.22,  c2H:10.44, bond:2.65 },
 };
-const MCOL = { V:0x2e8bc0,Ti:0x7799aa,Mo:0x8855bb,W:0x4466aa,Nb:0x22aa88,Ta:0x667788,Pt:0xaabbcc,Zr:0x55aa77 };
-const XCOL = { S:0xddc000, Se:0xd48a00, Te:0xcc7722 };
+const MCOL_DEFAULT = { V:0x2e8bc0,Ti:0x7799aa,Mo:0x8855bb,W:0x4466aa,Nb:0x22aa88,Ta:0x667788,Pt:0xaabbcc,Zr:0x55aa77 };
+const XCOL_DEFAULT = { S:0xddc000, Se:0xd48a00, Te:0xcc7722 };
+const MCOL = {...MCOL_DEFAULT};
+const XCOL = {...XCOL_DEFAULT};
+// カスタム色上書き（カラーピッカーから）
+let customMCol=null, customXCol=null;
 
 // =====================================================
 //  Intercalant Database
@@ -430,6 +520,74 @@ let clickMode='dist'; // 'dist' | 'move' | 'tetra'
 let interOffset={dx:0, dz:0}; // 挿入分子のXZ平面オフセット(永続)
 let tetraState={step:0, centerIdx:-1, corners:[], meshes:[]};
 
+// =====================================================
+//  Undo 履歴管理
+// =====================================================
+const undoStack=[];
+const MAX_UNDO=50;
+
+function captureState(){
+  return {
+    curMat, curPhase, clickMode,
+    interOffset:{dx:interOffset.dx,dz:interOffset.dz},
+    gap:document.getElementById('sl-gap').value,
+    layers:document.getElementById('sl-layers').value,
+    na:document.getElementById('sl-na').value,
+    nb:document.getElementById('sl-nb').value,
+    rotA:document.getElementById('sl-rot-a').value,
+    rotB:document.getElementById('sl-rot-b').value,
+    rotC:document.getElementById('sl-rot-c').value,
+    inter:document.getElementById('sel-inter').value,
+    poly:document.getElementById('chk-poly').checked,
+    cell:document.getElementById('chk-cell').checked,
+    dist:document.getElementById('chk-dist').checked,
+    bg:document.getElementById('chk-bg').checked
+  };
+}
+function pushUndo(){
+  const s=captureState();
+  undoStack.push(s);
+  if(undoStack.length>MAX_UNDO) undoStack.shift();
+  updateUndoBtn();
+}
+function restoreState(s){
+  curMat=s.curMat; curPhase=s.curPhase;
+  interOffset.dx=s.interOffset.dx; interOffset.dz=s.interOffset.dz;
+  document.getElementById('sel-mat').value=s.curMat;
+  document.getElementById('sel-inter').value=s.inter;
+  document.getElementById('sl-gap').value=s.gap; document.getElementById('v-gap').value=parseFloat(s.gap).toFixed(1);
+  document.getElementById('sl-layers').value=s.layers; document.getElementById('v-layers').value=s.layers;
+  document.getElementById('sl-na').value=s.na; document.getElementById('v-na').value=s.na;
+  document.getElementById('sl-nb').value=s.nb; document.getElementById('v-nb').value=s.nb;
+  document.getElementById('sl-rot-a').value=s.rotA; document.getElementById('v-rot-a').value=s.rotA;
+  document.getElementById('sl-rot-b').value=s.rotB; document.getElementById('v-rot-b').value=s.rotB;
+  document.getElementById('sl-rot-c').value=s.rotC; document.getElementById('v-rot-c').value=s.rotC;
+  document.getElementById('chk-poly').checked=s.poly;
+  document.getElementById('chk-cell').checked=s.cell;
+  document.getElementById('chk-dist').checked=s.dist;
+  document.getElementById('chk-bg').checked=s.bg;
+  setClickMode(s.clickMode);
+  buildStructure();
+  updateBg();
+}
+function doUndo(){
+  if(undoStack.length===0) return;
+  const s=undoStack.pop();
+  restoreState(s);
+  updateUndoBtn();
+}
+function updateUndoBtn(){
+  const btn=document.getElementById('btn-undo');
+  if(btn){btn.disabled=undoStack.length===0;btn.title=`元に戻す (${undoStack.length})`;}
+}
+// Ctrl+Z / Cmd+Z ショートカット
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){
+    e.preventDefault();
+    doUndo();
+  }
+});
+
 function setClickMode(m){
   clickMode=m;
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.id==='mode-'+m));
@@ -486,6 +644,10 @@ function buildStructure() {
   // Update gap slider display to show effective value
   document.getElementById('v-gap').value = effExpansion>expansion?effExpansion.toFixed(1):expansion.toFixed(1);
 
+
+  // カスタム色が設定されていればMCOL/XCOLを上書き
+  if(customMCol!==null) MCOL[info.m]=customMCol;
+  if(customXCol!==null) XCOL[info.x]=customXCol;
   const matM=new THREE.MeshPhongMaterial({color:MCOL[info.m],shininess:80,specular:0x446688});
   const matX=new THREE.MeshPhongMaterial({color:XCOL[info.x],shininess:60,specular:0x888844});
   const matBond=new THREE.MeshPhongMaterial({color:0x8abbdd,transparent:true,opacity:0.55});
@@ -818,9 +980,10 @@ function updateLegend(info,interKey) {
 function setPhase(p) { curPhase=p; buildStructure(); }
 
 let viewLocked=false;
+const viewBtns=()=>document.querySelectorAll('.view-btn');
 function setView(dir) {
-  document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.view-btn').forEach(b=>{if(b.dataset.dir===dir)b.classList.add('active');});
+  viewBtns().forEach(b=>b.classList.remove('active'));
+  viewBtns().forEach(b=>{if(b.dataset.dir===dir)b.classList.add('active');});
 
   if(dir==='free'){viewLocked=false;sph.theta=Math.PI*0.3;sph.phi=Math.PI*0.35;structGroup.rotation.y=0;updateCam();return;}
   viewLocked=true; structGroup.rotation.y=0;
@@ -910,12 +1073,15 @@ function selectAtom(mesh){
   return entry;
 }
 
-// ドラッグと区別するためのクリック判定
+// ドラッグと区別するためのクリック判定（スマホはタッチのずれが大きいので閾値を広めに）
 let clickStart={x:0,y:0,t:0};
+const isTouchDevice='ontouchstart' in window||navigator.maxTouchPoints>0;
+const CLICK_DIST_THRESH=isTouchDevice?15:5;
+const CLICK_TIME_THRESH=isTouchDevice?500:300;
 canvas.addEventListener('pointerdown',e=>{clickStart={x:e.clientX,y:e.clientY,t:Date.now()};});
 canvas.addEventListener('pointerup',e=>{
   const dx=e.clientX-clickStart.x, dy=e.clientY-clickStart.y;
-  if(Math.sqrt(dx*dx+dy*dy)>5 || Date.now()-clickStart.t>300) return;
+  if(Math.sqrt(dx*dx+dy*dy)>CLICK_DIST_THRESH || Date.now()-clickStart.t>CLICK_TIME_THRESH) return;
   mouse.x=(e.clientX/window.innerWidth)*2-1;
   mouse.y=-(e.clientY/window.innerHeight)*2+1;
   raycaster.setFromCamera(mouse,camera);
@@ -1142,8 +1308,8 @@ function runTetraAlign(centerIdx, cornerIdxs, metalWorldPos){
 // =====================================================
 //  UI Binding
 // =====================================================
-document.getElementById('sel-mat').addEventListener('change',function(){curMat=this.value;resetInterOffset();setPhase(DB[curMat].defPhase);});
-document.getElementById('sel-inter').addEventListener('change',function(){resetInterOffset();buildStructure();});
+document.getElementById('sel-mat').addEventListener('change',function(){pushUndo();curMat=this.value;resetInterOffset();setPhase(DB[curMat].defPhase);});
+document.getElementById('sel-inter').addEventListener('change',function(){pushUndo();resetInterOffset();buildStructure();});
 // --- スライダー ↔ 数値入力の同期 ---
 function syncSliderToNum(slId){
   const sl=document.getElementById(slId);
@@ -1153,7 +1319,7 @@ function syncSliderToNum(slId){
   vEl.value=slId==='sl-gap'?parseFloat(sl.value).toFixed(1):sl.value;
 }
 function syncNumToSlider(vId){
-  // 数値入力 → スライダーへ反映
+  pushUndo();
   const vEl=document.getElementById(vId);
   let slId;
   if(vId.startsWith('v-rot-')){ slId='sl-rot-'+vId.replace('v-rot-',''); }
@@ -1168,6 +1334,7 @@ function syncNumToSlider(vId){
   buildStructure();
 }
 function stepSlider(slId, dir){
+  pushUndo();
   const sl=document.getElementById(slId);
   const st=parseFloat(sl.step), mn=parseFloat(sl.min), mx=parseFloat(sl.max);
   let v=parseFloat(sl.value)+dir*st;
@@ -1178,6 +1345,7 @@ function stepSlider(slId, dir){
 }
 
 ['sl-gap','sl-layers','sl-na','sl-nb'].forEach(id=>{
+  document.getElementById(id).addEventListener('pointerdown',function(){pushUndo();},{once:false});
   document.getElementById(id).addEventListener('input',function(){
     syncSliderToNum(id);
     buildStructure();
@@ -1189,6 +1357,7 @@ function stepSlider(slId, dir){
 });
 
 document.querySelectorAll('.rot-sl').forEach(sl=>{
+  sl.addEventListener('pointerdown',function(){pushUndo();},{once:false});
   sl.addEventListener('input',function(){
     syncSliderToNum(sl.id);
     buildStructure();
@@ -1200,6 +1369,28 @@ document.querySelectorAll('.rot-sl').forEach(sl=>{
 });
 ['chk-poly','chk-cell','chk-dist'].forEach(id=>document.getElementById(id).addEventListener('change',buildStructure));
 document.getElementById('chk-bg').addEventListener('change',updateBg);
+
+// --- カラーピッカー ---
+function hexToInt(h){return parseInt(h.replace('#',''),16);}
+function intToHex(n){return '#'+n.toString(16).padStart(6,'0');}
+function updateColorPickers(){
+  const info=DB[curMat];
+  document.getElementById('col-m').value=intToHex(MCOL[info.m]);
+  document.getElementById('col-x').value=intToHex(XCOL[info.x]);
+  document.getElementById('lbl-col-m').textContent=info.m+'色';
+  document.getElementById('lbl-col-x').textContent=info.x+'色';
+}
+document.getElementById('col-m').addEventListener('input',function(){
+  customMCol=hexToInt(this.value);buildStructure();
+});
+document.getElementById('col-x').addEventListener('input',function(){
+  customXCol=hexToInt(this.value);buildStructure();
+});
+// 物質変更時にカスタム色リセット＆ピッカー更新
+document.getElementById('sel-mat').addEventListener('change',function(){
+  customMCol=null;customXCol=null;updateColorPickers();
+});
+updateColorPickers();
 
 // =====================================================
 //  CIF File Parser
@@ -1871,10 +2062,11 @@ animate();
 setTimeout(()=>{const h=document.getElementById('hint');if(h){h.style.opacity='0';setTimeout(()=>h.style.display='none',1500);}},3000);
 
 window.addEventListener('resize',()=>{
-  const asp=window.innerWidth/window.innerHeight;
+  const w=window.innerWidth, h=window.innerHeight, asp=w/h;
   perspCamera.aspect=asp;perspCamera.updateProjectionMatrix();
-  updateCam();renderer.setSize(window.innerWidth,window.innerHeight);
+  updateCam();renderer.setSize(w,h);
 });
+if(screen.orientation) screen.orientation.addEventListener('change',()=>window.dispatchEvent(new Event('resize')));
 </script>
 </body>
 </html>

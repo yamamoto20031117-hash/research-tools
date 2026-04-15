@@ -1,6 +1,8 @@
 {
   "rewrites": [
-    { "source": "/tmd-viewer", "destination": "/tmd-viewer/index.html" }
+    { "source": "/tmd-viewer", "destination": "/tmd-viewer/index.html" },
+    { "source": "/xrd-plotter", "destination": "/xrd-plotter/index.html" },
+    { "source": "/squid-plotter", "destination": "/squid-plotter/index.html" }
   ],
   "headers": [
     {
