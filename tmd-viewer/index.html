@@ -252,7 +252,6 @@
     <button class="btn view-btn" data-dir="z" onclick="setView('z')">c</button>
     <button class="btn view-btn" data-dir="free" onclick="setView('free')">自由</button>
   </div>
-  <div class="g"><input type="checkbox" id="chk-bg" checked><label for="chk-bg">背景透過</label></div>
   <div class="g"><button class="btn btn-snap" onclick="takeScreenshot()">&#128247; 撮影</button></div>
   <div class="g"><button class="btn" id="btn-opt" onclick="runOptimize()" style="background:#1a1a2a;border-color:#8855cc;color:#bb88ff">&#9883; 向き最適化</button></div>
   <div class="g"><button class="btn" id="btn-undo" onclick="doUndo()" disabled title="元に戻す (Ctrl+Z)" style="background:#1a1a1a;border-color:#aa6622;color:#dd9944">&#8630; 戻す</button></div>
@@ -455,8 +454,8 @@ const canvas = document.getElementById('canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true, preserveDrawingBuffer:true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
 renderer.setSize(window.innerWidth, window.innerHeight);
-let bgTransparent = true;
-renderer.setClearColor(0x080b12, 0);
+let bgTransparent = false;
+renderer.setClearColor(0x080b12, 1);
 
 const scene = new THREE.Scene();
 const asp0 = window.innerWidth/window.innerHeight;
@@ -482,9 +481,9 @@ function toggleInfo() {
   document.getElementById('info-arrow').classList.toggle('collapsed',!infoVisible);
 }
 function updateBg() {
-  bgTransparent = document.getElementById('chk-bg').checked;
-  renderer.setClearColor(0x080b12, bgTransparent?0:1);
-  document.body.style.background = bgTransparent?'transparent':'#080b12';
+  bgTransparent = false;
+  renderer.setClearColor(0x080b12, 1);
+  document.body.style.background = '#080b12';
 }
 function takeScreenshot() {
   renderer.render(scene, camera);
@@ -540,8 +539,7 @@ function captureState(){
     inter:document.getElementById('sel-inter').value,
     poly:document.getElementById('chk-poly').checked,
     cell:document.getElementById('chk-cell').checked,
-    dist:document.getElementById('chk-dist').checked,
-    bg:document.getElementById('chk-bg').checked
+    dist:document.getElementById('chk-dist').checked
   };
 }
 function pushUndo(){
@@ -565,7 +563,6 @@ function restoreState(s){
   document.getElementById('chk-poly').checked=s.poly;
   document.getElementById('chk-cell').checked=s.cell;
   document.getElementById('chk-dist').checked=s.dist;
-  document.getElementById('chk-bg').checked=s.bg;
   setClickMode(s.clickMode);
   buildStructure();
   updateBg();
@@ -1368,7 +1365,6 @@ document.querySelectorAll('.rot-sl').forEach(sl=>{
   document.getElementById(vId).addEventListener('change',function(){ syncNumToSlider(vId); });
 });
 ['chk-poly','chk-cell','chk-dist'].forEach(id=>document.getElementById(id).addEventListener('change',buildStructure));
-document.getElementById('chk-bg').addEventListener('change',updateBg);
 
 // --- カラーピッカー ---
 function hexToInt(h){return parseInt(h.replace('#',''),16);}
