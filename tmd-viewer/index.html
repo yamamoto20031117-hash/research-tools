@@ -1,0 +1,1880 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TMD 結晶構造ビューア — 1T / 2H + インターカレーション</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#080b12;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-serif;color:#ccc}
+  #canvas{display:block;width:100vw;height:100vh}
+
+  #bar{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:8px 14px;
+    background:rgba(8,11,18,0.92);backdrop-filter:blur(10px);z-index:20;flex-wrap:wrap;font-size:.8rem}
+  #bar h1{font-size:.95rem;color:#fff;white-space:nowrap;margin-right:4px}
+  .g{display:flex;align-items:center;gap:4px;color:#aaa}
+  .g select,.g input[type=range]{accent-color:#58a6ff;font-size:.78rem;background:#181d27;color:#ddd;
+    border:1px solid #2a3040;border-radius:4px;padding:2px 4px}
+  .g select{min-width:90px}
+  .g input[type=range]{width:100px}
+  .g .v{color:#58a6ff;min-width:30px;font-variant-numeric:tabular-nums}
+  .g input[type=checkbox]{accent-color:#58a6ff}
+  .g .num-in{width:42px;background:#181d27;color:#58a6ff;border:1px solid #2a3040;border-radius:4px;
+    font-size:.76rem;text-align:center;padding:1px 2px;font-variant-numeric:tabular-nums;
+    -moz-appearance:textfield;appearance:textfield}
+  .g .num-in::-webkit-inner-spin-button,.g .num-in::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .g .num-in:focus{outline:none;border-color:#58a6ff}
+  .pm{display:inline-flex;gap:1px}
+  .pm button{width:20px;height:20px;background:#181d27;color:#888;border:1px solid #2a3040;
+    border-radius:3px;cursor:pointer;font-size:.72rem;line-height:1;padding:0;transition:.12s}
+  .pm button:hover{border-color:#58a6ff;color:#58a6ff}
+  .btn{padding:3px 9px;border:1px solid #2a3040;background:transparent;color:#888;
+    border-radius:4px;cursor:pointer;font-size:.78rem;transition:.15s}
+  .btn.active{background:#1a3050;color:#58a6ff;border-color:#58a6ff}
+  .btn:hover{border-color:#58a6ff}
+  .btn-snap{background:#1a2a1a;border-color:#2a5030;color:#6c6}
+
+  #info-wrap{position:fixed;top:52px;right:14px;z-index:15;max-width:240px}
+  #info-toggle{background:rgba(8,11,18,0.9);backdrop-filter:blur(10px);border:1px solid rgba(88,166,255,0.12);
+    border-radius:6px;padding:4px 10px;font-size:.72rem;color:#888;cursor:pointer;margin-bottom:4px;
+    display:flex;align-items:center;gap:4px;margin-left:auto;transition:.15s}
+  #info-toggle:hover{color:#58a6ff;border-color:rgba(88,166,255,0.3)}
+  #info-toggle .arrow{display:inline-block;transition:transform .2s}
+  #info-toggle .arrow.collapsed{transform:rotate(180deg)}
+  #info{background:rgba(8,11,18,0.9);backdrop-filter:blur(10px);
+    border:1px solid rgba(88,166,255,0.12);border-radius:8px;padding:12px 16px;font-size:.74rem;
+    color:#999;line-height:1.75;overflow:hidden;max-height:300px;
+    transition:max-height .3s ease,opacity .25s ease,padding .3s ease,border-color .3s ease}
+  #info.hidden{max-height:0!important;opacity:0;padding-top:0;padding-bottom:0;border-color:transparent}
+  #info strong{color:#ddd}
+  #info .hl{color:#58a6ff}
+
+  #legend{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:14px;
+    padding:7px 14px;background:rgba(8,11,18,0.9);backdrop-filter:blur(10px);border-radius:8px;
+    font-size:.76rem;color:#bbb;z-index:15;white-space:nowrap}
+  #legend span{display:flex;align-items:center;gap:4px}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .bline{display:inline-block;width:16px;height:2px;border-radius:1px}
+
+  #hint{position:fixed;bottom:42px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.25);
+    font-size:.7rem;z-index:15;pointer-events:none;
+    opacity:1;transition:opacity 1.5s ease;}
+  #opt-panel{position:fixed;bottom:50px;right:14px;z-index:25;background:rgba(8,11,18,0.92);
+    backdrop-filter:blur(10px);border:1px solid rgba(88,166,255,0.15);border-radius:8px;
+    padding:10px 14px;font-size:.74rem;color:#aaa;display:none;min-width:220px}
+  #opt-panel .opt-title{color:#ffcc44;font-weight:bold;margin-bottom:6px}
+  #opt-panel .opt-bar{height:4px;background:#1a2a3a;border-radius:2px;margin:6px 0}
+  #opt-panel .opt-fill{height:100%;background:#58a6ff;border-radius:2px;width:0%;transition:width .2s}
+  #opt-panel .opt-log{max-height:80px;overflow-y:auto;font-size:.66rem;color:#777;font-family:monospace;margin-top:4px}
+  #dist-label{position:fixed;pointer-events:none;z-index:25;background:rgba(0,0,0,0.82);
+    color:#ffcc44;font-size:.82rem;font-weight:bold;padding:4px 10px;border-radius:6px;
+    border:1px solid rgba(255,200,60,0.4);white-space:nowrap;display:none;
+    backdrop-filter:blur(6px);transform:translate(-50%,-120%)}
+  .mode-btn.active{background:#1a3050;color:#58a6ff;border-color:#58a6ff}
+  #mode-status{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+    background:rgba(8,11,18,0.92);color:#58a6ff;font-size:.76rem;padding:6px 14px;
+    border-radius:6px;border:1px solid rgba(88,166,255,0.25);z-index:20;display:none;
+    backdrop-filter:blur(8px);white-space:nowrap}
+  #mode-status .ms-step{color:#ffcc44}
+  #ilayer-dist-panel{position:fixed;bottom:50px;left:14px;z-index:15;
+    background:rgba(8,11,18,0.9);backdrop-filter:blur(10px);border:1px solid rgba(255,200,60,0.15);
+    border-radius:8px;padding:8px 12px;font-size:.74rem;color:#ccc;display:none;max-width:200px;line-height:1.6}
+  #ilayer-dist-panel .ild-title{color:#ffcc44;font-weight:bold;font-size:.72rem;margin-bottom:4px}
+  #ilayer-dist-panel .ild-row{color:#ddd;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <h1>TMD 結晶構造</h1>
+  <div class="g">
+    <label>物質</label>
+    <select id="sel-mat">
+      <optgroup label="1T (八面体)">
+        <option value="VSe2" selected>VSe₂</option>
+        <option value="TiS2">TiS₂</option>
+        <option value="TiSe2">TiSe₂</option>
+        <option value="TaS2">TaS₂</option>
+        <option value="PtS2">PtS₂</option>
+        <option value="PtTe2">PtTe₂</option>
+        <option value="ZrS2">ZrS₂</option>
+      </optgroup>
+      <optgroup label="2H (三角柱)">
+        <option value="MoS2">MoS₂</option>
+        <option value="MoSe2">MoSe₂</option>
+        <option value="WS2">WS₂</option>
+        <option value="WSe2">WSe₂</option>
+        <option value="NbSe2">NbSe₂</option>
+        <option value="NbS2">NbS₂</option>
+      </optgroup>
+    </select>
+  </div>
+  <div class="g">
+    <label>層間</label>
+    <input type="range" id="sl-gap" min="1.0" max="5.0" step="0.1" value="1.0">
+    <input type="number" class="num-in" id="v-gap" min="1.0" max="5.0" step="0.1" value="1.0">
+    <span class="pm"><button onclick="stepSlider('sl-gap',-1)">−</button><button onclick="stepSlider('sl-gap',1)">+</button></span>
+  </div>
+  <div class="g">
+    <label>層数</label>
+    <input type="range" id="sl-layers" min="2" max="5" step="1" value="3">
+    <input type="number" class="num-in" id="v-layers" min="2" max="5" step="1" value="3">
+    <span class="pm"><button onclick="stepSlider('sl-layers',-1)">−</button><button onclick="stepSlider('sl-layers',1)">+</button></span>
+  </div>
+  <div class="g">
+    <label>a₁幅</label>
+    <input type="range" id="sl-na" min="1" max="10" step="1" value="4">
+    <input type="number" class="num-in" id="v-na" min="1" max="10" step="1" value="4">
+    <span class="pm"><button onclick="stepSlider('sl-na',-1)">−</button><button onclick="stepSlider('sl-na',1)">+</button></span>
+  </div>
+  <div class="g">
+    <label>a₂幅</label>
+    <input type="range" id="sl-nb" min="1" max="10" step="1" value="4">
+    <input type="number" class="num-in" id="v-nb" min="1" max="10" step="1" value="4">
+    <span class="pm"><button onclick="stepSlider('sl-nb',-1)">−</button><button onclick="stepSlider('sl-nb',1)">+</button></span>
+  </div>
+  <div class="g">
+    <label>挿入分子</label>
+    <select id="sel-inter">
+      <option value="none">なし</option>
+      <optgroup label="イオン">
+        <option value="Li">Li⁺</option>
+        <option value="Na">Na⁺</option>
+        <option value="K">K⁺</option>
+      </optgroup>
+      <optgroup label="分子">
+        <option value="H2O">H₂O</option>
+        <option value="NH3">NH₃</option>
+        <option value="Py">ピリジン</option>
+        <option value="CTAB">CTA⁺</option>
+        <option value="TBA">TBA⁺</option>
+        <option value="N2H4">ヒドラジン</option>
+      </optgroup>
+      <optgroup id="og-custom" label="読込分子" style="display:none"></optgroup>
+    </select>
+    <button class="btn" onclick="document.getElementById('mol-input').click()" title="CIF/XYZファイルから分子を追加">+ CIF/XYZ</button>
+    <input type="file" id="mol-input" accept=".cif,.CIF,.xyz,.XYZ" style="display:none">
+  </div>
+  <div class="g">
+    <label>a回転</label>
+    <input type="range" id="sl-rot-a" min="0" max="360" step="1" value="0" class="rot-sl">
+    <input type="number" class="num-in" id="v-rot-a" min="0" max="360" step="1" value="0">°
+    <span class="pm"><button onclick="stepSlider('sl-rot-a',-1)">−</button><button onclick="stepSlider('sl-rot-a',1)">+</button></span>
+  </div>
+  <div class="g">
+    <label>b回転</label>
+    <input type="range" id="sl-rot-b" min="0" max="360" step="1" value="0" class="rot-sl">
+    <input type="number" class="num-in" id="v-rot-b" min="0" max="360" step="1" value="0">°
+    <span class="pm"><button onclick="stepSlider('sl-rot-b',-1)">−</button><button onclick="stepSlider('sl-rot-b',1)">+</button></span>
+  </div>
+  <div class="g">
+    <label>c回転</label>
+    <input type="range" id="sl-rot-c" min="0" max="360" step="1" value="0" class="rot-sl">
+    <input type="number" class="num-in" id="v-rot-c" min="0" max="360" step="1" value="0">°
+    <span class="pm"><button onclick="stepSlider('sl-rot-c',-1)">−</button><button onclick="stepSlider('sl-rot-c',1)">+</button></span>
+  </div>
+  <div class="g"><input type="checkbox" id="chk-poly"><label for="chk-poly">多面体</label></div>
+  <div class="g"><input type="checkbox" id="chk-cell"><label for="chk-cell">単位胞</label></div>
+  <div class="g"><input type="checkbox" id="chk-dist" checked><label for="chk-dist">層間距離</label></div>
+  <div class="g">
+    <label>操作</label>
+    <button class="btn mode-btn active" id="mode-dist" onclick="setClickMode('dist')">距離</button>
+    <button class="btn mode-btn" id="mode-move" onclick="setClickMode('move')">移動</button>
+    <button class="btn mode-btn" id="mode-tetra" onclick="setClickMode('tetra')">四面体</button>
+  </div>
+  <div class="g">
+    <button class="btn" id="btn-persp" onclick="setProj('persp')">透視</button>
+    <button class="btn active" id="btn-ortho" onclick="setProj('ortho')">平行</button>
+  </div>
+  <div class="g">
+    <label>視点</label>
+    <button class="btn view-btn" data-dir="x" onclick="setView('x')">a</button>
+    <button class="btn view-btn" data-dir="y" onclick="setView('y')">b</button>
+    <button class="btn view-btn" data-dir="z" onclick="setView('z')">c</button>
+    <button class="btn view-btn" data-dir="free" onclick="setView('free')">自由</button>
+  </div>
+  <div class="g"><input type="checkbox" id="chk-bg" checked><label for="chk-bg">背景透過</label></div>
+  <div class="g"><button class="btn btn-snap" onclick="takeScreenshot()">&#128247; 撮影</button></div>
+  <div class="g"><button class="btn" id="btn-opt" onclick="runOptimize()" style="background:#1a1a2a;border-color:#8855cc;color:#bb88ff">&#9883; 向き最適化</button></div>
+</div>
+
+<div id="info-wrap">
+  <button id="info-toggle" onclick="toggleInfo()"><span class="arrow" id="info-arrow">&#9660;</span> 結晶データ</button>
+  <div id="info"></div>
+</div>
+
+<div id="hint">ドラッグ: 回転 ／ スクロール: ズーム ／ 操作モードを選んで原子をクリック</div>
+<div id="opt-panel">
+  <div class="opt-title">&#9883; 分子向き最適化</div>
+  <div id="opt-status">準備中...</div>
+  <div class="opt-bar"><div class="opt-fill" id="opt-fill"></div></div>
+  <div class="opt-log" id="opt-log"></div>
+</div>
+<div id="dist-label"></div>
+<div id="mode-status"></div>
+<div id="ilayer-dist-panel"></div>
+
+<div id="legend">
+  <span><span class="dot" id="leg-m"></span><span id="leg-m-name">V</span></span>
+  <span><span class="dot" id="leg-x"></span><span id="leg-x-name">Se</span></span>
+  <span><span class="bline" style="background:rgba(150,200,240,.6)"></span>結合</span>
+  <span id="leg-inter" style="display:none"><span class="dot" id="leg-i-dot"></span><span id="leg-i-name"></span></span>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// =====================================================
+//  TMD Material Database
+// =====================================================
+const DB = {
+  VSe2:  { m:'V',  x:'Se', defPhase:'1T', a:3.354, c1T:6.10,  c2H:12.20, bond:2.50 },
+  TiS2:  { m:'Ti', x:'S',  defPhase:'1T', a:3.407, c1T:5.70,  c2H:11.40, bond:2.43 },
+  TiSe2: { m:'Ti', x:'Se', defPhase:'1T', a:3.540, c1T:6.01,  c2H:12.02, bond:2.55 },
+  TaS2:  { m:'Ta', x:'S',  defPhase:'1T', a:3.365, c1T:5.90,  c2H:12.10, bond:2.43 },
+  PtS2:  { m:'Pt', x:'S',  defPhase:'1T', a:3.543, c1T:5.04,  c2H:10.08, bond:2.40 },
+  ZrS2:  { m:'Zr', x:'S',  defPhase:'1T', a:3.662, c1T:5.81,  c2H:11.62, bond:2.57 },
+  MoS2:  { m:'Mo', x:'S',  defPhase:'2H', a:3.160, c1T:6.15,  c2H:12.30, bond:2.41 },
+  MoSe2: { m:'Mo', x:'Se', defPhase:'2H', a:3.289, c1T:6.47,  c2H:12.93, bond:2.53 },
+  WS2:   { m:'W',  x:'S',  defPhase:'2H', a:3.153, c1T:6.16,  c2H:12.32, bond:2.42 },
+  WSe2:  { m:'W',  x:'Se', defPhase:'2H', a:3.282, c1T:6.48,  c2H:12.96, bond:2.53 },
+  NbSe2: { m:'Nb', x:'Se', defPhase:'2H', a:3.442, c1T:6.27,  c2H:12.55, bond:2.60 },
+  NbS2:  { m:'Nb', x:'S',  defPhase:'2H', a:3.310, c1T:5.97,  c2H:11.94, bond:2.47 },
+  PtTe2: { m:'Pt', x:'Te', defPhase:'1T', a:4.002, c1T:5.22,  c2H:10.44, bond:2.65 },
+};
+const MCOL = { V:0x2e8bc0,Ti:0x7799aa,Mo:0x8855bb,W:0x4466aa,Nb:0x22aa88,Ta:0x667788,Pt:0xaabbcc,Zr:0x55aa77 };
+const XCOL = { S:0xddc000, Se:0xd48a00, Te:0xcc7722 };
+
+// =====================================================
+//  Intercalant Database
+//  atoms: [{el, color, r, dx,dy,dz}]  (offsets in Å from center)
+//  minGap: minimum vdW expansion multiplier
+//  spacing: how far apart to place molecules in-plane (in units of a)
+// =====================================================
+const INTER = {
+  none: { name:'なし', color:0, atoms:[], minGap:1.0, spacing:1 },
+
+  // --- 単原子イオン ---
+  Li: { name:'Li⁺', color:0x55dd55,
+    atoms:[{el:'Li',color:0x55dd55,r:0.28,dx:0,dy:0,dz:0}],
+    minGap:1.2, spacing:1 },
+  Na: { name:'Na⁺', color:0xff6666,
+    atoms:[{el:'Na',color:0xff6666,r:0.35,dx:0,dy:0,dz:0}],
+    minGap:1.5, spacing:1 },
+  K:  { name:'K⁺',  color:0xcc66ff,
+    atoms:[{el:'K', color:0xcc66ff,r:0.42,dx:0,dy:0,dz:0}],
+    minGap:1.8, spacing:1 },
+
+  // --- H₂O  O-H = 0.957Å, H-O-H = 104.5° ---
+  H2O: { name:'H₂O', color:0xff3333, atoms:[
+    {el:'O',color:0xff3333,r:0.30, dx:0,    dy:0,    dz:0   },
+    {el:'H',color:0xffffff,r:0.15, dx:0.76, dy:0.59, dz:0   },
+    {el:'H',color:0xffffff,r:0.15, dx:-0.76,dy:0.59, dz:0   }
+  ], minGap:1.8, spacing:1, bonds:[[0,1],[0,2]] },
+
+  // --- NH₃  N-H = 1.017Å, H-N-H = 106.7°, 三角錐 ---
+  // α=67.8° (C₃軸とN-H結合の角度)
+  // H: r_perp=0.942, r_para=0.383
+  NH3: { name:'NH₃', color:0x4488ff, atoms:[
+    {el:'N',color:0x4488ff,r:0.28, dx:0,     dy:0,    dz:0    },
+    {el:'H',color:0xffffff,r:0.15, dx:0.94,  dy:0.38, dz:0    },
+    {el:'H',color:0xffffff,r:0.15, dx:-0.47, dy:0.38, dz:0.82 },
+    {el:'H',color:0xffffff,r:0.15, dx:-0.47, dy:0.38, dz:-0.82}
+  ], minGap:1.8, spacing:1, bonds:[[0,1],[0,2],[0,3]] },
+
+  // --- N₂H₄ (ヒドラジン)  N-N = 1.449Å, N-H = 1.021Å ---
+  // H-N-N = 112.0°, H-N-H = 106.0°, 二面角 = 89° (ゴーシュ形)
+  N2H4: { name:'N₂H₄', color:0x44aaff, atoms:[
+    {el:'N',color:0x4488ff,r:0.28, dx:-0.72, dy:0.00,  dz:0.00 },
+    {el:'N',color:0x4488ff,r:0.28, dx:0.72,  dy:0.00,  dz:0.00 },
+    {el:'H',color:0xffffff,r:0.15, dx:-1.11, dy:0.95,  dz:0.00 },
+    {el:'H',color:0xffffff,r:0.15, dx:-1.11, dy:-0.46, dz:0.83 },
+    {el:'H',color:0xffffff,r:0.15, dx:1.11,  dy:0.02,  dz:-0.95},
+    {el:'H',color:0xffffff,r:0.15, dx:1.11,  dy:0.82,  dz:0.47 }
+  ], minGap:2.0, spacing:1, bonds:[[0,1],[0,2],[0,3],[1,4],[1,5]] },
+
+  // --- ピリジン C₅H₅N  正六角環, C-C ≈ 1.39Å, C-N ≈ 1.34Å ---
+  // center-to-vertex = 1.39Å, 60°間隔
+  Py: { name:'ピリジン', color:0x33bbaa, atoms:[
+    {el:'N',color:0x4488ff,r:0.28, dx:0,     dy:0, dz:1.39 },
+    {el:'C',color:0x555555,r:0.25, dx:1.20,  dy:0, dz:0.70 },
+    {el:'C',color:0x555555,r:0.25, dx:1.20,  dy:0, dz:-0.70},
+    {el:'C',color:0x555555,r:0.25, dx:0,     dy:0, dz:-1.39},
+    {el:'C',color:0x555555,r:0.25, dx:-1.20, dy:0, dz:-0.70},
+    {el:'C',color:0x555555,r:0.25, dx:-1.20, dy:0, dz:0.70 }
+  ], minGap:2.5, spacing:2, bonds:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,0]] },
+
+  // --- CTA⁺ (セチルトリメチルアンモニウム) CH₃-N⁺(CH₃)₂-(CH₂)₁₅CH₃ ---
+  // N(CH₃)₃ 四面体頭部 + C16 all-trans ジグザグ鎖 (省略8C)
+  // N-C = 1.50Å, C-C = 1.54Å, C-C-C = 112°
+  // 鎖はdy方向に伸びる。yz面内でジグザグ。重心をdy=0に補正
+  CTAB: { name:'CTA⁺', color:0xff8800, atoms:[
+    {el:'N',color:0x4488ff,r:0.30, dx:0.00,  dy:-3.68, dz:-0.27},
+    {el:'C',color:0xaaaaaa,r:0.20, dx:1.41,  dy:-4.18, dz:-0.27},
+    {el:'C',color:0xaaaaaa,r:0.20, dx:-0.71, dy:-4.18, dz:0.95 },
+    {el:'C',color:0xaaaaaa,r:0.20, dx:-0.71, dy:-4.18, dz:-1.50},
+    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:-2.44, dz:0.57 },
+    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:-1.16, dz:-0.29},
+    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:0.11,  dz:0.57 },
+    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:1.39,  dz:-0.29},
+    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:2.67,  dz:0.57 },
+    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:3.94,  dz:-0.29},
+    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:5.22,  dz:0.57 },
+    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:6.50,  dz:-0.29}
+  ], minGap:5.0, spacing:3,
+  bonds:[[0,1],[0,2],[0,3],[0,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11]] },
+
+  // --- TBA⁺ (テトラブチルアンモニウム) N(C₄H₉)₄⁺ ---
+  // 中心Nから正四面体方向に4本のブチル鎖 (各4C)
+  // N-C = 1.50Å, C-C = 1.54Å, C-C-C = 112° (all-trans ジグザグ)
+  // 各腕は四面体方向に沿ってジグザグ → 直線ではなく折れ曲がった鎖
+  TBA: { name:'TBA⁺', color:0xee6600, atoms:[
+    {el:'N',color:0x4488ff,r:0.30, dx:0.00,  dy:0.00,  dz:0.00 },
+    // 腕1: (+,+,+)/√3 方向 ジグザグ
+    {el:'C',color:0xee6600,r:0.20, dx:0.72,  dy:1.31,  dz:0.12 },
+    {el:'C',color:0xee6600,r:0.20, dx:1.46,  dy:1.44,  dz:1.47 },
+    {el:'C',color:0xee6600,r:0.20, dx:2.19,  dy:2.79,  dz:1.60 },
+    {el:'C',color:0xee6600,r:0.20, dx:2.93,  dy:2.91,  dz:2.95 },
+    // 腕2: (+,-,-)/√3 方向 ジグザグ
+    {el:'C',color:0xee6600,r:0.20, dx:0.72,  dy:-1.31, dz:-0.12},
+    {el:'C',color:0xee6600,r:0.20, dx:1.46,  dy:-1.44, dz:-1.47},
+    {el:'C',color:0xee6600,r:0.20, dx:2.19,  dy:-2.79, dz:-1.60},
+    {el:'C',color:0xee6600,r:0.20, dx:2.93,  dy:-2.91, dz:-2.95},
+    // 腕3: (-,+,-)/√3 方向 ジグザグ
+    {el:'C',color:0xee6600,r:0.20, dx:-0.72, dy:0.12,  dz:-1.31},
+    {el:'C',color:0xee6600,r:0.20, dx:-1.46, dy:1.47,  dz:-1.44},
+    {el:'C',color:0xee6600,r:0.20, dx:-2.19, dy:1.60,  dz:-2.79},
+    {el:'C',color:0xee6600,r:0.20, dx:-2.93, dy:2.95,  dz:-2.91},
+    // 腕4: (-,-,+)/√3 方向 ジグザグ
+    {el:'C',color:0xee6600,r:0.20, dx:-0.72, dy:-0.12, dz:1.31 },
+    {el:'C',color:0xee6600,r:0.20, dx:-1.46, dy:-1.47, dz:1.44 },
+    {el:'C',color:0xee6600,r:0.20, dx:-2.19, dy:-1.60, dz:2.79 },
+    {el:'C',color:0xee6600,r:0.20, dx:-2.93, dy:-2.95, dz:2.91 }
+  ], minGap:5.0, spacing:4,
+  bonds:[[0,1],[1,2],[2,3],[3,4],
+         [0,5],[5,6],[6,7],[7,8],
+         [0,9],[9,10],[10,11],[11,12],
+         [0,13],[13,14],[14,15],[15,16]] },
+};
+
+// =====================================================
+//  Three.js Setup
+// =====================================================
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true, preserveDrawingBuffer:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+let bgTransparent = true;
+renderer.setClearColor(0x080b12, 0);
+
+const scene = new THREE.Scene();
+const asp0 = window.innerWidth/window.innerHeight;
+const perspCamera = new THREE.PerspectiveCamera(45, asp0, 0.1, 300);
+const orthoCamera = new THREE.OrthographicCamera(-12*asp0,12*asp0,12,-12,0.1,300);
+let camera = orthoCamera;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dl1 = new THREE.DirectionalLight(0xffffff, 0.65); dl1.position.set(10,15,12); scene.add(dl1);
+const dl2 = new THREE.DirectionalLight(0x6699cc, 0.25); dl2.position.set(-8,-5,-10); scene.add(dl2);
+
+function setProj(mode) {
+  document.getElementById('btn-persp').classList.toggle('active',mode==='persp');
+  document.getElementById('btn-ortho').classList.toggle('active',mode==='ortho');
+  camera = mode==='persp'?perspCamera:orthoCamera;
+  updateCam();
+}
+
+let infoVisible = true;
+function toggleInfo() {
+  infoVisible=!infoVisible;
+  document.getElementById('info').classList.toggle('hidden',!infoVisible);
+  document.getElementById('info-arrow').classList.toggle('collapsed',!infoVisible);
+}
+function updateBg() {
+  bgTransparent = document.getElementById('chk-bg').checked;
+  renderer.setClearColor(0x080b12, bgTransparent?0:1);
+  document.body.style.background = bgTransparent?'transparent':'#080b12';
+}
+function takeScreenshot() {
+  renderer.render(scene, camera);
+  const a=document.createElement('a');
+  const info=DB[curMat];
+  a.download=`${info.m}${info.x}2_${curPhase}_structure.png`;
+  a.href=canvas.toDataURL('image/png');
+  a.click();
+}
+
+// =====================================================
+//  Helpers
+// =====================================================
+const S3 = Math.sqrt(3);
+function fracToXZ(f1,f2,a) { return [f1*a+f2*(-a/2), f2*(a*S3/2)]; }
+function makeCyl(p1,p2,r,mat) {
+  const d=new THREE.Vector3().subVectors(p2,p1), len=d.length();
+  if(len<0.01)return null;
+  const g=new THREE.CylinderGeometry(r,r,len,6,1);
+  g.translate(0,len/2,0); g.rotateX(Math.PI/2);
+  const m=new THREE.Mesh(g,mat); m.position.copy(p1); m.lookAt(p2); return m;
+}
+
+// =====================================================
+//  State
+// =====================================================
+let curMat='VSe2', curPhase='1T';
+const structGroup = new THREE.Group();
+scene.add(structGroup);
+
+// --- クリックモード管理 ---
+let clickMode='dist'; // 'dist' | 'move' | 'tetra'
+let interOffset={dx:0, dz:0}; // 挿入分子のXZ平面オフセット(永続)
+let tetraState={step:0, centerIdx:-1, corners:[], meshes:[]};
+
+function setClickMode(m){
+  clickMode=m;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.id==='mode-'+m));
+  clearSelection();
+  tetraState={step:0,centerIdx:-1,corners:[],meshes:[]};
+  updateModeStatus();
+}
+function updateModeStatus(){
+  const el=document.getElementById('mode-status');
+  if(clickMode==='dist'){el.style.display='none';return;}
+  if(clickMode==='move'){
+    el.innerHTML='<span class="ms-step">移動モード:</span> 挿入分子の原子 → 層の原子 をクリック';
+    el.style.display='block';return;
+  }
+  if(clickMode==='tetra'){
+    const msgs=[
+      '① 中心原子（挿入分子）を選択',
+      '② 結合先1を選択 (残り3)',
+      '③ 結合先2を選択 (残り2)',
+      '④ 結合先3を選択 (残り1)',
+      '⑤ TMD金属原子を選択'
+    ];
+    const s=Math.min(tetraState.step, msgs.length-1);
+    el.innerHTML=`<span class="ms-step">四面体モード:</span> ${msgs[s]}`;
+    el.style.display='block';return;
+  }
+}
+function resetInterOffset(){interOffset={dx:0,dz:0};}
+
+// =====================================================
+//  Build Structure
+// =====================================================
+function buildStructure() {
+  clearSelection();
+  while(structGroup.children.length) structGroup.remove(structGroup.children[0]);
+
+  const info=DB[curMat], a=info.a, bond=info.bond, phase=curPhase;
+  const numLayers=parseInt(document.getElementById('sl-layers').value);
+  const expansion=parseFloat(document.getElementById('sl-gap').value);
+  const showPoly=document.getElementById('chk-poly').checked;
+  const showCell=document.getElementById('chk-cell').checked;
+  const interKey=document.getElementById('sel-inter').value;
+  const inter=INTER[interKey];
+
+  const c_layer=phase==='2H'?info.c2H/2:info.c1T;
+  const r_inp=a/S3;
+  const d_xm=Math.sqrt(Math.max(bond*bond-r_inp*r_inp,0.1));
+  const sandwich=2*d_xm;
+  const normalGap=c_layer-sandwich;
+  const effExpansion=Math.max(expansion, inter.minGap);
+  const expandedGap=normalGap*effExpansion;
+  const layerStep=sandwich+expandedGap;
+
+  // Update gap slider display to show effective value
+  document.getElementById('v-gap').value = effExpansion>expansion?effExpansion.toFixed(1):expansion.toFixed(1);
+
+  const matM=new THREE.MeshPhongMaterial({color:MCOL[info.m],shininess:80,specular:0x446688});
+  const matX=new THREE.MeshPhongMaterial({color:XCOL[info.x],shininess:60,specular:0x888844});
+  const matBond=new THREE.MeshPhongMaterial({color:0x8abbdd,transparent:true,opacity:0.55});
+  const geoM=new THREE.SphereGeometry(0.45,24,24);
+  const geoX=new THREE.SphereGeometry(0.36,20,20);
+
+  const Na=parseInt(document.getElementById('sl-na').value);
+  const Nb=parseInt(document.getElementById('sl-nb').value);
+  const mAtoms=[], xAtoms=[];
+
+  for(let l=0;l<numLayers;l++){
+    const yC=l*layerStep+d_xm;
+    for(let i=-1;i<=Na;i++) for(let j=-1;j<=Nb;j++){
+      if(phase==='1T'){
+        const[mx,mz]=fracToXZ(i,j,a); mAtoms.push(new THREE.Vector3(mx,yC,mz));
+        const[xtx,xtz]=fracToXZ(i+1/3,j+2/3,a); xAtoms.push(new THREE.Vector3(xtx,yC+d_xm,xtz));
+        const[xbx,xbz]=fracToXZ(i+2/3,j+1/3,a); xAtoms.push(new THREE.Vector3(xbx,yC-d_xm,xbz));
+      } else {
+        const mf=l%2===0?[1/3,2/3]:[2/3,1/3], xf=l%2===0?[2/3,1/3]:[1/3,2/3];
+        const[mx,mz]=fracToXZ(i+mf[0],j+mf[1],a); mAtoms.push(new THREE.Vector3(mx,yC,mz));
+        const[xx,xz]=fracToXZ(i+xf[0],j+xf[1],a);
+        xAtoms.push(new THREE.Vector3(xx,yC+d_xm,xz));
+        xAtoms.push(new THREE.Vector3(xx,yC-d_xm,xz));
+      }
+    }
+  }
+
+  // Bounding box
+  const pad=0.5;
+  const[x0]=fracToXZ(0,0,a),[xNa]=fracToXZ(Na,0,a),[,zNb]=fracToXZ(0,Nb,a),[xNmin]=fracToXZ(0,Nb,a);
+  const dXMin=Math.min(x0,xNmin)-pad, dXMax=xNa+pad, dZMin=-pad, dZMax=zNb+pad;
+  const inB=p=>p.x>=dXMin&&p.x<=dXMax&&p.z>=dZMin&&p.z<=dZMax;
+
+  const cx=(dXMin+dXMax)/2, cy=((numLayers-1)*layerStep+sandwich)/2, cz=(dZMin+dZMax)/2;
+  const off=new THREE.Vector3(-cx,-cy,-cz);
+
+  const visM=mAtoms.filter(inB), visX=xAtoms.filter(inB);
+  visM.forEach(p=>{const m=new THREE.Mesh(geoM,matM);m.position.copy(p).add(off);m.userData={isAtom:true,el:info.m};structGroup.add(m);});
+  visX.forEach(p=>{const m=new THREE.Mesh(geoX,matX);m.position.copy(p).add(off);m.userData={isAtom:true,el:info.x};structGroup.add(m);});
+
+  // Bonds
+  const bCut=bond+0.2, bCut2=bCut*bCut;
+  visM.forEach(mp=>{
+    const nb=[];
+    visX.forEach(xp=>{
+      const d2=mp.distanceToSquared(xp);
+      if(d2>0.01&&d2<bCut2){
+        const c=makeCyl(mp.clone().add(off),xp.clone().add(off),0.06,matBond);
+        if(c)structGroup.add(c);
+        nb.push(xp.clone().add(off));
+      }
+    });
+    // Polyhedra
+    if(showPoly&&nb.length>=6){
+      const mPos=mp.clone().add(off);
+      const srt=(arr)=>arr.sort((a,b)=>Math.atan2(a.z-mPos.z,a.x-mPos.x)-Math.atan2(b.z-mPos.z,b.x-mPos.x));
+      const top3=srt(nb.filter(n=>n.y>mPos.y)).slice(0,3);
+      const bot3=srt(nb.filter(n=>n.y<mPos.y)).slice(0,3);
+      if(top3.length===3&&bot3.length===3){
+        const fv=[],ev=[];
+        fv.push(top3[0].x,top3[0].y,top3[0].z,top3[1].x,top3[1].y,top3[1].z,top3[2].x,top3[2].y,top3[2].z);
+        fv.push(bot3[0].x,bot3[0].y,bot3[0].z,bot3[2].x,bot3[2].y,bot3[2].z,bot3[1].x,bot3[1].y,bot3[1].z);
+        for(let ti=0;ti<3;ti++){
+          const tni=(ti+1)%3;
+          if(phase==='1T'){
+            let bj=0,bd=Infinity;
+            for(let k=0;k<3;k++){const d=top3[ti].distanceTo(bot3[k])+top3[tni].distanceTo(bot3[k]);if(d<bd){bd=d;bj=k;}}
+            fv.push(top3[ti].x,top3[ti].y,top3[ti].z,top3[tni].x,top3[tni].y,top3[tni].z,bot3[bj].x,bot3[bj].y,bot3[bj].z);
+            const bnj=(bj+2)%3;
+            fv.push(top3[ti].x,top3[ti].y,top3[ti].z,bot3[bj].x,bot3[bj].y,bot3[bj].z,bot3[bnj].x,bot3[bnj].y,bot3[bnj].z);
+          } else {
+            let bo=0,bd=Infinity;
+            for(let o=0;o<3;o++){let d=0;for(let k=0;k<3;k++)d+=top3[k].distanceTo(bot3[(k+o)%3]);if(d<bd){bd=d;bo=o;}}
+            const bi=(ti+bo)%3,bni=(tni+bo)%3;
+            fv.push(top3[ti].x,top3[ti].y,top3[ti].z,top3[tni].x,top3[tni].y,top3[tni].z,bot3[bi].x,bot3[bi].y,bot3[bi].z);
+            fv.push(top3[tni].x,top3[tni].y,top3[tni].z,bot3[bni].x,bot3[bni].y,bot3[bni].z,bot3[bi].x,bot3[bi].y,bot3[bi].z);
+          }
+        }
+        const pcol=phase==='1T'?0x3399ff:0x33cc88;
+        const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute(fv,3));fg.computeVertexNormals();
+        structGroup.add(new THREE.Mesh(fg,new THREE.MeshBasicMaterial({color:pcol,transparent:true,opacity:0.07,side:THREE.DoubleSide,depthWrite:false})));
+        for(let i=0;i<3;i++){
+          ev.push(top3[i].x,top3[i].y,top3[i].z,top3[(i+1)%3].x,top3[(i+1)%3].y,top3[(i+1)%3].z);
+          ev.push(bot3[i].x,bot3[i].y,bot3[i].z,bot3[(i+1)%3].x,bot3[(i+1)%3].y,bot3[(i+1)%3].z);
+        }
+        for(let ti=0;ti<3;ti++)for(let bi=0;bi<3;bi++){
+          if(top3[ti].distanceTo(bot3[bi])<bond*1.1)
+            ev.push(top3[ti].x,top3[ti].y,top3[ti].z,bot3[bi].x,bot3[bi].y,bot3[bi].z);
+        }
+        const eg=new THREE.BufferGeometry();eg.setAttribute('position',new THREE.Float32BufferAttribute(ev,3));
+        structGroup.add(new THREE.LineSegments(eg,new THREE.LineBasicMaterial({color:pcol,transparent:true,opacity:0.2})));
+      }
+    }
+  });
+
+  // ===================== Intercalant molecules =====================
+  // 層間圧縮モデル:
+  //   層間ギャップが分子の自由高さより小さい場合、
+  //   結合長を保存しつつ分子を扁平に変形させる
+  //   (c軸方向を圧縮、ab面方向に展開 → パンケーキ型変形)
+  //   圧縮率 f_c = gap / mol_height (f_c ≤ 1)
+  //   結合長保存: 各結合について dy を f_c 倍に縮め、
+  //   dx,dz を sqrt((L²-dy'²)/(dx²+dz²)) でスケールして L を維持
+  if(interKey!=='none'){
+    const matIBond=new THREE.MeshPhongMaterial({color:0xaaaaaa,transparent:true,opacity:0.6});
+    const sp=inter.spacing;
+
+    // --- 1) 3軸回転行列を構築 (ループ外で1回) ---
+    const rA=parseFloat(document.getElementById('sl-rot-a').value)*Math.PI/180;
+    const rB=parseFloat(document.getElementById('sl-rot-b').value)*Math.PI/180;
+    const rC=parseFloat(document.getElementById('sl-rot-c').value)*Math.PI/180;
+    const rotMat=new THREE.Matrix4().makeRotationY(rC)
+      .multiply(new THREE.Matrix4().makeRotationZ(rB))
+      .multiply(new THREE.Matrix4().makeRotationX(rA));
+
+    // --- 2) 回転後の座標を計算 ---
+    const rotCoords=inter.atoms.map(at=>{
+      return new THREE.Vector3(at.dx,at.dy,at.dz).applyMatrix4(rotMat);
+    });
+
+    // --- 3) 層間圧縮を計算 ---
+    // 回転後の分子のy方向 (c軸=層間方向) の広がり
+    const yVals=rotCoords.map(v=>v.y);
+    const molYmin=Math.min(...yVals), molYmax=Math.max(...yVals);
+    const molHeight=molYmax-molYmin;
+    // 利用可能ギャップ (vdW半径分のバッファ 1.5Å)
+    const vdwBuf=1.5;
+    const availGap=Math.max(0.5, expandedGap-vdwBuf);
+    // 圧縮率: 1.0 = 圧縮なし (自由分子), < 1.0 = 扁平化
+    const compF = molHeight>0.1 ? Math.min(1.0, availGap/molHeight) : 1.0;
+
+    // --- 4) 結合長保存型の圧縮座標を計算 ---
+    // まず単純圧縮 (dy *= compF) した座標を作成
+    const compCoords=rotCoords.map(v=>new THREE.Vector3(v.x, v.y*compF, v.z));
+
+    // 結合長を保存するために反復的に補正 (3回イテレーション)
+    if(compF<0.999 && inter.bonds && inter.bonds.length>0){
+      // 元の結合長を記録
+      const origLengths=inter.bonds.map(([ai,bi])=>{
+        return rotCoords[ai].distanceTo(rotCoords[bi]);
+      });
+      // 反復補正: 結合長制約を満たすように座標を調整
+      for(let iter=0;iter<5;iter++){
+        inter.bonds.forEach(([ai,bi],bIdx)=>{
+          const L=origLengths[bIdx];
+          const pa=compCoords[ai], pb=compCoords[bi];
+          const dx=pb.x-pa.x, dy=pb.y-pa.y, dz=pb.z-pa.z;
+          const curL=Math.sqrt(dx*dx+dy*dy+dz*dz);
+          if(curL<0.01) return;
+          // 結合長の差分
+          const scale=L/curL;
+          // 中心を保ちつつ両端を移動
+          const cx=(pa.x+pb.x)/2, cy=(pa.y+pb.y)/2, cz=(pa.z+pb.z)/2;
+          // dy方向は圧縮を維持しつつ、dx,dz方向で結合長を補正
+          const dyNew=dy; // y方向は変えない (層間圧縮を維持)
+          const latSq=dx*dx+dz*dz;
+          const needLatSq=L*L-dyNew*dyNew;
+          if(needLatSq>0 && latSq>0.001){
+            const latScale=Math.sqrt(needLatSq/latSq);
+            const dxNew=dx*latScale, dzNew=dz*latScale;
+            pa.x=cx-dxNew/2; pa.z=cz-dzNew/2;
+            pb.x=cx+dxNew/2; pb.z=cz+dzNew/2;
+            pa.y=cy-dyNew/2; pb.y=cy+dyNew/2;
+          } else if(needLatSq<=0){
+            // 結合が完全に水平になれない → dyを少し緩和
+            const newDy=Math.sign(dy)*L*0.95;
+            const remLat=Math.sqrt(Math.max(0,L*L-newDy*newDy));
+            const latDir=latSq>0.001?Math.sqrt(latSq):1;
+            pa.x=cx-(dx/latDir)*remLat/2; pa.z=cz-(dz/latDir)*remLat/2;
+            pb.x=cx+(dx/latDir)*remLat/2; pb.z=cz+(dz/latDir)*remLat/2;
+            pa.y=cy-newDy/2; pb.y=cy+newDy/2;
+          }
+        });
+      }
+    }
+
+    // 圧縮後の重心をy=0に再センタリング
+    const cyVals=compCoords.map(v=>v.y);
+    const compCenterY=(Math.min(...cyVals)+Math.max(...cyVals))/2;
+    compCoords.forEach(v=>v.y-=compCenterY);
+
+    // 情報パネル用に圧縮率を保存
+    window._lastCompF = compF;
+
+    // --- 5) 各ギャップに分子を配置 (中心寄せ) ---
+    // 配置候補を生成してから中心に最も近い順に配置
+    const placePts=[];
+    for(let i=0;i<Na;i+=sp) for(let j=0;j<Nb;j+=sp){
+      const[bx,bz]=fracToXZ(i+0.5,j+0.5,a);
+      if(bx<dXMin||bx>dXMax||bz<dZMin||bz>dZMax) continue;
+      placePts.push({bx,bz});
+    }
+    // 中心がないなら結晶中心に1つ配置
+    if(placePts.length===0){
+      const[cbx,cbz]=fracToXZ(Na/2,Nb/2,a);
+      placePts.push({bx:cbx,bz:cbz});
+    }
+    // 中心に近い順にソート
+    const ctrX=(dXMin+dXMax)/2+off.x, ctrZ=(dZMin+dZMax)/2+off.z;
+    placePts.sort((a,b)=>{
+      const da=(a.bx+off.x-ctrX)**2+(a.bz+off.z-ctrZ)**2;
+      const db=(b.bx+off.x-ctrX)**2+(b.bz+off.z-ctrZ)**2;
+      return da-db;
+    });
+
+    for(let l=0;l<numLayers-1;l++){
+      const gapCenterY = l*layerStep + d_xm + d_xm + expandedGap/2;
+
+      for(let pi=0;pi<placePts.length;pi++){
+        const{bx,bz}=placePts[pi];
+
+        compCoords.forEach((rv,idx)=>{
+          const at=inter.atoms[idx];
+          const geo=new THREE.SphereGeometry(at.r,16,16);
+          const mat=new THREE.MeshPhongMaterial({color:at.color,shininess:60});
+          const mesh=new THREE.Mesh(geo,mat);
+          mesh.position.set(bx+rv.x+off.x+interOffset.dx, gapCenterY+rv.y+off.y, bz+rv.z+off.z+interOffset.dz);
+          mesh.userData={isAtom:true,el:at.el||'?',isInter:true,atomIdx:idx};
+          structGroup.add(mesh);
+        });
+
+        if(inter.bonds){
+          inter.bonds.forEach(([ai,bi])=>{
+            const r1=compCoords[ai], r2=compCoords[bi];
+            const p1=new THREE.Vector3(bx+r1.x+off.x+interOffset.dx, gapCenterY+r1.y+off.y, bz+r1.z+off.z+interOffset.dz);
+            const p2=new THREE.Vector3(bx+r2.x+off.x+interOffset.dx, gapCenterY+r2.y+off.y, bz+r2.z+off.z+interOffset.dz);
+            const c=makeCyl(p1,p2,0.05,matIBond);
+            if(c){c.userData={isInter:true};structGroup.add(c);}
+          });
+        }
+      }
+    }
+  }
+
+  // Unit cell
+  if(showCell){
+    const matL=new THREE.LineBasicMaterial({color:0x58a6ff,transparent:true,opacity:0.3});
+    const p0=fracToXZ(0,0,a),p1=fracToXZ(1,0,a),p2=fracToXZ(1,1,a),p3=fracToXZ(0,1,a);
+    const base=[[p0[0],p0[1]],[p1[0],p1[1]],[p2[0],p2[1]],[p3[0],p3[1]]];
+    const ucH=layerStep, vts=[];
+    for(let i=0;i<4;i++){
+      const ni=(i+1)%4;
+      vts.push(base[i][0],0,base[i][1],base[ni][0],0,base[ni][1]);
+      vts.push(base[i][0],ucH,base[i][1],base[ni][0],ucH,base[ni][1]);
+      vts.push(base[i][0],0,base[i][1],base[i][0],ucH,base[i][1]);
+    }
+    const lg=new THREE.BufferGeometry();
+    lg.setAttribute('position',new THREE.Float32BufferAttribute(vts.map((v,i)=>i%3===0?v+off.x:i%3===1?v+off.y:v+off.z),3));
+    structGroup.add(new THREE.LineSegments(lg,matL));
+  }
+
+  // ===================== 層間金属距離の自動表示 (UIパネル) =====================
+  const showDist=document.getElementById('chk-dist').checked;
+  const ildPanel=document.getElementById('ilayer-dist-panel');
+  if(showDist && numLayers>=2){
+    const layerYs=[];
+    for(let l=0;l<numLayers;l++) layerYs.push(l*layerStep+d_xm);
+    const layerMetals=layerYs.map(yTarget=>{
+      let best=null, bestX=Infinity;
+      visM.forEach(p=>{
+        if(Math.abs(p.y-yTarget)<0.1 && p.x<bestX){bestX=p.x;best=p;}
+      });
+      return best;
+    }).filter(p=>p!==null);
+
+    if(layerMetals.length>=2){
+      let panelHTML=`<div class="ild-title">層間 ${info.m}–${info.m} 距離</div>`;
+      for(let l=0;l<layerMetals.length-1;l++){
+        const dist=layerMetals[l].distanceTo(layerMetals[l+1]);
+        panelHTML+=`<div class="ild-row">L${l+1}–L${l+2}: <span style="color:#ffcc44;font-weight:bold">${dist.toFixed(3)} Å</span></div>`;
+      }
+      ildPanel.innerHTML=panelHTML;
+      ildPanel.style.display='block';
+    } else {
+      ildPanel.style.display='none';
+    }
+  } else {
+    ildPanel.style.display='none';
+  }
+
+  updateInfo(info,phase,c_layer,d_xm,normalGap,bond,interKey,effExpansion);
+  updateLegend(info,interKey);
+}
+
+// =====================================================
+//  Info / Legend
+// =====================================================
+function updateInfo(info,phase,cL,dxm,gap,bond,interKey,effExp) {
+  const sg=phase==='1T'?'P-3m1 (No.164)':'P6₃/mmc (No.194)';
+  const pt=phase==='1T'?'CdI₂型 (八面体)':'MoS₂型 (三角柱)';
+  const cd=phase==='1T'?'八面体 (6配位)':'三角柱 (6配位)';
+  const cf=phase==='2H'?info.c2H:info.c1T;
+  const f=info.m+info.x+'₂';
+  let html=`<strong>${f} — ${phase}</strong><br>`+
+    `空間群: <span class="hl">${sg}</span><br>構造型: ${pt}<br>`+
+    `a = ${info.a.toFixed(3)} Å, c = ${cf.toFixed(2)} Å<br>`+
+    `${info.m}–${info.x} 結合長: <span class="hl">${bond.toFixed(2)} Å</span><br>`+
+    `配位: ${cd}<br>層間 (vdW gap): ${gap.toFixed(2)} Å`;
+  if(interKey!=='none'){
+    const inter=INTER[interKey];
+    html+=`<br><span class="hl">挿入: ${inter.name}</span>`;
+    if(effExp>1) html+=` (${effExp.toFixed(1)}× 拡大)`;
+    const cf2=window._lastCompF||1;
+    if(cf2<0.999) html+=`<br><span style="color:#ff8844">層間圧縮: ${(cf2*100).toFixed(0)}% (${cf2<0.5?'強圧縮':cf2<0.8?'中圧縮':'弱圧縮'})</span>`;
+  }
+  html+=`<br><span style="color:#555;font-size:.68rem">`+
+    (phase==='1T'?`Wyckoff: ${info.m} 1a(0,0,0), ${info.x} 2d(⅓,⅔,±z)`
+      :`Wyckoff: ${info.m} 2c(⅓,⅔,¼), ${info.x} 4f(⅔,⅓,z)`)+`</span>`;
+  document.getElementById('info').innerHTML=html;
+}
+
+const MNAME={V:'バナジウム',Ti:'チタン',Mo:'モリブデン',W:'タングステン',Nb:'ニオブ',Ta:'タンタル',Pt:'白金',Zr:'ジルコニウム'};
+const XNAME={S:'硫黄',Se:'セレン',Te:'テルル'};
+function updateLegend(info,interKey) {
+  document.getElementById('leg-m').style.background='#'+MCOL[info.m].toString(16).padStart(6,'0');
+  document.getElementById('leg-x').style.background='#'+XCOL[info.x].toString(16).padStart(6,'0');
+  document.getElementById('leg-m-name').textContent=info.m+' ('+MNAME[info.m]+')';
+  document.getElementById('leg-x-name').textContent=info.x+' ('+XNAME[info.x]+')';
+  const li=document.getElementById('leg-inter');
+  if(interKey!=='none'){
+    li.style.display='flex';
+    document.getElementById('leg-i-dot').style.background='#'+INTER[interKey].color.toString(16).padStart(6,'0');
+    document.getElementById('leg-i-name').textContent=INTER[interKey].name;
+  } else li.style.display='none';
+}
+
+// =====================================================
+//  Phase / View
+// =====================================================
+function setPhase(p) { curPhase=p; buildStructure(); }
+
+let viewLocked=false;
+function setView(dir) {
+  document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.view-btn').forEach(b=>{if(b.dataset.dir===dir)b.classList.add('active');});
+
+  if(dir==='free'){viewLocked=false;sph.theta=Math.PI*0.3;sph.phi=Math.PI*0.35;structGroup.rotation.y=0;updateCam();return;}
+  viewLocked=true; structGroup.rotation.y=0;
+
+  // Crystallographic axes: a→scene X, b→scene Z, c→scene Y
+  if(dir==='x'){      // View along a-axis (from +X)
+    sph.theta=0; sph.phi=Math.PI/2;
+  } else if(dir==='y'){ // View along b-axis (from +Z)
+    sph.theta=Math.PI/2; sph.phi=Math.PI/2;
+  } else if(dir==='z'){ // View along c-axis (top-down, from +Y) rotated 90° for landscape
+    sph.theta=Math.PI/2; sph.phi=0.001;
+  }
+  updateCam();
+}
+
+// =====================================================
+//  Orbit Controls
+// =====================================================
+let isDrag=false, prev={x:0,y:0};
+let sph={theta:Math.PI*0.3,phi:Math.PI*0.35,radius:20};
+
+function updateCam(){
+  const{radius:r,theta:t,phi:p}=sph;
+  const pos=new THREE.Vector3(r*Math.sin(p)*Math.cos(t),r*Math.cos(p),r*Math.sin(p)*Math.sin(t));
+  perspCamera.position.copy(pos); perspCamera.lookAt(0,0,0);
+  orthoCamera.position.copy(pos); orthoCamera.lookAt(0,0,0);
+  const oSz=sph.radius*0.6, asp=window.innerWidth/window.innerHeight;
+  orthoCamera.left=-oSz*asp;orthoCamera.right=oSz*asp;orthoCamera.top=oSz;orthoCamera.bottom=-oSz;
+  orthoCamera.updateProjectionMatrix();
+}
+updateCam();
+
+canvas.addEventListener('pointerdown',e=>{isDrag=true;prev={x:e.clientX,y:e.clientY};});
+window.addEventListener('pointerup',()=>isDrag=false);
+window.addEventListener('pointermove',e=>{
+  if(!isDrag)return;
+  if(viewLocked){viewLocked=false;document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active'));}
+  sph.theta-=(e.clientX-prev.x)*0.007;
+  sph.phi=Math.max(0.1,Math.min(Math.PI-0.1,sph.phi+(e.clientY-prev.y)*0.007));
+  prev={x:e.clientX,y:e.clientY};updateCam();
+});
+canvas.addEventListener('wheel',e=>{e.preventDefault();sph.radius=Math.max(5,Math.min(45,sph.radius+e.deltaY*0.015));updateCam();},{passive:false});
+
+let tDist=0;
+canvas.addEventListener('touchstart',e=>{
+  if(e.touches.length===1){isDrag=true;prev={x:e.touches[0].clientX,y:e.touches[0].clientY};}
+  else if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;tDist=Math.sqrt(dx*dx+dy*dy);}
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1&&isDrag){sph.theta-=(e.touches[0].clientX-prev.x)*0.007;sph.phi=Math.max(0.1,Math.min(Math.PI-0.1,sph.phi+(e.touches[0].clientY-prev.y)*0.007));prev={x:e.touches[0].clientX,y:e.touches[0].clientY};updateCam();}
+  else if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY,d=Math.sqrt(dx*dx+dy*dy);sph.radius=Math.max(5,Math.min(45,sph.radius-(d-tDist)*0.03));tDist=d;updateCam();}
+},{passive:false});
+canvas.addEventListener('touchend',()=>isDrag=false);
+
+// =====================================================
+//  Atom Selection & Click Mode Handler
+// =====================================================
+const raycaster=new THREE.Raycaster();
+const mouse=new THREE.Vector2();
+let selAtoms=[];  // [{mesh, origMat}]
+let distLine=null, distLabelEl=document.getElementById('dist-label');
+const SEL_MAT=new THREE.MeshPhongMaterial({color:0xffee44,emissive:0x886600,shininess:120});
+const TETRA_CENTER_MAT=new THREE.MeshPhongMaterial({color:0xff4488,emissive:0x882244,shininess:120});
+
+function clearSelection(){
+  selAtoms.forEach(s=>{if(s.mesh.parent) s.mesh.material=s.origMat;});
+  selAtoms=[];
+  if(distLine){scene.remove(distLine);distLine=null;}
+  distLabelEl.style.display='none';
+  if(clickMode==='tetra'){tetraState={step:0,centerIdx:-1,corners:[],meshes:[]};updateModeStatus();}
+}
+
+function updateDistLabel(){
+  if(selAtoms.length<2||!distLine) return;
+  const p1=selAtoms[0].mesh.position, p2=selAtoms[1].mesh.position;
+  const mid=new THREE.Vector3().addVectors(p1,p2).multiplyScalar(0.5);
+  mid.project(camera);
+  distLabelEl.style.left=((mid.x*0.5+0.5)*window.innerWidth)+'px';
+  distLabelEl.style.top=((-mid.y*0.5+0.5)*window.innerHeight)+'px';
+}
+
+function selectAtom(mesh){
+  const entry={mesh, origMat:mesh.material};
+  selAtoms.push(entry);
+  mesh.material=SEL_MAT;
+  return entry;
+}
+
+// ドラッグと区別するためのクリック判定
+let clickStart={x:0,y:0,t:0};
+canvas.addEventListener('pointerdown',e=>{clickStart={x:e.clientX,y:e.clientY,t:Date.now()};});
+canvas.addEventListener('pointerup',e=>{
+  const dx=e.clientX-clickStart.x, dy=e.clientY-clickStart.y;
+  if(Math.sqrt(dx*dx+dy*dy)>5 || Date.now()-clickStart.t>300) return;
+  mouse.x=(e.clientX/window.innerWidth)*2-1;
+  mouse.y=-(e.clientY/window.innerHeight)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(structGroup.children,false);
+  const atomHit=hits.find(h=>h.object.userData&&h.object.userData.isAtom);
+
+  // === 距離モード ===
+  if(clickMode==='dist'){
+    if(!atomHit){clearSelection();return;}
+    const mesh=atomHit.object;
+    if(selAtoms.some(s=>s.mesh===mesh)){clearSelection();return;}
+    if(selAtoms.length>=2) clearSelection();
+    selectAtom(mesh);
+    if(selAtoms.length===2){
+      const p1=selAtoms[0].mesh.position, p2=selAtoms[1].mesh.position;
+      const dist=p1.distanceTo(p2);
+      const lg=new THREE.BufferGeometry().setFromPoints([p1,p2]);
+      distLine=new THREE.Line(lg,new THREE.LineBasicMaterial({color:0xffcc44,linewidth:2,transparent:true,opacity:0.8}));
+      scene.add(distLine);
+      const el1=selAtoms[0].mesh.userData.el, el2=selAtoms[1].mesh.userData.el;
+      distLabelEl.textContent=`${el1}–${el2}: ${dist.toFixed(3)} Å`;
+      distLabelEl.style.display='block';
+      updateDistLabel();
+    }
+    return;
+  }
+
+  // === 移動モード ===
+  if(clickMode==='move'){
+    if(!atomHit){clearSelection();return;}
+    const mesh=atomHit.object;
+    if(selAtoms.some(s=>s.mesh===mesh)){clearSelection();return;}
+    if(selAtoms.length>=2) clearSelection();
+    selectAtom(mesh);
+    if(selAtoms.length===2){
+      const ud0=selAtoms[0].mesh.userData, ud1=selAtoms[1].mesh.userData;
+      const isI0=!!ud0.isInter, isI1=!!ud1.isInter;
+      if(isI0===isI1){
+        // 両方同じ種類 → 距離表示だけ
+        const p1=selAtoms[0].mesh.position, p2=selAtoms[1].mesh.position;
+        distLabelEl.textContent=`${ud0.el}–${ud1.el}: ${p1.distanceTo(p2).toFixed(3)} Å`;
+        distLabelEl.style.display='block';
+        const mid=new THREE.Vector3().addVectors(p1,p2).multiplyScalar(0.5);
+        mid.project(camera);
+        distLabelEl.style.left=((mid.x*0.5+0.5)*window.innerWidth)+'px';
+        distLabelEl.style.top=((-mid.y*0.5+0.5)*window.innerHeight)+'px';
+        return;
+      }
+      // 挿入分子原子 + 層原子 → XZ平面移動
+      const iSel=isI0?selAtoms[0]:selAtoms[1];
+      const mSel=isI0?selAtoms[1]:selAtoms[0];
+      const dxS=mSel.mesh.position.x-iSel.mesh.position.x;
+      const dzS=mSel.mesh.position.z-iSel.mesh.position.z;
+      interOffset.dx+=dxS;
+      interOffset.dz+=dzS;
+      clearSelection();
+      buildStructure();
+    }
+    return;
+  }
+
+  // === 四面体モード ===
+  if(clickMode==='tetra'){
+    if(!atomHit){clearSelection();return;}
+    const mesh=atomHit.object;
+    const ud=mesh.userData;
+
+    if(tetraState.step===0){
+      // Step 0: 中心原子を選択（挿入分子のみ）
+      if(!ud.isInter){distLabelEl.textContent='挿入分子の原子を選択してください';distLabelEl.style.display='block';
+        setTimeout(()=>distLabelEl.style.display='none',1500);return;}
+      clearSelection();
+      tetraState.centerIdx=ud.atomIdx;
+      const entry={mesh,origMat:mesh.material};
+      selAtoms.push(entry);
+      mesh.material=TETRA_CENTER_MAT;
+      tetraState.meshes=[entry];
+      tetraState.step=1;
+      updateModeStatus();
+      return;
+    }
+
+    if(tetraState.step>=1 && tetraState.step<=3){
+      // Step 1-3: 結合先3原子を選択（挿入分子のみ）
+      if(!ud.isInter){distLabelEl.textContent='挿入分子の原子を選択してください';distLabelEl.style.display='block';
+        setTimeout(()=>distLabelEl.style.display='none',1500);return;}
+      if(ud.atomIdx===tetraState.centerIdx) return;
+      if(tetraState.corners.includes(ud.atomIdx)) return;
+      tetraState.corners.push(ud.atomIdx);
+      const entry={mesh,origMat:mesh.material};
+      selAtoms.push(entry);
+      mesh.material=SEL_MAT;
+      tetraState.meshes.push(entry);
+      tetraState.step++;
+      updateModeStatus();
+      return;
+    }
+
+    if(tetraState.step===4){
+      // Step 4: TMD金属原子を選択（層の原子のみ）
+      if(ud.isInter){distLabelEl.textContent='TMDの原子を選択してください';distLabelEl.style.display='block';
+        setTimeout(()=>distLabelEl.style.display='none',1500);return;}
+      const entry={mesh,origMat:mesh.material};
+      selAtoms.push(entry);
+      mesh.material=SEL_MAT;
+      // 四面体配位を実行
+      runTetraAlign(tetraState.centerIdx, tetraState.corners, mesh.position.clone());
+      clearSelection();
+      return;
+    }
+  }
+});
+
+// =====================================================
+//  四面体配位 回転+移動
+//  centerIdx: 中心原子の挿入分子内インデックス
+//  cornerIdxs: 結合先3原子のインデックス配列
+//  metalWorldPos: TMD原子のワールド座標
+// =====================================================
+function runTetraAlign(centerIdx, cornerIdxs, metalWorldPos){
+  const interKey=document.getElementById('sel-inter').value;
+  if(interKey==='none') return;
+  const inter=INTER[interKey];
+  if(!inter||!inter.atoms) return;
+
+  const atoms=inter.atoms;
+  const cAt=atoms[centerIdx];
+  const cPos=new THREE.Vector3(cAt.dx,cAt.dy,cAt.dz);
+
+  // 中心→結合先の単位ベクトル（未回転座標系）
+  const dirs=cornerIdxs.map(ci=>{
+    const a=atoms[ci];
+    const v=new THREE.Vector3(a.dx-cAt.dx,a.dy-cAt.dy,a.dz-cAt.dz);
+    v.normalize();
+    return v;
+  });
+
+  // 第4方向 = -normalize(v1+v2+v3) （ローンペア方向）
+  const sum=new THREE.Vector3();
+  dirs.forEach(d=>sum.add(d));
+  const d4=sum.negate().normalize();
+
+  // ターゲット方向: 中心原子からTMD原子への方向
+  // XZ移動後は真上/真下になるので、Y方向の符号で判定
+  // まず現在の分子ギャップ中心Y座標を推定（中心原子のワールドY付近）
+  // 金属が上にあれば(0,1,0)、下なら(0,-1,0)
+  const interMeshes=[];
+  structGroup.children.forEach(c=>{if(c.userData&&c.userData.isInter&&c.userData.atomIdx===centerIdx) interMeshes.push(c);});
+  let centerWorldY=0;
+  if(interMeshes.length>0) centerWorldY=interMeshes[0].position.y;
+  const targetY=metalWorldPos.y>centerWorldY?1:-1;
+
+  // グリッドサーチ: d4をRy(C)*Rz(B)*Rx(A)で回転し、Y成分が最大/最小になる角度を探す
+  const deg=Math.PI/180;
+  let bestA=0,bestB=0,bestC=0,bestDot=-Infinity;
+
+  function rotD4y(rA,rB,rC){
+    const ca=Math.cos(rA),sa=Math.sin(rA);
+    const cb=Math.cos(rB),sb=Math.sin(rB);
+    const cc=Math.cos(rC),sc=Math.sin(rC);
+    let x1=d4.x, y1=ca*d4.y-sa*d4.z, z1=sa*d4.y+ca*d4.z;
+    let x2=cb*x1-sb*y1, y2=sb*x1+cb*y1, z2=z1;
+    let y3=y2; // Ry doesn't change y
+    return y3*targetY; // maximize: dot with target
+  }
+
+  // Phase 1: coarse (15°)
+  for(let a=0;a<360;a+=15) for(let b=0;b<360;b+=15) for(let c=0;c<180;c+=15){
+    const dot=rotD4y(a*deg,b*deg,c*deg);
+    if(dot>bestDot){bestDot=dot;bestA=a;bestB=b;bestC=c;}
+  }
+  // Phase 2: fine (1°)
+  const r=12;
+  const fA=bestA,fB=bestB,fC=bestC;
+  for(let a=fA-r;a<=fA+r;a++) for(let b=fB-r;b<=fB+r;b++) for(let c=fC-r;c<=fC+r;c++){
+    const dot=rotD4y(a*deg,b*deg,c*deg);
+    if(dot>bestDot){bestDot=dot;bestA=a;bestB=b;bestC=c;}
+  }
+
+  // 回転スライダー更新
+  const normA=((bestA%360)+360)%360, normB=((bestB%360)+360)%360, normC=((bestC%360)+360)%360;
+  document.getElementById('sl-rot-a').value=normA;
+  document.getElementById('v-rot-a').value=normA;
+  document.getElementById('sl-rot-b').value=normB;
+  document.getElementById('v-rot-b').value=normB;
+  document.getElementById('sl-rot-c').value=normC;
+  document.getElementById('v-rot-c').value=normC;
+
+  // XZ移動: 回転適用後に中心原子がTMD原子のXZ上に来るようにする
+  // 回転後の中心原子の相対座標を計算
+  const rA2=normA*deg, rB2=normB*deg, rC2=normC*deg;
+  const ca=Math.cos(rA2),sa=Math.sin(rA2);
+  const cb=Math.cos(rB2),sb=Math.sin(rB2);
+  const cc=Math.cos(rC2),sc=Math.sin(rC2);
+  let x1=cAt.dx, y1=ca*cAt.dy-sa*cAt.dz, z1=sa*cAt.dy+ca*cAt.dz;
+  let x2=cb*x1-sb*y1, y2=sb*x1+cb*y1, z2=z1;
+  let x3=cc*x2+sc*z2, z3=-sc*x2+cc*z2;
+  // 圧縮後のオフセットも考慮する必要があるが、近似的に回転後座標で十分
+  // buildStructure内で配置される位置: bx + x3 + off.x + interOffset.dx
+  // TMD原子位置: metalWorldPos.x
+  // → interOffset.dx = metalWorldPos.x - (bx + x3 + off.x)
+  // 配置基準点(bx, bz)は最も近い配置ポイント - 現在のオフセットをリセットして再計算
+
+  // まずオフセットリセットして一度リビルドし、配置位置を取得
+  interOffset={dx:0, dz:0};
+  buildStructure();
+
+  // リビルド後、中心原子のメッシュを探す
+  let centerMesh=null;
+  structGroup.children.forEach(c=>{
+    if(c.userData&&c.userData.isInter&&c.userData.atomIdx===centerIdx&&!centerMesh) centerMesh=c;
+  });
+  if(centerMesh){
+    interOffset.dx=metalWorldPos.x-centerMesh.position.x;
+    interOffset.dz=metalWorldPos.z-centerMesh.position.z;
+  }
+
+  buildStructure();
+  distLabelEl.textContent='四面体配位 完了';
+  distLabelEl.style.display='block';
+  setTimeout(()=>distLabelEl.style.display='none',2000);
+}
+
+// =====================================================
+//  UI Binding
+// =====================================================
+document.getElementById('sel-mat').addEventListener('change',function(){curMat=this.value;resetInterOffset();setPhase(DB[curMat].defPhase);});
+document.getElementById('sel-inter').addEventListener('change',function(){resetInterOffset();buildStructure();});
+// --- スライダー ↔ 数値入力の同期 ---
+function syncSliderToNum(slId){
+  const sl=document.getElementById(slId);
+  const k=slId.replace('sl-','');
+  const vId=slId.startsWith('sl-rot-')?'v-rot-'+k.replace('rot-',''):'v-'+k;
+  const vEl=document.getElementById(vId);
+  vEl.value=slId==='sl-gap'?parseFloat(sl.value).toFixed(1):sl.value;
+}
+function syncNumToSlider(vId){
+  // 数値入力 → スライダーへ反映
+  const vEl=document.getElementById(vId);
+  let slId;
+  if(vId.startsWith('v-rot-')){ slId='sl-rot-'+vId.replace('v-rot-',''); }
+  else { slId='sl-'+vId.replace('v-',''); }
+  const sl=document.getElementById(slId);
+  let v=parseFloat(vEl.value);
+  const mn=parseFloat(sl.min), mx=parseFloat(sl.max), st=parseFloat(sl.step);
+  if(isNaN(v)) v=parseFloat(sl.value);
+  v=Math.max(mn,Math.min(mx,Math.round(v/st)*st));
+  sl.value=v;
+  vEl.value=slId==='sl-gap'?v.toFixed(1):v;
+  buildStructure();
+}
+function stepSlider(slId, dir){
+  const sl=document.getElementById(slId);
+  const st=parseFloat(sl.step), mn=parseFloat(sl.min), mx=parseFloat(sl.max);
+  let v=parseFloat(sl.value)+dir*st;
+  v=Math.max(mn,Math.min(mx,Math.round(v/st)*st));
+  sl.value=v;
+  syncSliderToNum(slId);
+  buildStructure();
+}
+
+['sl-gap','sl-layers','sl-na','sl-nb'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',function(){
+    syncSliderToNum(id);
+    buildStructure();
+  });
+});
+// 数値入力欄のイベント
+['v-gap','v-layers','v-na','v-nb'].forEach(vId=>{
+  document.getElementById(vId).addEventListener('change',function(){ syncNumToSlider(vId); });
+});
+
+document.querySelectorAll('.rot-sl').forEach(sl=>{
+  sl.addEventListener('input',function(){
+    syncSliderToNum(sl.id);
+    buildStructure();
+  });
+});
+// 回転の数値入力
+['v-rot-a','v-rot-b','v-rot-c'].forEach(vId=>{
+  document.getElementById(vId).addEventListener('change',function(){ syncNumToSlider(vId); });
+});
+['chk-poly','chk-cell','chk-dist'].forEach(id=>document.getElementById(id).addEventListener('change',buildStructure));
+document.getElementById('chk-bg').addEventListener('change',updateBg);
+
+// =====================================================
+//  CIF File Parser
+// =====================================================
+// 元素 → 色マッピング（CPK 配色ベース）
+const EL_COL={
+  H:0xffffff,He:0xd9ffff,Li:0x55dd55,Be:0xc2ff00,B:0xffb5b5,C:0x555555,N:0x4488ff,O:0xff3333,
+  F:0x90e050,Ne:0xb3e3f5,Na:0xff6666,Mg:0x8aff00,Al:0xbfa6a6,Si:0xf0c8a0,P:0xff8000,S:0xddc000,
+  Cl:0x1ff01f,Ar:0x80d1e3,K:0xcc66ff,Ca:0x3dff00,Sc:0xe6e6e6,Ti:0x7799aa,V:0x2e8bc0,Cr:0x8a99c7,
+  Mn:0x9c7ac7,Fe:0xe06633,Co:0xf090a0,Ni:0x50d050,Cu:0xc88033,Zn:0x7d80b0,Ga:0xc28f8f,Ge:0x668f8f,
+  As:0xbd80e3,Se:0xd48a00,Br:0xa62929,Kr:0x5cb8d1,Rb:0x702eb0,Sr:0x00ff00,Y:0x94ffff,Zr:0x55aa77,
+  Nb:0x22aa88,Mo:0x8855bb,Ru:0x248f8f,Rh:0x0a7d8c,Pd:0x006985,Ag:0xc0c0c0,Cd:0xffd98f,In:0xa67573,
+  Sn:0x668080,Sb:0x9e63b5,Te:0xd47a00,I:0x940094,Xe:0x429eb0,Cs:0x57178f,Ba:0x00c900,
+  La:0x70d4ff,Ce:0xffffc7,W:0x4466aa,Re:0x267dab,Os:0x266696,Ir:0x175487,Pt:0xaabbcc,Au:0xffd123,
+  Hg:0xb8b8d0,Pb:0x575961,Bi:0x9e4fb5,Ta:0x667788
+};
+const EL_RAD={H:0.15,He:0.20,Li:0.28,Be:0.25,B:0.25,C:0.25,N:0.28,O:0.30,F:0.27,Ne:0.22,
+  Na:0.35,Mg:0.30,Al:0.30,Si:0.30,P:0.30,S:0.32,Cl:0.32,Ar:0.25,K:0.42,Ca:0.35,
+  default:0.28};
+// 共有結合半径テーブル (Å) — 結合判定に使用
+const CRAD={H:0.31,He:0.28,Li:1.28,Be:0.96,B:0.84,C:0.76,N:0.71,O:0.66,F:0.57,Ne:0.58,
+  Na:1.66,Mg:1.41,Al:1.21,Si:1.11,P:1.07,S:1.05,Cl:1.02,Ar:1.06,K:2.03,Ca:1.76,
+  Sc:1.70,Ti:1.60,V:1.53,Cr:1.39,Mn:1.39,Fe:1.32,Co:1.26,Ni:1.24,Cu:1.32,Zn:1.22,
+  Ga:1.22,Ge:1.20,As:1.19,Se:1.20,Br:1.20,Rb:2.20,Sr:1.95,Zr:1.75,Nb:1.64,Mo:1.54,
+  Ru:1.46,Rh:1.42,Pd:1.39,Ag:1.45,Cd:1.44,In:1.42,Sn:1.39,Sb:1.39,Te:1.38,I:1.39,
+  W:1.62,Re:1.51,Os:1.44,Ir:1.41,Pt:1.36,Au:1.36,Pb:1.46,Bi:1.48,Ta:1.70,default:1.50};
+
+let cifCounter = 0; // カスタム分子の連番
+
+function parseCIF(text, fileName) {
+  const lines = text.split(/\r?\n/);
+  let atoms = []; // {el, x, y, z}
+  let cellA=1,cellB=1,cellC=1,alpha=90,beta=90,gamma=90;
+  let hasFrac=false, hasCart=false;
+
+  // 1) セルパラメータを探す
+  for(const line of lines){
+    const t=line.trim();
+    if(t.startsWith('_cell_length_a')) cellA=parseFloat(t.split(/\s+/)[1])||1;
+    if(t.startsWith('_cell_length_b')) cellB=parseFloat(t.split(/\s+/)[1])||1;
+    if(t.startsWith('_cell_length_c')) cellC=parseFloat(t.split(/\s+/)[1])||1;
+    if(t.startsWith('_cell_angle_alpha')) alpha=parseFloat(t.split(/\s+/)[1])||90;
+    if(t.startsWith('_cell_angle_beta'))  beta =parseFloat(t.split(/\s+/)[1])||90;
+    if(t.startsWith('_cell_angle_gamma')) gamma=parseFloat(t.split(/\s+/)[1])||90;
+  }
+
+  // 2) loop_ ブロックから原子座標を抽出
+  let inLoop=false, headers=[], dataLines=[];
+  for(let i=0;i<lines.length;i++){
+    const t=lines[i].trim();
+    if(t==='loop_'){
+      // 新しいloopを検出 — 前のloopの処理
+      if(headers.length>0 && dataLines.length>0) processLoop(headers,dataLines);
+      inLoop=true; headers=[]; dataLines=[]; continue;
+    }
+    if(inLoop){
+      if(t.startsWith('_')){ headers.push(t.split(/\s+/)[0]); }
+      else if(t==='' || t.startsWith('#') || t.startsWith('loop_') || t.startsWith('data_')){
+        if(headers.length>0 && dataLines.length>0) processLoop(headers,dataLines);
+        inLoop = t==='loop_'; headers=[]; dataLines=[];
+        if(t==='loop_') inLoop=true;
+      } else { dataLines.push(t); }
+    }
+  }
+  if(headers.length>0 && dataLines.length>0) processLoop(headers,dataLines);
+
+  function processLoop(hdr,data){
+    // _atom_site 関連のヘッダーがあるか確認
+    const iLabel  = hdr.indexOf('_atom_site_label');
+    const iSymbol = hdr.indexOf('_atom_site_type_symbol');
+    const iFx = hdr.indexOf('_atom_site_fract_x');
+    const iFy = hdr.indexOf('_atom_site_fract_y');
+    const iFz = hdr.indexOf('_atom_site_fract_z');
+    const iCx = hdr.indexOf('_atom_site_Cartn_x');
+    const iCy = hdr.indexOf('_atom_site_Cartn_y');
+    const iCz = hdr.indexOf('_atom_site_Cartn_z');
+
+    if(iFx>=0 && iFy>=0 && iFz>=0) hasFrac=true;
+    if(iCx>=0 && iCy>=0 && iCz>=0) hasCart=true;
+    if(!hasFrac && !hasCart) return;
+
+    const iEl = iSymbol>=0 ? iSymbol : iLabel;
+    if(iEl<0) return;
+
+    data.forEach(line=>{
+      // CIF のフィールド分割（引用符対応）
+      const cols = line.match(/'[^']*'|"[^"]*"|\S+/g);
+      if(!cols || cols.length<hdr.length) return;
+      let el = cols[iEl].replace(/['"]/g,'').replace(/[0-9+\-]/g,'');
+      // 元素記号を正規化 (先頭大文字 + 残り小文字)
+      el = el.charAt(0).toUpperCase() + el.slice(1).toLowerCase();
+
+      let x,y,z;
+      if(hasCart){
+        x=parseFloat(cols[iCx]); y=parseFloat(cols[iCy]); z=parseFloat(cols[iCz]);
+      } else {
+        // 分率座標 → Cartesian (一般三斜晶系対応)
+        const fx=parseFloat(cols[iFx]), fy=parseFloat(cols[iFy]), fz=parseFloat(cols[iFz]);
+        const ar=alpha*Math.PI/180, br=beta*Math.PI/180, gr=gamma*Math.PI/180;
+        const cosA=Math.cos(ar),cosB=Math.cos(br),cosG=Math.cos(gr),sinG=Math.sin(gr);
+        const v=Math.sqrt(1-cosA*cosA-cosB*cosB-cosG*cosG+2*cosA*cosB*cosG);
+        x = fx*cellA + fy*cellB*cosG + fz*cellC*cosB;
+        y = fy*cellB*sinG + fz*cellC*(cosA-cosB*cosG)/sinG;
+        z = fz*cellC*v/sinG;
+      }
+      if(!isNaN(x)&&!isNaN(y)&&!isNaN(z)) atoms.push({el,x,y,z});
+    });
+  }
+
+  if(atoms.length===0){ alert('CIFから原子座標を読み取れませんでした'); return null; }
+
+  // 3) 重心を原点に移動
+  const cx=atoms.reduce((s,a)=>s+a.x,0)/atoms.length;
+  const cy=atoms.reduce((s,a)=>s+a.y,0)/atoms.length;
+  const cz=atoms.reduce((s,a)=>s+a.z,0)/atoms.length;
+  atoms.forEach(a=>{a.x-=cx;a.y-=cy;a.z-=cz;});
+
+  // 4) 結合を共有結合半径の和で自動判定 (1.15倍のマージン)
+  const bonds=[];
+  for(let i=0;i<atoms.length;i++){
+    for(let j=i+1;j<atoms.length;j++){
+      const dx=atoms[i].x-atoms[j].x, dy=atoms[i].y-atoms[j].y, dz=atoms[i].z-atoms[j].z;
+      const d=Math.sqrt(dx*dx+dy*dy+dz*dz);
+      const ri=CRAD[atoms[i].el]||CRAD.default, rj=CRAD[atoms[j].el]||CRAD.default;
+      if(d>0.4 && d<(ri+rj)*1.15) bonds.push([i,j]);
+    }
+  }
+
+  // 5) dy方向 (層間方向) の広がりを計算して minGap を決定
+  const dyMin=Math.min(...atoms.map(a=>a.y)), dyMax=Math.max(...atoms.map(a=>a.y));
+  const molHeight=dyMax-dyMin;
+  const dxMax2=Math.max(...atoms.map(a=>Math.sqrt(a.x*a.x+a.z*a.z)));
+  const estMinGap = Math.max(1.5, (molHeight+1.5)/2.5);
+  const estSpacing = Math.max(1, Math.ceil((dxMax2*2+1.0)/3.5));
+
+  // 6) INTER エントリを構築
+  const mainEl = atoms.reduce((acc,a)=>{acc[a.el]=(acc[a.el]||0)+1;return acc;},{});
+  const dominant = Object.entries(mainEl).sort((a,b)=>b[1]-a[1])[0][0];
+  const color = EL_COL[dominant] || 0x88aacc;
+
+  const entry = {
+    name: fileName.replace(/\.cif$/i,''),
+    color: color,
+    atoms: atoms.map(a=>({
+      el:a.el,
+      color: EL_COL[a.el]||0x88aacc,
+      r: EL_RAD[a.el]||EL_RAD.default,
+      dx:a.x, dy:a.y, dz:a.z
+    })),
+    minGap: Math.round(estMinGap*10)/10,
+    spacing: estSpacing,
+    bonds: bonds
+  };
+  return entry;
+}
+
+// =====================================================
+//  XYZ File Parser
+// =====================================================
+function parseXYZ(text, fileName){
+  const lines=text.trim().split('\n');
+  if(lines.length<3){alert('XYZファイルが短すぎます');return null;}
+  const nAtoms=parseInt(lines[0].trim());
+  if(isNaN(nAtoms)||nAtoms<1){alert('XYZ原子数を読み取れません');return null;}
+  // line 1 = comment, lines 2..nAtoms+1 = atoms
+  const atoms=[];
+  for(let i=2;i<2+nAtoms&&i<lines.length;i++){
+    const parts=lines[i].trim().split(/\s+/);
+    if(parts.length<4) continue;
+    let el=parts[0].replace(/[^a-zA-Z]/g,'');
+    el=el.charAt(0).toUpperCase()+(el.slice(1).toLowerCase());
+    const x=parseFloat(parts[1]),y=parseFloat(parts[2]),z=parseFloat(parts[3]);
+    if(isNaN(x)||isNaN(y)||isNaN(z)) continue;
+    atoms.push({el,x,y,z});
+  }
+  if(atoms.length===0){alert('XYZから原子座標を読み取れませんでした');return null;}
+  // Center
+  const cx=atoms.reduce((s,a)=>s+a.x,0)/atoms.length;
+  const cy=atoms.reduce((s,a)=>s+a.y,0)/atoms.length;
+  const cz=atoms.reduce((s,a)=>s+a.z,0)/atoms.length;
+  atoms.forEach(a=>{a.x-=cx;a.y-=cy;a.z-=cz;});
+  // Bonds
+  const bonds=[];
+  for(let i=0;i<atoms.length;i++) for(let j=i+1;j<atoms.length;j++){
+    const dx=atoms[i].x-atoms[j].x,dy=atoms[i].y-atoms[j].y,dz=atoms[i].z-atoms[j].z;
+    const d=Math.sqrt(dx*dx+dy*dy+dz*dz);
+    const ri=CRAD[atoms[i].el]||CRAD.default, rj=CRAD[atoms[j].el]||CRAD.default;
+    if(d>0.4&&d<(ri+rj)*1.15) bonds.push([i,j]);
+  }
+  const dyMin=Math.min(...atoms.map(a=>a.y)),dyMax=Math.max(...atoms.map(a=>a.y));
+  const molH=dyMax-dyMin;
+  const dxMax2=Math.max(...atoms.map(a=>Math.sqrt(a.x*a.x+a.z*a.z)));
+  const mainEl=atoms.reduce((acc,a)=>{acc[a.el]=(acc[a.el]||0)+1;return acc;},{});
+  const dominant=Object.entries(mainEl).sort((a,b)=>b[1]-a[1])[0][0];
+  return{
+    name:fileName.replace(/\.xyz$/i,''),
+    color:EL_COL[dominant]||0x88aacc,
+    atoms:atoms.map(a=>({
+      el:a.el, color:EL_COL[a.el]||0x88aacc,
+      r:EL_RAD[a.el]||EL_RAD.default,
+      dx:a.x, dy:a.y, dz:a.z
+    })),
+    minGap:Math.round(Math.max(1.5,(molH+1.5)/2.5)*10)/10,
+    spacing:Math.max(1,Math.ceil((dxMax2*2+1.0)/3.5)),
+    bonds
+  };
+}
+
+// =====================================================
+//  File Input Handler (CIF + XYZ)
+// =====================================================
+document.getElementById('mol-input').addEventListener('change',function(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    const text=ev.target.result;
+    const isXYZ=/\.xyz$/i.test(file.name);
+    const entry=isXYZ?parseXYZ(text,file.name):parseCIF(text,file.name);
+    if(!entry) return;
+    cifCounter++;
+    const key='mol_'+cifCounter;
+    INTER[key]=entry;
+    const og=document.getElementById('og-custom');
+    og.style.display='';
+    const opt=document.createElement('option');
+    opt.value=key;
+    opt.textContent=entry.name+' ('+entry.atoms.length+'原子)';
+    og.appendChild(opt);
+    document.getElementById('sel-inter').value=key;
+    buildStructure();
+  };
+  reader.readAsText(file);
+  this.value='';
+});
+
+// =====================================================
+//  Extended Hückel Theory (EHT) Quantum Engine
+// =====================================================
+// Slater exponents (ζ) and VSIP (eV) for valence orbitals
+const EHT_P={
+  H: [{n:1,l:0,z:1.300,ip:-13.60}],
+  Li:[{n:2,l:0,z:0.650,ip:-5.39}],
+  C: [{n:2,l:0,z:1.625,ip:-21.40},{n:2,l:1,z:1.625,ip:-11.40}],
+  N: [{n:2,l:0,z:1.950,ip:-26.00},{n:2,l:1,z:1.950,ip:-13.40}],
+  O: [{n:2,l:0,z:2.275,ip:-32.30},{n:2,l:1,z:2.275,ip:-14.80}],
+  Na:[{n:3,l:0,z:0.733,ip:-5.14}],
+  K: [{n:4,l:0,z:0.585,ip:-4.34}],
+  S: [{n:3,l:0,z:1.817,ip:-20.00},{n:3,l:1,z:1.817,ip:-11.00}],
+  Se:[{n:4,l:0,z:2.070,ip:-20.50},{n:4,l:1,z:2.070,ip:-11.00}]
+};
+// Valence electrons per element
+const EHT_NEL={H:1,Li:1,C:4,N:5,O:6,Na:1,K:1,S:6,Se:6};
+
+// STO-3G coefficients {alpha, coeff} for zeta=1, scaled by zeta^2
+const STO3G={
+  '1s':{a:[0.109818,0.405771,2.22766],c:[0.444635,0.535328,0.154329]},
+  '2s':{a:[0.0751386,0.231031,0.994203],c:[0.700115,0.399513,-0.0999672]},
+  '2p':{a:[0.0751386,0.231031,0.994203],c:[0.391957,0.607684,0.155916]},
+  '3s':{a:[0.0334946,0.104982,0.383108],c:[0.700115,0.399513,-0.0999672]},
+  '3p':{a:[0.0334946,0.104982,0.383108],c:[0.391957,0.607684,0.155916]},
+  '4s':{a:[0.0190633,0.0620511,0.212198],c:[0.700115,0.399513,-0.0999672]},
+  '4p':{a:[0.0190633,0.0620511,0.212198],c:[0.391957,0.607684,0.155916]}
+};
+
+// Primitive Gaussian overlap: <g_A|g_B> for s-type
+function gOvS(aA,pA,aB,pB){
+  const g=aA+aB,mu=aA*aB/g;
+  const dx=pA[0]-pB[0],dy=pA[1]-pB[1],dz=pA[2]-pB[2];
+  return Math.pow(Math.PI/g,1.5)*Math.exp(-mu*(dx*dx+dy*dy+dz*dz));
+}
+
+// Gaussian product center
+function gPC(aA,pA,aB,pB){
+  const g=aA+aB;
+  return[(aA*pA[0]+aB*pB[0])/g,(aA*pA[1]+aB*pB[1])/g,(aA*pA[2]+aB*pB[2])/g];
+}
+
+// Overlap between primitive Gaussians with angular momentum
+// lA/lB: [lx,ly,lz] cartesian angular momentum
+function primOverlap(aA,pA,lA,aB,pB,lB){
+  const g=aA+aB, P=gPC(aA,pA,aB,pB);
+  const mu=aA*aB/g;
+  const dx=pA[0]-pB[0],dy=pA[1]-pB[1],dz=pA[2]-pB[2];
+  const K=Math.exp(-mu*(dx*dx+dy*dy+dz*dz));
+  // Compute 1D overlaps for each axis using recursion
+  function ov1d(lA,lB,PA,PB,g){
+    // PA=P-A, PB=P-B
+    if(lA===0&&lB===0) return 1;
+    if(lA===1&&lB===0) return PA;
+    if(lA===0&&lB===1) return PB;
+    if(lA===1&&lB===1) return PA*PB+1/(2*g);
+    return 0; // we only need l=0,1
+  }
+  const sx=ov1d(lA[0],lB[0],P[0]-pA[0],P[0]-pB[0],g);
+  const sy=ov1d(lA[1],lB[1],P[1]-pA[1],P[1]-pB[1],g);
+  const sz=ov1d(lA[2],lB[2],P[2]-pA[2],P[2]-pB[2],g);
+  return Math.pow(Math.PI/g,1.5)*K*sx*sy*sz;
+}
+
+// Normalization constant for a primitive Gaussian
+function gNorm(a,l){
+  // N^2 * integral |G|^2 = 1
+  const L=l[0]+l[1]+l[2];
+  if(L===0) return Math.pow(2*a/Math.PI,0.75);
+  if(L===1) return Math.pow(128*a*a*a*a*a/(Math.PI*Math.PI*Math.PI),0.25);
+  return 1;
+}
+
+// Build basis set for a molecule
+// atoms: [{el,x,y,z}] coordinates in Angstrom
+function buildBasis(atoms){
+  const basis=[];
+  atoms.forEach((at,ai)=>{
+    const par=EHT_P[at.el];
+    if(!par) return;
+    const pos=[at.x,at.y,at.z];
+    par.forEach(orb=>{
+      const key=orb.n+(orb.l===0?'s':'p');
+      const sto=STO3G[key];
+      if(!sto) return;
+      const z2=orb.z*orb.z;
+      if(orb.l===0){
+        // s orbital
+        const prims=sto.a.map((a,i)=>({a:a*z2,c:sto.c[i],l:[0,0,0]}));
+        // normalize
+        prims.forEach(p=>p.N=gNorm(p.a,p.l));
+        basis.push({atom:ai,pos,ip:orb.ip,l:0,m:0,prims,label:at.el+key});
+      } else {
+        // px, py, pz
+        for(let m=0;m<3;m++){
+          const lv=[0,0,0]; lv[m]=1;
+          const prims=sto.a.map((a,i)=>({a:a*z2,c:sto.c[i],l:lv.slice()}));
+          prims.forEach(p=>p.N=gNorm(p.a,p.l));
+          basis.push({atom:ai,pos,ip:orb.ip,l:1,m,prims,label:at.el+key+['x','y','z'][m]});
+        }
+      }
+    });
+  });
+  return basis;
+}
+
+// Compute overlap between two contracted GTOs
+function cOverlap(bA,bB){
+  let S=0;
+  for(const pA of bA.prims){
+    for(const pB of bB.prims){
+      S+=pA.N*pA.c*pB.N*pB.c*primOverlap(pA.a,bA.pos,pA.l,pB.a,bB.pos,pB.l);
+    }
+  }
+  return S;
+}
+
+// Build overlap matrix
+function buildSMat(basis){
+  const n=basis.length, S=new Float64Array(n*n);
+  for(let i=0;i<n;i++){
+    S[i*n+i]=1.0; // self-overlap = 1 (if normalized)
+    for(let j=i+1;j<n;j++){
+      const v=cOverlap(basis[i],basis[j]);
+      S[i*n+j]=v; S[j*n+i]=v;
+    }
+  }
+  // Fix diagonal (compute actual self-overlap for correctness)
+  for(let i=0;i<n;i++) S[i*n+i]=cOverlap(basis[i],basis[i]);
+  return S;
+}
+
+// Build EHT Hamiltonian (Wolfsberg-Helmholz)
+function buildHMat(basis,S){
+  const n=basis.length, H=new Float64Array(n*n);
+  const K=1.75; // Wolfsberg-Helmholz constant
+  for(let i=0;i<n;i++){
+    H[i*n+i]=basis[i].ip; // diagonal = VSIP
+    for(let j=i+1;j<n;j++){
+      const v=0.5*K*(basis[i].ip+basis[j].ip)*S[i*n+j];
+      H[i*n+j]=v; H[j*n+i]=v;
+    }
+  }
+  return H;
+}
+
+// Jacobi eigenvalue decomposition for symmetric matrix
+function jacobiEigen(A,n,maxIter){
+  maxIter=maxIter||200;
+  const V=new Float64Array(n*n);
+  const D=new Float64Array(n*n);
+  for(let i=0;i<n*n;i++) D[i]=A[i];
+  for(let i=0;i<n;i++) V[i*n+i]=1;
+
+  for(let iter=0;iter<maxIter;iter++){
+    // Find max off-diagonal
+    let mx=0,p=0,q=1;
+    for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
+      const v=Math.abs(D[i*n+j]);
+      if(v>mx){mx=v;p=i;q=j;}
+    }
+    if(mx<1e-12) break;
+
+    const app=D[p*n+p],aqq=D[q*n+q],apq=D[p*n+q];
+    let theta;
+    if(Math.abs(app-aqq)<1e-15) theta=Math.PI/4;
+    else theta=0.5*Math.atan(2*apq/(app-aqq));
+    const c=Math.cos(theta),s=Math.sin(theta);
+
+    // Rotate
+    for(let i=0;i<n;i++){
+      const ip=D[i*n+p],iq=D[i*n+q];
+      D[i*n+p]=c*ip+s*iq; D[i*n+q]=-s*ip+c*iq;
+    }
+    for(let j=0;j<n;j++){
+      const pj=D[p*n+j],qj=D[q*n+j];
+      D[p*n+j]=c*pj+s*qj; D[q*n+j]=-s*pj+c*qj;
+    }
+    // Eigenvectors
+    for(let i=0;i<n;i++){
+      const vp=V[i*n+p],vq=V[i*n+q];
+      V[i*n+p]=c*vp+s*vq; V[i*n+q]=-s*vp+c*vq;
+    }
+  }
+  const evals=[];
+  for(let i=0;i<n;i++) evals.push(D[i*n+i]);
+  return{evals,V};
+}
+
+// Solve generalized eigenvalue problem HC=SCE
+// via Löwdin orthogonalization: S^{-1/2} H S^{-1/2}
+function solveHSC(H,S,n){
+  // 1. Diagonalize S
+  const sEig=jacobiEigen(S,n);
+  // 2. Build S^{-1/2}
+  const Sh=new Float64Array(n*n);
+  for(let i=0;i<n;i++){
+    const si=sEig.evals[i];
+    const inv=si>1e-8?1/Math.sqrt(si):0;
+    for(let a=0;a<n;a++) for(let b=0;b<n;b++){
+      Sh[a*n+b]+=inv*sEig.V[a*n+i]*sEig.V[b*n+i];
+    }
+  }
+  // 3. H' = Sh * H * Sh
+  const tmp=new Float64Array(n*n);
+  for(let i=0;i<n;i++) for(let j=0;j<n;j++){
+    let v=0; for(let k=0;k<n;k++) v+=Sh[i*n+k]*H[k*n+j]; tmp[i*n+j]=v;
+  }
+  const Hp=new Float64Array(n*n);
+  for(let i=0;i<n;i++) for(let j=0;j<n;j++){
+    let v=0; for(let k=0;k<n;k++) v+=tmp[i*n+k]*Sh[k*n+j]; Hp[i*n+j]=v;
+  }
+  // 4. Diagonalize H'
+  const hEig=jacobiEigen(Hp,n);
+  return hEig.evals.slice().sort((a,b)=>a-b);
+}
+
+// Repulsive pair potential (prevents atoms from collapsing)
+function eRepulsive(atoms){
+  let E=0;
+  for(let i=0;i<atoms.length;i++){
+    for(let j=i+1;j<atoms.length;j++){
+      const dx=atoms[i].x-atoms[j].x,dy=atoms[i].y-atoms[j].y,dz=atoms[i].z-atoms[j].z;
+      let r=Math.sqrt(dx*dx+dy*dy+dz*dz);
+      if(r<0.5) r=0.5;
+      const Zi=EHT_NEL[atoms[i].el]||1, Zj=EHT_NEL[atoms[j].el]||1;
+      E+=Zi*Zj*27.2114/r*Math.exp(-1.5*r);
+    }
+  }
+  return E;
+}
+
+// vdW radii for layer-molecule interaction (Å)
+const VDW_R={H:1.20,Li:1.82,C:1.70,N:1.55,O:1.52,Na:2.27,K:2.75,S:1.80,Se:1.90,Te:2.06};
+
+// Layer confinement potential: molecule atoms between two walls at y=±gap/2
+// Uses LJ 9-3 wall potential (integrated LJ 12-6 over infinite plane)
+function eLayerConfinement(atoms, gap, chalcogen){
+  const sigma=VDW_R[chalcogen]||1.80;
+  let E=0;
+  for(const a of atoms){
+    const sigA=(VDW_R[a.el]||1.70);
+    const sig=(sigA+sigma)/2; // Lorentz combining rule
+    const eps=0.05; // eV, typical vdW well depth
+    // Distance from atom to top wall (+gap/2) and bottom wall (-gap/2)
+    const dTop=gap/2-a.y;
+    const dBot=a.y+gap/2;
+    // LJ 9-3 wall potential: E = eps * [2/15*(sig/d)^9 - (sig/d)^3]
+    for(const d of [dTop,dBot]){
+      if(d<0.3){ E+=1000; continue; } // hard wall penalty
+      const sd=sig/d;
+      const sd3=sd*sd*sd;
+      E+=eps*(2/15*sd3*sd3*sd3 - sd3);
+    }
+  }
+  return E;
+}
+
+// Elastic energy for layer expansion (harmonic spring)
+// k_layer: spring constant in eV/Å², gap0: natural gap without intercalant
+function eElastic(gap, gap0, kLayer){
+  return 0.5*kLayer*(gap-gap0)*(gap-gap0);
+}
+
+// Total energy: EHT(molecule) + repulsion + layer confinement + elastic
+function ehtEnergy(atoms, gap, gap0, chalcogen){
+  if(!atoms||atoms.length<2) return 0;
+  let nEl=0;
+  atoms.forEach(a=>{nEl+=(EHT_NEL[a.el]||0);});
+  if(atoms.some(a=>!EHT_P[a.el])) return NaN;
+
+  const basis=buildBasis(atoms);
+  const n=basis.length;
+  if(n===0) return NaN;
+
+  const S=buildSMat(basis);
+  const H=buildHMat(basis,S);
+  const evals=solveHSC(H,S,n);
+
+  const nOcc=Math.floor(nEl/2);
+  let Eel=0;
+  for(let i=0;i<nOcc&&i<evals.length;i++) Eel+=2*evals[i];
+  if(nEl%2===1&&nOcc<evals.length) Eel+=evals[nOcc];
+
+  let Etot=Eel+eRepulsive(atoms);
+
+  // Layer confinement (optional: only when gap is provided)
+  if(typeof gap==='number'&&gap>0){
+    Etot+=eLayerConfinement(atoms, gap, chalcogen||'Se');
+    const kL=2.0; // eV/Å² layer stiffness
+    Etot+=eElastic(gap, gap0||gap, kL);
+  }
+  return Etot;
+}
+
+// Numerical gradient for atoms + gap (central difference)
+function ehtGradientWithGap(atoms, gap, gap0, chalcogen){
+  const h=0.005;
+  const grad=atoms.map(()=>({x:0,y:0,z:0}));
+  const keys=['x','y','z'];
+  for(let i=0;i<atoms.length;i++){
+    for(const k of keys){
+      const orig=atoms[i][k];
+      atoms[i][k]=orig+h;
+      const ep=ehtEnergy(atoms,gap,gap0,chalcogen);
+      atoms[i][k]=orig-h;
+      const em=ehtEnergy(atoms,gap,gap0,chalcogen);
+      atoms[i][k]=orig;
+      grad[i][k]=(ep-em)/(2*h);
+    }
+  }
+  // Gradient w.r.t. gap
+  const epG=ehtEnergy(atoms,gap+h,gap0,chalcogen);
+  const emG=ehtEnergy(atoms,gap-h,gap0,chalcogen);
+  const gGap=(epG-emG)/(2*h);
+  return{grad,gGap};
+}
+
+// =====================================================
+//  Rotation Optimizer: find orientation that minimizes
+//  layer height (y-extent) → minimizes interlayer gap
+//  Molecule shape is FIXED, only rotation changes.
+// =====================================================
+function molYExtent(atoms, rA, rB, rC){
+  // Apply rotation Ry(C)*Rz(B)*Rx(A) and return y-span + vdW buffer
+  const ca=Math.cos(rA),sa=Math.sin(rA);
+  const cb=Math.cos(rB),sb=Math.sin(rB);
+  const cc=Math.cos(rC),sc=Math.sin(rC);
+  let yMin=Infinity, yMax=-Infinity;
+  for(const a of atoms){
+    // Rx(A)
+    let x1=a.dx, y1=ca*a.dy-sa*a.dz, z1=sa*a.dy+ca*a.dz;
+    // Rz(B)
+    let x2=cb*x1-sb*y1, y2=sb*x1+cb*y1, z2=z1;
+    // Ry(C)
+    let x3=cc*x2+sc*z2, y3=y2, z3=-sc*x2+cc*z2;
+    // Add vdW radius for this atom
+    const vr=VDW_R[a.el]||1.70;
+    if(y3-vr<yMin) yMin=y3-vr;
+    if(y3+vr>yMax) yMax=y3+vr;
+  }
+  return yMax-yMin;
+}
+
+function runOptimize(){
+  const interKey=document.getElementById('sel-inter').value;
+  if(interKey==='none'){alert('挿入分子を選択してください');return;}
+  const inter=INTER[interKey];
+  if(!inter||!inter.atoms||inter.atoms.length<2){alert('この分子は最適化できません');return;}
+
+  const matInfo=DB[curMat], phase=curPhase;
+  const r_inp=matInfo.a/S3;
+  const d_xm=Math.sqrt(Math.max(matInfo.bond*matInfo.bond-r_inp*r_inp,0.1));
+  const c_layer=phase==='2H'?matInfo.c2H/2:matInfo.c1T;
+  const normalGap=c_layer-2*d_xm;
+
+  const panel=document.getElementById('opt-panel');
+  const fill=document.getElementById('opt-fill');
+  const status=document.getElementById('opt-status');
+  const log=document.getElementById('opt-log');
+  panel.style.display='block';
+  fill.style.width='0%'; fill.style.background='#58a6ff';
+  log.innerHTML=`<span style="color:#8888ff">${inter.name} の向きを最適化中...</span><br>`;
+  document.getElementById('btn-opt').disabled=true;
+
+  const t0=performance.now();
+  const atoms=inter.atoms;
+  const deg=Math.PI/180;
+
+  // Phase 1: Coarse grid search (15° steps)
+  let bestA=0,bestB=0,bestC=0,bestH=Infinity;
+  const step1=15;
+  for(let a=0;a<360;a+=step1) for(let b=0;b<360;b+=step1) for(let c=0;c<180;c+=step1){
+    const h=molYExtent(atoms,a*deg,b*deg,c*deg);
+    if(h<bestH){bestH=h;bestA=a;bestB=b;bestC=c;}
+  }
+  log.innerHTML+=`粗探索: a=${bestA}° b=${bestB}° c=${bestC}° → 高さ${bestH.toFixed(2)}Å<br>`;
+  fill.style.width='50%';
+
+  // Phase 2: Fine grid search (1° steps around best)
+  const r=10; // ±10° range
+  for(let a=bestA-r;a<=bestA+r;a+=1) for(let b=bestB-r;b<=bestB+r;b+=1) for(let c=bestC-r;c<=bestC+r;c+=1){
+    const h=molYExtent(atoms,a*deg,b*deg,c*deg);
+    if(h<bestH){bestH=h;bestA=a;bestB=b;bestC=c;}
+  }
+
+  const dt=((performance.now()-t0)).toFixed(0);
+  log.innerHTML+=`精密探索: a=${bestA}° b=${bestB}° c=${bestC}° → 高さ${bestH.toFixed(3)}Å<br>`;
+
+  // Calculate optimal gap = molecule height + vdW buffer (1.0Å)
+  const optGap=bestH+1.0;
+  const optRatio=Math.max(1.0, optGap/normalGap);
+  const cr=Math.min(5.0,optRatio);
+
+  // Apply rotation sliders
+  const normA=((bestA%360)+360)%360, normB=((bestB%360)+360)%360, normC=((bestC%360)+360)%360;
+  document.getElementById('sl-rot-a').value=normA;
+  document.getElementById('v-rot-a').value=normA;
+  document.getElementById('sl-rot-b').value=normB;
+  document.getElementById('v-rot-b').value=normB;
+  document.getElementById('sl-rot-c').value=normC;
+  document.getElementById('v-rot-c').value=normC;
+
+  // Update inter.minGap to reflect optimized orientation
+  const oldMinGap=inter.minGap;
+  inter.minGap=Math.round(optRatio*10)/10;
+
+  // Apply gap slider (set to optimized ratio)
+  document.getElementById('sl-gap').value=cr.toFixed(1);
+  document.getElementById('v-gap').value=cr.toFixed(1);
+
+  fill.style.width='100%'; fill.style.background='#44cc88';
+  status.textContent=`完了! ${dt}ms`;
+  log.innerHTML+=`<span style="color:#44cc88">━━ 完了 (${dt}ms) ━━</span><br>`;
+  log.innerHTML+=`<span style="color:#ffcc44">最小高さ: ${bestH.toFixed(3)}Å</span><br>`;
+  log.innerHTML+=`<span style="color:#ffcc44">最適gap: ${optGap.toFixed(2)}Å (${optRatio.toFixed(2)}×)</span><br>`;
+  log.innerHTML+=`<span style="color:#888">minGap: ${oldMinGap}× → ${inter.minGap}×</span><br>`;
+  if(optRatio<=1.0) log.innerHTML+=`<span style="color:#44cc88">自然gap内に収まります!</span><br>`;
+
+  document.getElementById('btn-opt').disabled=false;
+  buildStructure();
+  setTimeout(()=>{panel.style.display='none';},5000);
+}
+
+// =====================================================
+//  Render
+// =====================================================
+function animate(){requestAnimationFrame(animate);renderer.render(scene,camera);updateDistLabel();}
+buildStructure();
+animate();
+
+// ヒントを3秒後にフェードアウトして非表示
+setTimeout(()=>{const h=document.getElementById('hint');if(h){h.style.opacity='0';setTimeout(()=>h.style.display='none',1500);}},3000);
+
+window.addEventListener('resize',()=>{
+  const asp=window.innerWidth/window.innerHeight;
+  perspCamera.aspect=asp;perspCamera.updateProjectionMatrix();
+  updateCam();renderer.setSize(window.innerWidth,window.innerHeight);
+});
+</script>
+</body>
+</html>

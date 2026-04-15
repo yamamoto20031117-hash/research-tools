@@ -1,0 +1,13 @@
+{
+  "rewrites": [
+    { "source": "/tmd-viewer", "destination": "/tmd-viewer/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    }
+  ]
+}
