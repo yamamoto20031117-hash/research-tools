@@ -114,6 +114,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script>
 const COLORS=['#2F5496','#CC0000','#228B22','#FF8C00','#8B008B','#008B8B','#B22222','#4169E1'];
 let fileList=[]; // {name, label, color, x[], y[], peaks[]}
@@ -523,62 +524,66 @@ function toggleTable(){
   el.style.display='block';
 }
 
-// ===== Excel出力（グラフ画像 + データ） =====
-function exportXLSX(){
+// ===== Excel出力（ExcelJS: 正規.xlsx + 画像埋め込み） =====
+async function exportXLSX(){
   if(fileList.length===0){alert('データを先に読み込んでください');return;}
   const canvas=document.getElementById('xrdCanvas');
-  const imgDataUrl=canvas.toDataURL('image/png');
   const firstName=fileList[0].label;
-
-  // HTML-Excel形式で画像付きエクスポート（.xls はExcelで正常に開ける）
   const lambda=1.5406;
-  let html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">';
-  html+='<head><meta charset="UTF-8">';
-  html+='<style>td,th{font-family:Arial,sans-serif;font-size:11px;border:1px solid #ccc;padding:4px 8px}';
-  html+='th{background:#4472C4;color:#fff;font-weight:bold}';
-  html+='h2{font-family:Arial;color:#2F5496;margin:16px 0 8px}';
-  html+='</style></head><body>';
 
-  // グラフ画像
-  html+='<h2>XRD Plot</h2>';
-  html+='<img src="'+imgDataUrl+'" width="'+Math.min(canvas.clientWidth,900)+'">';
-  html+='<br><br>';
+  const wb=new ExcelJS.Workbook();
 
-  // 各データセットのテーブル
+  // --- シート1: グラフ画像 ---
+  const wsChart=wb.addWorksheet('XRD Chart');
+  const imgBase64=canvas.toDataURL('image/png').split(',')[1];
+  const imgId=wb.addImage({base64:imgBase64, extension:'png'});
+  // キャンバスのアスペクト比を保持
+  const cols=Math.min(14, Math.round(canvas.clientWidth/70));
+  const rows=Math.min(35, Math.round(canvas.clientHeight/20));
+  wsChart.addImage(imgId,{tl:{col:0,row:0},br:{col:cols,row:rows}});
+
+  // --- シート2〜: 各データセット ---
   for(const f of fileList){
-    html+='<h2>'+escHtml(f.label)+'</h2>';
-    html+='<table><thead><tr><th>2\u03B8 (\u00B0)</th><th>Intensity (cps)</th></tr></thead><tbody>';
-    for(let i=0;i<f.x.length;i++){
-      html+='<tr><td>'+f.x[i].toFixed(4)+'</td><td>'+f.y[i].toFixed(2)+'</td></tr>';
-    }
-    html+='</tbody></table><br>';
+    const name=(f.label||'data').substring(0,28).replace(/[\\\/\*\?\[\]:]/g,'');
+    const ws=wb.addWorksheet(name);
+    ws.columns=[{header:'2\u03B8 (\u00B0)',key:'x',width:14},{header:'Intensity (cps)',key:'y',width:18}];
+    const headerRow=ws.getRow(1);
+    headerRow.font={bold:true,color:{argb:'FFFFFFFF'}};
+    headerRow.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
+    for(let i=0;i<f.x.length;i++) ws.addRow({x:f.x[i],y:f.y[i]});
   }
 
-  // ピークテーブル
+  // --- ピークシート ---
   const hasPeaks=fileList.some(f=>f.peaks&&f.peaks.length>0);
   if(hasPeaks){
-    html+='<h2>Detected Peaks</h2>';
-    html+='<table><thead><tr><th>Dataset</th><th>#</th><th>2\u03B8 (\u00B0)</th><th>Intensity</th><th>d (\u00C5)</th><th>Label</th></tr></thead><tbody>';
+    const wsP=wb.addWorksheet('Peaks');
+    wsP.columns=[
+      {header:'Dataset',key:'ds',width:22},{header:'#',key:'n',width:5},
+      {header:'2\u03B8 (\u00B0)',key:'x',width:12},{header:'Intensity',key:'y',width:14},
+      {header:'d (\u00C5)',key:'d',width:12},{header:'Label',key:'l',width:14}
+    ];
+    const hdr=wsP.getRow(1);
+    hdr.font={bold:true,color:{argb:'FFFFFFFF'}};
+    hdr.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
     for(const f of fileList){
       if(!f.peaks) continue;
       f.peaks.forEach((p,i)=>{
         const theta=p.x*Math.PI/360;
         const d=lambda/(2*Math.sin(theta));
-        html+='<tr><td>'+escHtml(f.label)+'</td><td>'+(i+1)+'</td><td>'+p.x.toFixed(3)+'</td><td>'+p.y.toFixed(1)+'</td><td>'+d.toFixed(4)+'</td><td>'+escHtml(p.label||'')+'</td></tr>';
+        wsP.addRow({ds:f.label,n:i+1,x:p.x,y:p.y,d:d,l:p.label||''});
       });
     }
-    html+='</tbody></table>';
   }
-  html+='</body></html>';
 
-  const blob=new Blob([html],{type:'application/vnd.ms-excel'});
+  // ダウンロード
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download=firstName+'_XRD.xls';
+  a.download=firstName+'_XRD.xlsx';
   a.click();
   URL.revokeObjectURL(a.href);
 }
-function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 // ===== PNG出力 =====
 function exportPNG(){

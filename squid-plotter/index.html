@@ -145,6 +145,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script>
 const COLORS=['#CC0000','#2F5496','#228B22','#FF8C00','#8B008B','#008B8B','#B22222','#4169E1'];
 let fileList=[]; // {name, label, color, temp[], field[], moment[], mass, marker}
@@ -705,42 +706,45 @@ function formatTick(v){
   return parseFloat(v.toPrecision(3)).toString();
 }
 
-// ===== Excel出力 =====
-function exportXLS(){
+// ===== Excel出力（ExcelJS: 正規.xlsx + 画像埋め込み） =====
+async function exportXLS(){
   if(fileList.length===0){alert('データを先に読み込んでください');return;}
   const canvas=document.getElementById('squidCanvas');
-  const imgDataUrl=canvas.toDataURL('image/png');
   const firstName=fileList[0].label;
 
-  let html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">';
-  html+='<head><meta charset="UTF-8">';
-  html+='<style>td,th{font-family:Arial,sans-serif;font-size:11px;border:1px solid #ccc;padding:4px 8px}';
-  html+='th{background:#4472C4;color:#fff;font-weight:bold}';
-  html+='h2{font-family:Arial;color:#2F5496;margin:16px 0 8px}';
-  html+='</style></head><body>';
+  const wb=new ExcelJS.Workbook();
 
-  html+='<h2>'+escHtml(document.getElementById('plotTitle').value||'SQUID Plot')+'</h2>';
-  html+='<img src="'+imgDataUrl+'" width="'+Math.min(canvas.clientWidth,900)+'">';
-  html+='<br><br>';
+  // --- シート1: グラフ画像 ---
+  const wsChart=wb.addWorksheet('SQUID Chart');
+  const imgBase64=canvas.toDataURL('image/png').split(',')[1];
+  const imgId=wb.addImage({base64:imgBase64, extension:'png'});
+  const cols=Math.min(14, Math.round(canvas.clientWidth/70));
+  const rows=Math.min(35, Math.round(canvas.clientHeight/20));
+  wsChart.addImage(imgId,{tl:{col:0,row:0},br:{col:cols,row:rows}});
 
+  // --- シート2〜: 各データセット ---
   for(const f of fileList){
-    html+='<h2>'+escHtml(f.label)+'</h2>';
-    html+='<table><thead><tr><th>Temperature (K)</th><th>Field (Oe)</th><th>Moment (emu)</th></tr></thead><tbody>';
-    for(let i=0;i<f.temp.length;i++){
-      html+='<tr><td>'+f.temp[i].toFixed(2)+'</td><td>'+f.field[i].toFixed(1)+'</td><td>'+f.moment[i].toExponential(6)+'</td></tr>';
-    }
-    html+='</tbody></table><br>';
+    const name=(f.label||'data').substring(0,28).replace(/[\\\/\*\?\[\]:]/g,'');
+    const ws=wb.addWorksheet(name);
+    ws.columns=[
+      {header:'Temperature (K)',key:'t',width:16},
+      {header:'Field (Oe)',key:'h',width:14},
+      {header:'Moment (emu)',key:'m',width:18}
+    ];
+    const hdr=ws.getRow(1);
+    hdr.font={bold:true,color:{argb:'FFFFFFFF'}};
+    hdr.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
+    for(let i=0;i<f.temp.length;i++) ws.addRow({t:f.temp[i],h:f.field[i],m:f.moment[i]});
   }
-  html+='</body></html>';
 
-  const blob=new Blob([html],{type:'application/vnd.ms-excel'});
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download=firstName+'_SQUID.xls';
+  a.download=firstName+'_SQUID.xlsx';
   a.click();
   URL.revokeObjectURL(a.href);
 }
-function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 // ===== PNG出力 =====
 function exportPNG(){
