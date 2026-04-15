@@ -85,6 +85,30 @@
   .setup-notice{padding:16px;text-align:center;color:#666;font-size:.78rem;border-bottom:1px solid rgba(255,255,255,0.04)}
   .setup-notice a{color:#58a6ff}
 
+  /* 接続ステータス */
+  .conn-status{position:fixed;top:8px;right:12px;font-size:.7rem;padding:3px 10px;border-radius:10px;z-index:100;
+    display:flex;align-items:center;gap:5px;pointer-events:none}
+  .conn-status .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+  .conn-status.online{background:rgba(34,197,94,0.15);color:#22c55e}
+  .conn-status.online .dot{background:#22c55e}
+  .conn-status.offline{background:rgba(234,179,8,0.15);color:#eab308}
+  .conn-status.offline .dot{background:#eab308}
+
+  /* 新着通知バッジ */
+  .new-badge{background:#ef4444;color:#fff;font-size:.6rem;padding:1px 6px;border-radius:8px;
+    margin-left:6px;animation:badgePulse .6s ease-in-out}
+  @keyframes badgePulse{0%{transform:scale(0)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
+
+  /* 新着レスハイライト */
+  .res.new-res{animation:resHighlight 1.5s ease-out}
+  @keyframes resHighlight{0%{background:rgba(88,166,255,0.2);border-left-color:#58a6ff}100%{background:rgba(20,24,36,0.6);border-left-color:rgba(88,166,255,0.2)}}
+
+  /* 自動更新インジケーター */
+  .auto-refresh{font-size:.65rem;color:#555;text-align:center;padding:4px;display:flex;align-items:center;justify-content:center;gap:4px}
+  .auto-refresh .spinner{width:10px;height:10px;border:1.5px solid #333;border-top-color:#58a6ff;border-radius:50%;
+    animation:spin 1s linear infinite;display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
   footer{margin-top:auto;padding:24px;color:#555;font-size:.75rem;text-align:center}
   footer a{color:#58a6ff;text-decoration:none}
 
@@ -98,6 +122,10 @@
 </style>
 </head>
 <body>
+
+<div class="conn-status" id="conn-status">
+  <span class="dot"></span><span id="conn-text"></span>
+</div>
 
 <header>
   <h1>Research Tools</h1>
@@ -292,13 +320,14 @@
 //  4. 下の firebaseConfig を自分の値に差し替え
 // =====================================================
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyClK3vIE_SQ7SGdXWbmWzZ51MdeBappDKY",
+  authDomain: "research-tools-board.firebaseapp.com",
+  databaseURL: "https://research-tools-board-default-rtdb.firebaseio.com",
+  projectId: "research-tools-board",
+  storageBucket: "research-tools-board.firebasestorage.app",
+  messagingSenderId: "919441103197",
+  appId: "1:919441103197:web:2bb09e95d4b3034648f0b4",
+  measurementId: "G-7JCBM41RH4"
 };
 
 let db=null, firebaseReady=false;
@@ -311,10 +340,52 @@ try{
 }catch(e){console.warn('Firebase init failed:',e);}
 
 // =====================================================
-//  ローカルストレージ fallback
+//  接続ステータス
+// =====================================================
+const connEl=document.getElementById('conn-status');
+const connText=document.getElementById('conn-text');
+
+function setConnStatus(online,text){
+  connEl.className='conn-status '+(online?'online':'offline');
+  connText.textContent=text;
+  connEl.style.opacity='1';
+  // 5秒後にフェードアウト（オンラインの場合）
+  if(online){setTimeout(()=>{connEl.style.transition='opacity 1s';connEl.style.opacity='0.3';},4000);}
+}
+
+if(firebaseReady){
+  const connRef=firebase.database().ref('.info/connected');
+  connRef.on('value',snap=>{
+    if(snap.val()===true){setConnStatus(true,'リアルタイム接続中');}
+    else{setConnStatus(false,'再接続中...');}
+  });
+}else{
+  setConnStatus(false,'ローカルモード');
+}
+
+// =====================================================
+//  ローカルストレージ fallback + ポーリング
 // =====================================================
 function getLocal(toolId){try{return JSON.parse(localStorage.getItem('rt-'+toolId)||'[]');}catch(e){return [];}}
 function setLocal(toolId,d){localStorage.setItem('rt-'+toolId,JSON.stringify(d));}
+
+// ローカルモード時: 他タブの変更を検知（storage イベント）
+if(!firebaseReady){
+  window.addEventListener('storage',e=>{
+    if(e.key&&e.key.startsWith('rt-')){
+      const t=e.key.replace('rt-','');
+      const arr=getLocal(t);
+      window['_threads_'+t]=arr;
+      renderList(t,arr);
+      // スレッド閲覧中なら再描画
+      const curId=window['_curThread_'+t];
+      if(curId&&document.getElementById('view-'+t).style.display==='block'){
+        const th=arr.find(x=>x.id===curId);
+        if(th) renderThread(t,th,true);
+      }
+    }
+  });
+}
 
 // =====================================================
 //  板UI
@@ -330,6 +401,8 @@ function backToList(t){
   document.getElementById('threads-'+t).style.display='block';
   document.getElementById('ntbtn-'+t).style.display='block';
   if(firebaseReady&&window['_unsub_'+t]){window['_unsub_'+t]();window['_unsub_'+t]=null;}
+  window['_curThread_'+t]=null;
+  window['_postCount_'+t]=0;
 }
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
@@ -344,12 +417,18 @@ function renderList(t,threads){
   el.innerHTML=threads.map(th=>{
     const d=new Date(th.lastActivity||th.created);
     const ds=d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'})+' '+d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
-    const rc=(th.replies?Object.keys(th.replies).length:0)+1;
+    const rc=countPosts(th);
     return `<div class="thread-item" onclick="openThread('${t}','${th.id}')"><span class="t-title">${esc(th.title)}</span><span class="t-meta">${ds}<span class="t-count">${rc}</span></span></div>`;
   }).join('');
 }
 
-function renderThread(t,th){
+function countPosts(th){
+  if(!th.replies) return 1;
+  if(Array.isArray(th.replies)) return th.replies.length+1;
+  return Object.keys(th.replies).length+1;
+}
+
+function renderThread(t,th,isUpdate){
   document.getElementById('vtitle-'+t).textContent=th.title;
   const el=document.getElementById('replies-'+t);
   let posts=[{name:th.name||'名無しさん',body:th.body,time:th.created}];
@@ -357,13 +436,28 @@ function renderThread(t,th){
     const rArr=Array.isArray(th.replies)?th.replies:Object.values(th.replies);
     posts=posts.concat(rArr);
   }
+
+  const prevCount=window['_postCount_'+t]||0;
+  const newCount=posts.length;
+  window['_postCount_'+t]=newCount;
+
+  // 新着があるかチェック
+  const hasNew=isUpdate&&newCount>prevCount&&prevCount>0;
+
   el.innerHTML=posts.map((r,i)=>{
     const d=new Date(r.time);
     const ds=d.toLocaleDateString('ja-JP')+' '+d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    return `<div class="res"><div class="res-header"><span class="res-num">${i+1}</span> <span class="res-name">${esc(r.name||'名無しさん')}</span> ${ds}</div><div class="res-body">${esc(r.body)}</div></div>`;
+    const isNewRes=hasNew&&i>=prevCount;
+    return `<div class="res${isNewRes?' new-res':''}"><div class="res-header"><span class="res-num">${i+1}</span> <span class="res-name">${esc(r.name||'名無しさん')}</span> ${ds}${isNewRes?'<span class="new-badge">NEW</span>':''}</div><div class="res-body">${esc(r.body)}</div></div>`;
   }).join('');
-  // 最下部にスクロール
-  el.scrollTop=el.scrollHeight;
+
+  // 新着があれば自動スクロール
+  if(hasNew||!isUpdate){
+    const boardBody=el.closest('.board-body');
+    if(boardBody){
+      setTimeout(()=>{boardBody.scrollTop=boardBody.scrollHeight;},50);
+    }
+  }
 }
 
 // =====================================================
@@ -371,11 +465,39 @@ function renderThread(t,th){
 // =====================================================
 function loadThreads(t){
   if(firebaseReady){
-    db.ref('boards/'+t+'/threads').on('value',snap=>{
+    // リアルタイムリスナー: スレッド一覧を監視
+    db.ref('boards/'+t+'/threads').orderByChild('lastActivity').on('value',snap=>{
       const d=snap.val()||{};
       const arr=Object.entries(d).map(([id,v])=>({id,...v}));
+      const prev=window['_threads_'+t]||[];
       window['_threads_'+t]=arr;
-      renderList(t,arr);
+
+      // スレッド一覧表示中なら更新
+      if(document.getElementById('threads-'+t).style.display!=='none'){
+        renderList(t,arr);
+        // 新着スレッドがあればバッジ
+        if(prev.length>0&&arr.length>prev.length){
+          const countEl=document.getElementById('count-'+t);
+          const diff=arr.length-prev.length;
+          countEl.innerHTML=arr.length+' スレッド <span class="new-badge">+'+diff+'</span>';
+        }
+      }
+
+      // スレッド閲覧中なら該当スレッドも更新
+      const curId=window['_curThread_'+t];
+      if(curId&&document.getElementById('view-'+t).style.display==='block'){
+        const th=arr.find(x=>x.id===curId);
+        if(th) renderThread(t,th,true);
+      }
+    });
+
+    // 個別スレッドの child_changed も監視（より即座のレス反映）
+    db.ref('boards/'+t+'/threads').on('child_changed',snap=>{
+      const curId=window['_curThread_'+t];
+      if(curId&&snap.key===curId&&document.getElementById('view-'+t).style.display==='block'){
+        const th={id:snap.key,...snap.val()};
+        renderThread(t,th,true);
+      }
     });
   }else{
     const arr=getLocal(t);
@@ -393,12 +515,19 @@ function createThread(t){
 
   if(firebaseReady){
     db.ref('boards/'+t+'/threads').push().set({title,name:name||'名無しさん',body,created:now,lastActivity:now})
-      .then(()=>{document.getElementById('nt-title-'+t).value='';document.getElementById('nt-body-'+t).value='';hideNewThread(t);});
+      .then(()=>{
+        document.getElementById('nt-title-'+t).value='';
+        document.getElementById('nt-name-'+t).value='';
+        document.getElementById('nt-body-'+t).value='';
+        hideNewThread(t);
+      });
   }else{
     const arr=getLocal(t);
     arr.push({id:'t'+now,title,name:name||'名無しさん',body,created:now,lastActivity:now,replies:[]});
     setLocal(t,arr);
-    document.getElementById('nt-title-'+t).value='';document.getElementById('nt-body-'+t).value='';
+    document.getElementById('nt-title-'+t).value='';
+    document.getElementById('nt-name-'+t).value='';
+    document.getElementById('nt-body-'+t).value='';
     hideNewThread(t);loadThreads(t);
   }
 }
@@ -408,17 +537,12 @@ function openThread(t,id){
   const th=arr.find(x=>x.id===id);
   if(!th)return;
   window['_curThread_'+t]=id;
+  window['_postCount_'+t]=0; // 初回描画はNEWバッジなし
   document.getElementById('threads-'+t).style.display='none';
   document.getElementById('ntbtn-'+t).style.display='none';
   document.getElementById('newform-'+t).style.display='none';
   document.getElementById('view-'+t).style.display='block';
-  renderThread(t,th);
-
-  if(firebaseReady){
-    const ref=db.ref('boards/'+t+'/threads/'+id);
-    const cb=ref.on('value',snap=>{const u=snap.val();if(u)renderThread(t,{...u,id});});
-    window['_unsub_'+t]=()=>ref.off('value',cb);
-  }
+  renderThread(t,th,false);
 }
 
 function postReply(t){
@@ -427,19 +551,24 @@ function postReply(t){
   const body=document.getElementById('rp-body-'+t).value.trim();
   if(!body){alert('本文を入力してください');return;}
   const now=Date.now();
+  const replyData={name:name||'名無しさん',body,time:now};
 
   if(firebaseReady){
+    // push で新しいキーにレスを追加（リアルタイム反映）
     const tRef=db.ref('boards/'+t+'/threads/'+id);
-    tRef.once('value').then(snap=>{
-      const d=snap.val();
-      const replies=d.replies?Object.values(d.replies):[];
-      replies.push({name:name||'名無しさん',body,time:now});
-      return tRef.update({replies,lastActivity:now});
-    }).then(()=>{document.getElementById('rp-body-'+t).value='';});
+    tRef.child('replies').push().set(replyData)
+      .then(()=>tRef.update({lastActivity:now}))
+      .then(()=>{document.getElementById('rp-body-'+t).value='';});
   }else{
     const arr=getLocal(t);
     const th=arr.find(x=>x.id===id);
-    if(th){if(!th.replies)th.replies=[];th.replies.push({name:name||'名無しさん',body,time:now});th.lastActivity=now;setLocal(t,arr);renderThread(t,th);}
+    if(th){
+      if(!th.replies)th.replies=[];
+      th.replies.push(replyData);
+      th.lastActivity=now;
+      setLocal(t,arr);
+      renderThread(t,th,true);
+    }
     document.getElementById('rp-body-'+t).value='';
   }
 }
@@ -451,7 +580,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(!firebaseReady){
     document.querySelectorAll('.board-body').forEach(b=>{
       const n=document.createElement('div');n.className='setup-notice';
-      n.innerHTML='&#128270; ローカルモード（このブラウザのみ保存）<br><small>全ユーザー共有にするには <a href="https://console.firebase.google.com" target="_blank">Firebase</a> を設定</small>';
+      n.innerHTML='&#128270; ローカルモード（このブラウザのみ保存）<br><small>全ユーザー共有にするには <a href="https://console.firebase.google.com" target="_blank">Firebase</a> を設定してください</small>';
+      b.prepend(n);
+    });
+  }else{
+    // リアルタイムモード表示
+    document.querySelectorAll('.board-body').forEach(b=>{
+      const n=document.createElement('div');n.className='auto-refresh';
+      n.innerHTML='<span class="spinner"></span> リアルタイム更新中 — 他のユーザーの投稿が自動で反映されます';
       b.prepend(n);
     });
   }
