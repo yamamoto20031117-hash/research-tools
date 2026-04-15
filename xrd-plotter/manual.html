@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XRD データプロッター — 取扱説明書</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;
+    min-height:100vh;line-height:1.8}
+  .top-bar{background:rgba(8,11,18,0.95);backdrop-filter:blur(10px);padding:10px 20px;display:flex;
+    align-items:center;gap:14px;border-bottom:1px solid rgba(88,166,255,0.1)}
+  .top-bar a{color:#58a6ff;text-decoration:none;font-size:.85rem}
+  .top-bar h1{font-size:1rem;color:#fff}
+  .container{max-width:860px;margin:0 auto;padding:30px 20px 60px}
+  h2{color:#58a6ff;font-size:1.15rem;margin:36px 0 12px;padding-bottom:6px;border-bottom:1px solid rgba(88,166,255,0.15)}
+  h3{color:#7db8ff;font-size:.95rem;margin:20px 0 8px}
+  p{margin-bottom:12px;color:#bbb;font-size:.9rem}
+  .card{background:rgba(15,18,28,0.8);border:1px solid rgba(88,166,255,0.1);border-radius:8px;padding:16px 20px;margin-bottom:16px}
+  .card-title{color:#ffcc44;font-weight:bold;font-size:.88rem;margin-bottom:8px}
+  .step{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start}
+  .step-num{background:#58a6ff;color:#0a0e17;font-weight:bold;border-radius:50%;width:26px;height:26px;
+    display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;margin-top:2px}
+  .step-text{font-size:.88rem;color:#ccc}
+  .key{display:inline-block;background:#1a2030;border:1px solid #2a3040;border-radius:4px;padding:1px 8px;
+    font-size:.78rem;color:#58a6ff;font-family:monospace;margin:0 2px}
+  .tag{display:inline-block;background:rgba(88,166,255,0.12);color:#58a6ff;border-radius:3px;padding:1px 8px;
+    font-size:.76rem;margin-right:4px}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:.84rem}
+  th{background:rgba(88,166,255,0.1);color:#58a6ff;padding:6px 10px;text-align:left;font-size:.8rem}
+  td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.05);color:#bbb}
+  .note{background:rgba(255,200,60,0.06);border-left:3px solid #ffcc44;padding:10px 14px;border-radius:0 6px 6px 0;
+    margin:12px 0;font-size:.84rem;color:#dda}
+  .back-link{display:inline-block;margin-top:30px;color:#58a6ff;text-decoration:none;font-size:.88rem}
+  .back-link:hover{text-decoration:underline}
+  .img-placeholder{background:rgba(30,35,50,0.6);border:1px dashed rgba(88,166,255,0.2);border-radius:8px;
+    padding:40px 20px;text-align:center;color:#555;font-size:.8rem;margin:12px 0}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="/xrd-plotter/">&#8592; XRDプロッターへ戻る</a>
+  <h1>XRD データプロッター — 取扱説明書</h1>
+</div>
+
+<div class="container">
+
+  <h2>概要</h2>
+  <p>XRDデータプロッターは、Rigaku SmartLab等で取得したX線回折（XRD）データのTXTファイルを読み込み、
+    論文品質のグラフとして表示・出力するWebツールです。複数データのスタック表示、ピーク検出、
+    ドラッグ可能なラベル、Excel/PNG出力に対応しています。</p>
+
+  <h2>クイックスタート</h2>
+  <div class="card">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text">TXTファイルをドロップゾーンにドラッグ＆ドロップ（またはクリックして選択）。複数ファイルを同時に読み込むとスタック表示されます。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text">グラフが自動描画されます。ファイルリストでラベル名・色を編集できます。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-text">「ピーク検出」でピーク位置を自動検出し、ラベル欄に (001) 等を入力するとグラフに表示されます。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-text">「PNG保存」または「Excel出力」で結果を保存します。</div>
+    </div>
+  </div>
+
+  <h2>対応ファイル形式</h2>
+  <div class="card">
+    <div class="card-title">Rigaku SmartLab TXT形式</div>
+    <p>タブ区切り・カンマ区切り・スペース区切りのいずれにも対応。ヘッダー行は自動スキップされます。
+      2列（2θ角度, 強度）のデータが必要です。</p>
+    <div class="note">Shift-JIS、UTF-8、EUC-JP のエンコーディングに自動対応。読み取れない場合はバイナリからASCII部分を抽出する最終手段も備えています。</div>
+  </div>
+
+  <h2>ツールバーの各機能</h2>
+  <table>
+    <thead><tr><th>ボタン / 設定</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag">データ表示</span></td><td>読み込んだ生データを表形式で表示/非表示。最初のデータセットの先頭500行を表示します。</td></tr>
+      <tr><td><span class="tag">ピーク検出</span></td><td>全データセットのピークを自動検出。2θ位置・強度・d値・ラベル入力欄を表示。</td></tr>
+      <tr><td><span class="tag">Excel出力</span></td><td>グラフ画像 + 生データ + ピーク情報をまとめたExcelファイル (.xls) をダウンロード。</td></tr>
+      <tr><td><span class="tag">PNG保存</span></td><td>現在表示中のグラフをPNG画像として保存。そのまま論文に使えるクオリティです。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>グラフ設定</h2>
+  <table>
+    <thead><tr><th>設定項目</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td>X範囲</td><td>表示する2θの最小値・最大値を指定。データ読込時に自動設定されますが、手動で変更可能。</td></tr>
+      <tr><td>線幅</td><td>XRDパターンの描画線幅を 0.5〜4.0 の範囲で調整。</td></tr>
+      <tr><td>Y軸</td><td>Y軸のスケールモード。<strong>リニア</strong>（そのまま）、<strong>対数</strong>（弱いピークを強調）、<strong>平方根</strong>（中間）から選択。</td></tr>
+      <tr><td>グリッド</td><td>背景のグリッド線の表示/非表示。</td></tr>
+      <tr><td>ピークラベル</td><td>ピーク検出後のラベル表示/非表示を切り替え。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>スタック表示</h2>
+  <div class="card">
+    <p>複数ファイルを読み込むと、各データセットが縦方向にスタック表示されます。
+      各データセットは独立してY軸が正規化されるため、強度スケールが大きく異なるデータ同士でも
+      見やすく並べて表示できます。</p>
+    <p>ファイルリストでは各データセットの色（カラーピッカー）、ラベル名（テキスト入力）、
+      削除（×ボタン）が操作できます。ラベル名はグラフ右上に表示されます。</p>
+  </div>
+
+  <h2>ピーク検出</h2>
+  <div class="card">
+    <div class="card-title">検出アルゴリズム</div>
+    <p>移動平均で平滑化後、局所的な極大点を検出します。以下のフィルタリングを適用：</p>
+    <table>
+      <tbody>
+        <tr><td>閾値</td><td>最大強度の10%未満のピークを除外</td></tr>
+        <tr><td>突出度（プロミネンス）</td><td>周囲との高低差が最大強度の3%未満のピークを除外</td></tr>
+        <tr><td>近接マージ</td><td>1.0°以内の近接ピークは最も強い方を採用</td></tr>
+      </tbody>
+    </table>
+    <div class="note">検出後、ピークリストの「ラベル」欄に (001) や (002) などのミラー指数を入力すると、
+      グラフ上にラベルが表示されます。ラベルが空のピークはグラフ上には表示されません。</div>
+  </div>
+
+  <h3>d値の計算</h3>
+  <p>Braggの法則 (nλ = 2d sinθ) に基づき、Cu-Kα線の波長 λ = 1.5406 Å を使用して
+    d値（面間隔）を自動計算します。</p>
+
+  <h2>ピークラベルのドラッグ移動</h2>
+  <div class="card">
+    <div class="card-title">ラベルを自由に配置</div>
+    <p>ピークラベルはマウスでドラッグして任意の位置に移動できます。</p>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text">ラベルにマウスを合わせるとカーソルが<span class="key">grab</span>に変わります。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text">ドラッグしてラベルを好きな位置に移動。ピーク頂点からラベルまで点線のリーダーラインが自動で描かれます。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-text">ラベル位置はPNG保存・Excel出力にも反映されます。タッチ操作にも対応。</div>
+    </div>
+  </div>
+
+  <h2>Y軸スケールモードの使い分け</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>モード</th><th>計算</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td><strong>リニア</strong></td><td>そのまま表示</td><td>通常の論文用グラフ。ピーク強度比を正確に反映。</td></tr>
+        <tr><td><strong>対数</strong></td><td>log₁₀(Intensity)</td><td>非常に弱いピークや微量相を確認する際に有効。バックグラウンドのノイズも見えやすくなります。</td></tr>
+        <tr><td><strong>平方根</strong></td><td>√Intensity</td><td>対数ほど極端でなく、弱いピークを少し強調したい場合に適しています。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Excel出力の仕様</h2>
+  <div class="card">
+    <p>Excel出力 (.xls) ファイルには以下が含まれます：</p>
+    <table>
+      <tbody>
+        <tr><td>グラフ画像</td><td>現在のキャンバスのスクリーンショットがそのまま埋め込まれます。</td></tr>
+        <tr><td>生データテーブル</td><td>各データセットの全 2θ / 強度データ。</td></tr>
+        <tr><td>ピークテーブル</td><td>ピーク検出済みの場合、2θ・強度・d値・ラベル情報が出力されます。</td></tr>
+      </tbody>
+    </table>
+    <div class="note">出力形式は HTML-Excel (.xls) です。Microsoft Excel、LibreOffice Calc、Google Sheets 等で開けます。
+      macOS の Numbers では画像が表示されない場合があります。</div>
+  </div>
+
+  <h2>トラブルシューティング</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>症状</th><th>原因と対処法</th></tr></thead>
+      <tbody>
+        <tr><td>「データを読み取れませんでした」</td><td>TXTファイルが SmartLab 形式以外の可能性。2列（2θ, 強度）のタブ/カンマ/スペース区切りデータか確認してください。</td></tr>
+        <tr><td>ピークが検出されない</td><td>ピーク強度がバックグラウンドに対して十分でない可能性。X範囲を狭めて再検出してみてください。</td></tr>
+        <tr><td>ピークが多すぎる</td><td>ノイズの多いデータではピーク検出が過敏になることがあります。ピークリストのラベル欄に入力したもののみグラフ上に表示されます。</td></tr>
+        <tr><td>Excelにグラフが表示されない</td><td>.xls ファイルを Microsoft Excel または LibreOffice Calc で開いてください。ブラウザのプレビューでは画像が表示されない場合があります。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <a class="back-link" href="/xrd-plotter/">&larr; XRDプロッターへ戻る</a>
+
+</div>
+
+</body>
+</html>

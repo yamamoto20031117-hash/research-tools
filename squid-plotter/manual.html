@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQUID 磁化データプロッター — 取扱説明書</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;
+    min-height:100vh;line-height:1.8}
+  .top-bar{background:rgba(8,11,18,0.95);backdrop-filter:blur(10px);padding:10px 20px;display:flex;
+    align-items:center;gap:14px;border-bottom:1px solid rgba(88,166,255,0.1)}
+  .top-bar a{color:#58a6ff;text-decoration:none;font-size:.85rem}
+  .top-bar h1{font-size:1rem;color:#fff}
+  .container{max-width:860px;margin:0 auto;padding:30px 20px 60px}
+  h2{color:#58a6ff;font-size:1.15rem;margin:36px 0 12px;padding-bottom:6px;border-bottom:1px solid rgba(88,166,255,0.15)}
+  h3{color:#7db8ff;font-size:.95rem;margin:20px 0 8px}
+  p{margin-bottom:12px;color:#bbb;font-size:.9rem}
+  .card{background:rgba(15,18,28,0.8);border:1px solid rgba(88,166,255,0.1);border-radius:8px;padding:16px 20px;margin-bottom:16px}
+  .card-title{color:#ffcc44;font-weight:bold;font-size:.88rem;margin-bottom:8px}
+  .step{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start}
+  .step-num{background:#58a6ff;color:#0a0e17;font-weight:bold;border-radius:50%;width:26px;height:26px;
+    display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;margin-top:2px}
+  .step-text{font-size:.88rem;color:#ccc}
+  .key{display:inline-block;background:#1a2030;border:1px solid #2a3040;border-radius:4px;padding:1px 8px;
+    font-size:.78rem;color:#58a6ff;font-family:monospace;margin:0 2px}
+  .tag{display:inline-block;background:rgba(88,166,255,0.12);color:#58a6ff;border-radius:3px;padding:1px 8px;
+    font-size:.76rem;margin-right:4px}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:.84rem}
+  th{background:rgba(88,166,255,0.1);color:#58a6ff;padding:6px 10px;text-align:left;font-size:.8rem}
+  td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.05);color:#bbb}
+  .note{background:rgba(255,200,60,0.06);border-left:3px solid #ffcc44;padding:10px 14px;border-radius:0 6px 6px 0;
+    margin:12px 0;font-size:.84rem;color:#dda}
+  .back-link{display:inline-block;margin-top:30px;color:#58a6ff;text-decoration:none;font-size:.88rem}
+  .back-link:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="/squid-plotter/">&#8592; プロッターへ戻る</a>
+  <h1>SQUID 磁化データプロッター — 取扱説明書</h1>
+</div>
+
+<div class="container">
+
+  <h2>概要</h2>
+  <p>SQUID磁化データプロッターは、Quantum Design MPMS / PPMS で取得した磁化測定データを読み込み、
+    論文品質の M-H曲線、M-T曲線、χ-T、1/χ-T グラフを自動生成するWebツールです。
+    複数データの重ね描き、単位の自動スケーリング、質量正規化に対応しています。</p>
+
+  <h2>クイックスタート</h2>
+  <div class="card">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text">.dat ファイルをドロップゾーンにドラッグ＆ドロップ（またはクリックして選択）。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text">データが自動解析され、M-H または M-T が自動判定されてグラフが表示されます。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-text">タイトルの編集、単位の変更、点のスタイル調整などを行います。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-text">「PNG保存」または「Excel出力」で結果を保存します。</div>
+    </div>
+  </div>
+
+  <h2>対応ファイル形式</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>形式</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Quantum Design .dat</strong></td><td>MPMS3 / MPMS XL / PPMS 標準出力。[Header] と [Data] セクションを含むCSV形式。Temperature (K), Magnetic Field (Oe), Moment (emu) 等のカラムを自動認識。</td></tr>
+        <tr><td><strong>汎用 CSV / TSV</strong></td><td>カンマ・タブ・スペース区切りの数値データ。2列（x, moment）または3列（field, temp, moment）に対応。</td></tr>
+        <tr><td><strong>テキスト .txt</strong></td><td>数値列を含むプレーンテキスト。ヘッダー行・コメント行は自動スキップ。</td></tr>
+      </tbody>
+    </table>
+    <div class="note">Shift-JIS、UTF-8、EUC-JP のエンコーディングに自動対応。読み取れない場合はバイナリからASCII部分を抽出する最終手段も備えています。</div>
+  </div>
+
+  <h2>プロットモード</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>モード</th><th>X軸</th><th>Y軸</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag">M-H</span></td><td>磁場 (Oe)</td><td>磁化 (emu)</td><td>磁場依存性。ヒステリシスループ、常磁性/反磁性の判定。</td></tr>
+        <tr><td><span class="tag">M-T</span></td><td>温度 (K)</td><td>磁化 (emu)</td><td>温度依存性。転移温度、磁気秩序の観測。</td></tr>
+        <tr><td><span class="tag">χ-T</span></td><td>温度 (K)</td><td>χ = M/H (emu/Oe)</td><td>帯磁率。キュリー-ワイス則のフィッティング用データ。</td></tr>
+        <tr><td><span class="tag">1/χ-T</span></td><td>温度 (K)</td><td>1/χ (Oe/emu)</td><td>逆帯磁率。キュリー定数・ワイス温度の直線フィッティングに最適。</td></tr>
+      </tbody>
+    </table>
+    <p>データ読込時、磁場変化が温度変化より十分大きい場合はM-Hモード、それ以外はM-Tモードに自動設定されます。</p>
+  </div>
+
+  <h2>グラフ設定</h2>
+  <table>
+    <thead><tr><th>設定</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td>タイトル</td><td>グラフ上部に表示されるタイトル。自動生成されますが自由に編集可能。</td></tr>
+      <tr><td>点サイズ</td><td>データ点の大きさ（1〜10）。</td></tr>
+      <tr><td>線幅</td><td>データ点を結ぶ線の太さ。0 = 線なし（散布図のみ）。</td></tr>
+      <tr><td>グリッド</td><td>背景グリッドの表示/非表示。</td></tr>
+      <tr><td>原点十字線</td><td>x=0, y=0 の黒い直線を描画。M-Hカーブのヒステリシス観察に便利。</td></tr>
+      <tr><td>点形状</td><td>丸(●)、四角(■)、三角(▲)、ダイヤ(◆) から選択。</td></tr>
+      <tr><td>X単位</td><td>磁場の表示単位（自動 / Oe / kOe / 10kOe / T）。</td></tr>
+      <tr><td>Y単位</td><td>磁化の表示単位（自動 / emu / 10⁻²emu 等）。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>単位の自動スケーリング</h2>
+  <div class="card">
+    <p>「自動」設定では、データの値の大きさに応じて最適な単位プレフィックスが自動選択されます。</p>
+    <table>
+      <thead><tr><th>磁場範囲</th><th>自動選択</th></tr></thead>
+      <tbody>
+        <tr><td>50,000 Oe 以上</td><td>10kOe（参考画像と同じ表示）</td></tr>
+        <tr><td>5,000〜50,000 Oe</td><td>kOe</td></tr>
+        <tr><td>5,000 Oe 未満</td><td>Oe</td></tr>
+      </tbody>
+    </table>
+    <table>
+      <thead><tr><th>磁化オーダー</th><th>自動選択</th></tr></thead>
+      <tbody>
+        <tr><td>10⁻¹ 台</td><td>10⁻²emu</td></tr>
+        <tr><td>10⁻² 台</td><td>10⁻³emu</td></tr>
+        <tr><td>10⁻³〜10⁻⁴ 台</td><td>10⁻⁴emu</td></tr>
+        <tr><td>10⁻⁵ 以下</td><td>10⁻⁵emu</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>質量正規化（emu → emu/g）</h2>
+  <div class="card">
+    <p>各データセットの「質量(mg)」欄にサンプル質量を入力すると、磁化が質量あたりの値（emu/g）に自動変換されます。
+      Y軸ラベルも自動で emu/g に切り替わります。</p>
+    <div class="note">質量は mg（ミリグラム）単位で入力。0 または空欄の場合は正規化なし（生の emu 値）。</div>
+  </div>
+
+  <h2>複数データの重ね描き</h2>
+  <div class="card">
+    <p>複数ファイルを読み込むと、同じグラフ上に重ねて描画されます。各データセットの色・ラベル・点形状を個別に設定できます。
+      凡例はグラフ右上に自動表示されます。</p>
+    <p>用途例: 同一試料の異温度での M-H 測定比較、異なる試料の磁気特性比較など。</p>
+  </div>
+
+  <h2>出力</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>ボタン</th><th>出力内容</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag">PNG保存</span></td><td>白背景の高解像度PNG画像。そのまま論文に使用可能。</td></tr>
+        <tr><td><span class="tag">Excel出力</span></td><td>グラフ画像 + 全データセットの生データ（Temperature, Field, Moment）を含む .xls ファイル。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>トラブルシューティング</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>症状</th><th>対処法</th></tr></thead>
+      <tbody>
+        <tr><td>「データを読み取れませんでした」</td><td>ファイルが Quantum Design 標準 .dat 形式か確認してください。[Data]セクションに Temperature, Magnetic Field, Moment のカラムが必要です。</td></tr>
+        <tr><td>グラフが空白</td><td>プロットモードを確認。M-H データなのに M-T モードが選択されている場合、磁場変化がないためグラフが表示されません。</td></tr>
+        <tr><td>数値が非常に小さい/大きい</td><td>Y単位を「自動」以外に変更するか、質量正規化を適用してみてください。</td></tr>
+        <tr><td>ヒステリシスの形が崩れる</td><td>線幅を 0 にして散布図（点のみ）で表示すると、データの順序に依存しない正確な表示になります。</td></tr>
+        <tr><td>Excelにグラフが表示されない</td><td>Microsoft Excel または LibreOffice Calc で開いてください。ブラウザのプレビューでは画像が表示されない場合があります。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <a class="back-link" href="/squid-plotter/">&larr; プロッターへ戻る</a>
+
+</div>
+
+</body>
+</html>

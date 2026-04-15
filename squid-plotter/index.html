@@ -26,6 +26,21 @@
   .drop-zone p{color:#666;font-size:.85rem}
   .drop-zone .sub{font-size:.75rem;color:#555;margin-top:6px}
 
+  .multi-list{display:none;margin-bottom:16px}
+  .multi-item{display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(20,24,36,0.6);
+    border-radius:4px;margin-bottom:4px;font-size:.8rem;flex-wrap:wrap}
+  .multi-item input[type=color]{width:24px;height:24px;border:none;cursor:pointer;background:transparent;
+    -webkit-appearance:none;border-radius:3px}
+  .multi-item input[type=text]{width:180px;background:#0e1220;border:1px solid #2a3040;border-radius:4px;
+    padding:3px 8px;color:#ddd;font-size:.8rem}
+  .multi-item input[type=text]:focus{outline:none;border-color:#58a6ff}
+  .multi-item input[type=number]{width:80px;background:#0e1220;border:1px solid #2a3040;border-radius:4px;
+    padding:3px 8px;color:#ddd;font-size:.8rem}
+  .multi-item .mi-name{color:#666;font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .multi-item .mi-remove{color:#666;cursor:pointer;font-size:1.1rem;padding:0 4px}
+  .multi-item .mi-remove:hover{color:#ff6666}
+  .multi-item label{color:#888;font-size:.75rem}
+
   .mode-bar{display:none;margin-bottom:16px;padding:10px 16px;background:rgba(15,18,28,0.8);
     border-radius:8px;border:1px solid rgba(88,166,255,0.1)}
   .mode-bar h3{font-size:.85rem;color:#888;margin-bottom:8px}
@@ -33,17 +48,24 @@
 
   .chart-wrap{background:rgba(15,18,28,0.8);border:1px solid rgba(88,166,255,0.1);border-radius:8px;
     padding:16px;margin-bottom:20px;display:none}
-  .chart-wrap canvas{width:100%!important;max-height:500px}
   .chart-toolbar{display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap;font-size:.78rem;color:#aaa}
   .chart-toolbar input,.chart-toolbar select{background:#0e1220;border:1px solid #2a3040;border-radius:4px;
     padding:4px 8px;color:#ddd;font-size:.78rem}
-  .chart-toolbar input:focus{outline:none;border-color:#58a6ff}
+  .chart-toolbar input:focus,.chart-toolbar select:focus{outline:none;border-color:#58a6ff}
+  .chart-toolbar label{display:flex;align-items:center;gap:3px}
+
+  .title-edit{display:none;margin-bottom:12px}
+  .title-edit input{width:100%;background:#0e1220;border:1px solid #2a3040;border-radius:4px;
+    padding:6px 10px;color:#ddd;font-size:.9rem}
+  .title-edit input:focus{outline:none;border-color:#58a6ff}
 
   .info-box{display:none;background:rgba(15,18,28,0.8);border:1px solid rgba(88,166,255,0.1);
     border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:.82rem;line-height:1.7}
   .info-box .ib-title{color:#58a6ff;font-weight:bold;margin-bottom:4px}
   .info-box .ib-row{color:#bbb}
   .info-box .ib-val{color:#ffcc44;font-weight:bold}
+
+  #squidCanvas{width:100%;background:#fff;border-radius:4px}
 </style>
 </head>
 <body>
@@ -51,38 +73,70 @@
 <div class="top-bar">
   <a href="/">&#8592; Research Tools</a>
   <h1>SQUID 磁化データプロッター</h1>
+  <button class="btn" onclick="exportXLS()">Excel出力</button>
   <button class="btn btn-primary" onclick="exportPNG()">PNG保存</button>
+  <a href="/squid-plotter/manual.html" class="btn" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px">&#128214; 説明書</a>
 </div>
 
 <div class="container">
   <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
     <h2>SQUID / PPMS データファイルをドロップ</h2>
-    <p>対応形式: .dat .csv .txt（MPMS/PPMS標準出力、汎用CSV）</p>
-    <div class="sub">自動検出: M-T曲線（温度 vs 磁化）、M-H曲線（磁場 vs 磁化）</div>
+    <p>対応形式: .dat .csv .txt（Quantum Design MPMS/PPMS 標準出力、汎用CSV）</p>
+    <div class="sub">自動検出: M-H曲線（磁場 vs 磁化）、M-T曲線（温度 vs 磁化）、χ-T、1/χ-T</div>
     <input type="file" id="fileInput" multiple accept=".dat,.csv,.txt,.DAT,.CSV,.TXT" style="display:none">
   </div>
+
+  <div class="multi-list" id="multiList"></div>
 
   <div class="mode-bar" id="modeBar">
     <h3>プロットモード</h3>
     <div class="mode-btns">
-      <button class="btn active" id="btn-mt" onclick="setMode('mt')">M-T（温度依存性）</button>
-      <button class="btn" id="btn-mh" onclick="setMode('mh')">M-H（磁場依存性）</button>
+      <button class="btn active" id="btn-mh" onclick="setMode('mh')">M-H（磁場依存性）</button>
+      <button class="btn" id="btn-mt" onclick="setMode('mt')">M-T（温度依存性）</button>
       <button class="btn" id="btn-chi" onclick="setMode('chi')">&#967;-T（帯磁率）</button>
       <button class="btn" id="btn-invchi" onclick="setMode('invchi')">1/&#967;-T（逆帯磁率）</button>
     </div>
   </div>
 
   <div class="chart-wrap" id="chartWrap">
-    <div class="chart-toolbar">
-      <label>線幅:</label>
-      <input type="range" id="lineWidth" min="0.5" max="5" step="0.5" value="2" oninput="updateStyle()">
-      <label>点サイズ:</label>
-      <input type="range" id="pointSize" min="0" max="8" step="1" value="3" oninput="updateStyle()">
-      <label><input type="checkbox" id="chkGrid" checked onchange="updateGrid()"> グリッド</label>
-      <label>色:</label>
-      <input type="color" id="lineColor" value="#58a6ff" onchange="updateLineColor()">
+    <div class="title-edit" id="titleEdit">
+      <input type="text" id="plotTitle" placeholder="グラフタイトル（例: VSe₂ M-H curve 300K）" oninput="redraw()">
     </div>
-    <canvas id="chart"></canvas>
+    <div class="chart-toolbar">
+      <label>点サイズ:</label>
+      <input type="range" id="pointSize" min="1" max="10" step="0.5" value="4" oninput="redraw()">
+      <label>線幅:</label>
+      <input type="range" id="lineWidth" min="0" max="4" step="0.5" value="0" oninput="redraw()">
+      <label><input type="checkbox" id="chkGrid" checked onchange="redraw()"> グリッド</label>
+      <label><input type="checkbox" id="chkAxisCross" checked onchange="redraw()"> 原点十字線</label>
+      <label>点形状:</label>
+      <select id="dotShape" onchange="redraw()">
+        <option value="circle">●丸</option>
+        <option value="square">■四角</option>
+        <option value="triangle">▲三角</option>
+        <option value="diamond">◆ダイヤ</option>
+      </select>
+      <label>X単位:</label>
+      <select id="xUnit" onchange="redraw()">
+        <option value="auto">自動</option>
+        <option value="Oe">Oe</option>
+        <option value="kOe">kOe</option>
+        <option value="10kOe">10kOe</option>
+        <option value="T">T</option>
+      </select>
+      <label>Y単位:</label>
+      <select id="yUnit" onchange="redraw()">
+        <option value="auto">自動</option>
+        <option value="emu">emu</option>
+        <option value="1e-2emu">10⁻²emu</option>
+        <option value="1e-3emu">10⁻³emu</option>
+        <option value="1e-4emu">10⁻⁴emu</option>
+        <option value="1e-5emu">10⁻⁵emu</option>
+        <option value="emu/g">emu/g</option>
+        <option value="1e-2emu/g">10⁻²emu/g</option>
+      </select>
+    </div>
+    <canvas id="squidCanvas"></canvas>
   </div>
 
   <div class="info-box" id="infoBox">
@@ -91,66 +145,121 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-let chart=null;
-let allData=[]; // {filename, temp[], field[], moment[], raw[]}
-let currentMode='mt';
+const COLORS=['#CC0000','#2F5496','#228B22','#FF8C00','#8B008B','#008B8B','#B22222','#4169E1'];
+let fileList=[]; // {name, label, color, temp[], field[], moment[], mass, marker}
+let currentMode='mh';
 
+// ===== ファイル読み込み =====
 const dropZone=document.getElementById('dropZone');
 const fileInput=document.getElementById('fileInput');
 dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('active');});
 dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('active'));
 dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('active');handleFiles(e.dataTransfer.files);});
-fileInput.addEventListener('change',e=>handleFiles(e.target.files));
+fileInput.addEventListener('change',e=>{handleFiles(e.target.files);fileInput.value='';});
 
-function handleFiles(files){for(const f of files)readFile(f);}
+function handleFiles(files){
+  for(const f of files) readFile(f);
+}
 
 function readFile(file){
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const data=parseSQUID(e.target.result, file.name);
-    if(data){
-      allData.push(data);
-      document.getElementById('modeBar').style.display='block';
-      autoDetectMode(data);
-      plotData();
-      showInfo();
-    }else{alert('データを読み取れませんでした: '+file.name);}
-  };
-  reader.readAsText(file);
+  const encodings=['shift_jis','utf-8','euc-jp','iso-8859-1'];
+  let tryIdx=0;
+  function tryRead(){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const data=parseSQUID(e.target.result, file.name);
+      if(data&&data.moment.length>3){
+        const idx=fileList.length;
+        const label=file.name.replace(/\.(dat|csv|txt)$/i,'');
+        fileList.push({name:file.name, label, color:COLORS[idx%COLORS.length],
+          temp:data.temp, field:data.field, moment:data.moment, mass:0, marker:'circle'});
+        autoDetectMode();
+        updateUI();
+      } else {
+        tryIdx++;
+        if(tryIdx<encodings.length) tryRead();
+        else {
+          // バイナリフォールバック
+          const binReader=new FileReader();
+          binReader.onload=ev=>{
+            const arr=new Uint8Array(ev.target.result);
+            let text='';
+            for(let i=0;i<arr.length;i++){
+              const b=arr[i];
+              if(b===0x09)text+='\t';else if(b===0x0A)text+='\n';else if(b===0x0D)continue;
+              else if(b>=0x20&&b<=0x7E)text+=String.fromCharCode(b);else text+=' ';
+            }
+            const data2=parseSQUID(text, file.name);
+            if(data2&&data2.moment.length>3){
+              const idx2=fileList.length;
+              const label2=file.name.replace(/\.(dat|csv|txt)$/i,'');
+              fileList.push({name:file.name, label:label2, color:COLORS[idx2%COLORS.length],
+                temp:data2.temp, field:data2.field, moment:data2.moment, mass:0, marker:'circle'});
+              autoDetectMode();
+              updateUI();
+            } else {
+              alert('データを読み取れませんでした: '+file.name);
+            }
+          };
+          binReader.readAsArrayBuffer(file);
+        }
+      }
+    };
+    reader.onerror=()=>{tryIdx++;if(tryIdx<encodings.length)tryRead();else alert('読み込み失敗: '+file.name);};
+    reader.readAsText(file, encodings[tryIdx]);
+  }
+  tryRead();
 }
 
 function parseSQUID(text, filename){
   const lines=text.split(/\r?\n/);
   let temp=[],field=[],moment=[];
 
-  // MPMS/PPMS .dat format: find header row, then parse
+  // Quantum Design MPMS/PPMS .dat format
   let headerIdx=-1, colMap={};
-  for(let i=0;i<Math.min(lines.length,100);i++){
-    const l=lines[i];
-    // Quantum Design format: "[Header]" section then "[Data]"
-    if(l.includes('[Data]')){headerIdx=i+1;continue;}
-    if(headerIdx===-1 && /temperature|field|moment|magnetization/i.test(l) && (l.includes(',')||l.includes('\t'))){
-      headerIdx=i;
-    }
-    if(headerIdx===i){
-      const cols=l.split(/[,\t]+/).map(c=>c.trim().toLowerCase());
+  let inData=false;
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i].trim();
+
+    // [Data] セクション検出
+    if(l==='[Data]'){inData=true;continue;}
+    if(inData && headerIdx===-1){
+      // [Data]の次の行がヘッダー
+      const cols=l.split(',').map(c=>c.trim().toLowerCase());
       cols.forEach((c,j)=>{
-        if(/temp/i.test(c)) colMap.temp=j;
-        if(/field.*oe|magnetic.*field|field.*\(oe\)/i.test(c)) colMap.field=j;
-        else if(/field/i.test(c)&&colMap.field===undefined) colMap.field=j;
-        if(/moment|magnetization|dc.*moment|long.*moment/i.test(c)) colMap.moment=j;
-        if(/m.*emu|moment.*emu/i.test(c)) colMap.moment=j;
+        if(/^temperature/i.test(c)) colMap.temp=j;
+        if(/magnetic field/i.test(c)) colMap.field=j;
+        if(/^moment \(emu\)/i.test(c)&&colMap.moment===undefined) colMap.moment=j;
+        if(/dc moment/i.test(c)) colMap.moment=j;
+        if(/long moment/i.test(c)&&colMap.moment===undefined) colMap.moment=j;
+        if(/^m\.\s/i.test(c)&&colMap.moment===undefined) colMap.moment=j;
+        // Comment列（温度情報などが入る場合がある）
+        if(/^comment/i.test(c)) colMap.comment=j;
       });
+      headerIdx=i;
       continue;
     }
-  }
 
-  // If header found, parse subsequent rows
-  if(headerIdx>=0 && Object.keys(colMap).length>=2){
-    for(let i=headerIdx+1;i<lines.length;i++){
-      const parts=lines[i].split(/[,\t]+/).map(s=>s.trim());
+    // ヘッダー未検出の場合: カンマ/タブ区切りのヘッダー行を探す
+    if(!inData && headerIdx===-1){
+      if(/temperature|field|moment|magnetization/i.test(l)&&(l.includes(',')||l.includes('\t'))){
+        const cols=l.split(/[,\t]+/).map(c=>c.trim().toLowerCase());
+        cols.forEach((c,j)=>{
+          if(/temp/i.test(c)) colMap.temp=j;
+          if(/field.*oe|magnetic.*field/i.test(c)) colMap.field=j;
+          else if(/field/i.test(c)&&colMap.field===undefined) colMap.field=j;
+          if(/moment|magnetization/i.test(c)) colMap.moment=j;
+        });
+        headerIdx=i;
+        continue;
+      }
+    }
+
+    // データ行をパース
+    if(headerIdx>=0 && i>headerIdx){
+      const parts=l.split(/[,\t]+/).map(s=>s.trim());
+      if(parts.length<2) continue;
       const t=colMap.temp!==undefined?parseFloat(parts[colMap.temp]):NaN;
       const h=colMap.field!==undefined?parseFloat(parts[colMap.field]):NaN;
       const m=colMap.moment!==undefined?parseFloat(parts[colMap.moment]):NaN;
@@ -162,7 +271,7 @@ function parseSQUID(text, filename){
     }
   }
 
-  // Fallback: generic 2-3 column numeric data
+  // フォールバック: 汎用2〜3列数値データ
   if(moment.length===0){
     temp=[];field=[];moment=[];
     for(const line of lines){
@@ -170,103 +279,122 @@ function parseSQUID(text, filename){
       if(!tr||/^[#!*\[]/.test(tr)||/^[a-zA-Z]/.test(tr)) continue;
       const parts=tr.split(/[\s,;\t]+/).map(Number).filter(n=>!isNaN(n));
       if(parts.length>=2){
-        temp.push(parts[0]);
-        field.push(0);
-        moment.push(parts[1]);
-        if(parts.length>=3){field[field.length-1]=parts[0];temp[temp.length-1]=0;moment[moment.length-1]=parts[2];}
+        if(parts.length>=3){
+          // 3列: field, temp(?), moment or temp, field(?), moment
+          field.push(parts[0]);
+          temp.push(parts.length>=3?parts[1]:0);
+          moment.push(parts[parts.length-1]);
+        } else {
+          // 2列: x, moment
+          temp.push(parts[0]);
+          field.push(parts[0]);
+          moment.push(parts[1]);
+        }
       }
     }
   }
 
   if(moment.length===0) return null;
-  return {filename,temp,field,moment};
+  return {temp, field, moment};
 }
 
-function autoDetectMode(data){
-  // 温度変化が大きい→M-T、磁場変化が大きい→M-H
-  const tempRange=Math.max(...data.temp)-Math.min(...data.temp);
-  const fieldRange=Math.max(...data.field)-Math.min(...data.field);
+function autoDetectMode(){
+  if(fileList.length===0) return;
+  const d=fileList[fileList.length-1];
+  const tempRange=Math.max(...d.temp)-Math.min(...d.temp);
+  const fieldRange=Math.max(...d.field)-Math.min(...d.field);
   if(fieldRange>tempRange*100) setMode('mh');
   else setMode('mt');
 }
 
+// ===== UI =====
 function setMode(mode){
   currentMode=mode;
-  ['mt','mh','chi','invchi'].forEach(m=>{
+  ['mh','mt','chi','invchi'].forEach(m=>{
     document.getElementById('btn-'+m).classList.toggle('active',m===mode);
   });
-  plotData();
+  // X単位の選択肢をモードに応じて変更
+  const xUnitSel=document.getElementById('xUnit');
+  if(mode==='mh'){
+    xUnitSel.innerHTML='<option value="auto">自動</option><option value="Oe">Oe</option><option value="kOe">kOe</option><option value="10kOe">10kOe</option><option value="T">T</option>';
+  } else {
+    xUnitSel.innerHTML='<option value="auto">自動</option><option value="K">K</option>';
+  }
+  // Y単位の選択肢
+  const yUnitSel=document.getElementById('yUnit');
+  if(mode==='chi'||mode==='invchi'){
+    yUnitSel.innerHTML='<option value="auto">自動</option>';
+  } else {
+    yUnitSel.innerHTML='<option value="auto">自動</option><option value="emu">emu</option><option value="1e-2emu">10⁻²emu</option><option value="1e-3emu">10⁻³emu</option><option value="1e-4emu">10⁻⁴emu</option><option value="1e-5emu">10⁻⁵emu</option><option value="emu/g">emu/g</option><option value="1e-2emu/g">10⁻²emu/g</option>';
+  }
+  redraw();
 }
 
-function plotData(){
-  if(allData.length===0) return;
-  const COLORS=['#58a6ff','#ff6b6b','#44cc88','#ffcc44','#cc66ff','#ff8844'];
-
-  if(chart){chart.destroy();chart=null;}
-
-  const dsets=allData.map((d,i)=>{
-    let x,y,xLabel,yLabel;
-    if(currentMode==='mt'){
-      x=d.temp;y=d.moment;xLabel='Temperature (K)';yLabel='Moment (emu)';
-    }else if(currentMode==='mh'){
-      x=d.field;y=d.moment;xLabel='Field (Oe)';yLabel='Moment (emu)';
-    }else if(currentMode==='chi'){
-      // χ = M/H
-      x=d.temp;
-      y=d.temp.map((t,j)=>d.field[j]!==0?d.moment[j]/d.field[j]:0);
-      xLabel='Temperature (K)';yLabel='χ (emu/Oe)';
-    }else{
-      // 1/χ
-      x=d.temp;
-      y=d.temp.map((t,j)=>{const chi=d.field[j]!==0?d.moment[j]/d.field[j]:0;return chi!==0?1/chi:0;});
-      xLabel='Temperature (K)';yLabel='1/χ (Oe/emu)';
-    }
-
-    return {
-      label:d.filename,
-      data:x.map((xv,j)=>({x:xv,y:y[j]})),
-      borderColor:COLORS[i%COLORS.length],
-      backgroundColor:'transparent',
-      borderWidth:2,
-      pointRadius:3,
-      pointHitRadius:6,
-      tension:0,
-      xLabel, yLabel
-    };
-  });
-
-  const ctx=document.getElementById('chart').getContext('2d');
-  chart=new Chart(ctx,{
-    type:'scatter',
-    data:{datasets:dsets},
-    options:{
-      responsive:true,
-      maintainAspectRatio:false,
-      animation:false,
-      plugins:{
-        legend:{display:allData.length>1,labels:{color:'#aaa',font:{size:11}}},
-        tooltip:{callbacks:{label:c=>`(${c.parsed.x.toFixed(2)}, ${c.parsed.y.toExponential(3)})`}}
-      },
-      scales:{
-        x:{type:'linear',title:{display:true,text:dsets[0].xLabel,color:'#888'},ticks:{color:'#666'},grid:{color:'rgba(255,255,255,0.05)'}},
-        y:{type:'linear',title:{display:true,text:dsets[0].yLabel,color:'#888'},ticks:{color:'#666'},grid:{color:'rgba(255,255,255,0.05)'}}
+function updateUI(){
+  updateMultiList();
+  if(fileList.length>0){
+    document.getElementById('chartWrap').style.display='block';
+    document.getElementById('modeBar').style.display='block';
+    document.getElementById('titleEdit').style.display='block';
+    // 自動タイトル生成
+    const titleInput=document.getElementById('plotTitle');
+    if(!titleInput.value){
+      const d=fileList[0];
+      const tempVal=d.temp.length>0?d.temp[0]:0;
+      const isConstTemp=Math.max(...d.temp)-Math.min(...d.temp)<5;
+      if(currentMode==='mh'&&isConstTemp){
+        titleInput.value=d.label.replace(/_/g,' ')+' M-H curve '+Math.round(tempVal)+'K';
+      } else {
+        titleInput.value=d.label.replace(/_/g,' ');
       }
     }
-  });
-  document.getElementById('chart').parentElement.style.height='500px';
-  document.getElementById('chartWrap').style.display='block';
-  document.getElementById('lineColor').value=COLORS[0];
+    showInfo();
+    redraw();
+  }
+}
+
+function updateMultiList(){
+  const el=document.getElementById('multiList');
+  if(fileList.length===0){el.style.display='none';return;}
+  el.style.display='block';
+  el.innerHTML=fileList.map((f,i)=>
+    `<div class="multi-item">
+      <input type="color" value="${f.color}" onchange="fileList[${i}].color=this.value;redraw()">
+      <input type="text" value="${f.label}" onchange="fileList[${i}].label=this.value;redraw()" placeholder="ラベル">
+      <label>質量(mg):</label>
+      <input type="number" value="${f.mass||''}" min="0" step="0.01" placeholder="0=不使用"
+        onchange="fileList[${i}].mass=parseFloat(this.value)||0;redraw()">
+      <label>形状:</label>
+      <select onchange="fileList[${i}].marker=this.value;redraw()">
+        <option value="circle" ${f.marker==='circle'?'selected':''}>●丸</option>
+        <option value="square" ${f.marker==='square'?'selected':''}>■四角</option>
+        <option value="triangle" ${f.marker==='triangle'?'selected':''}>▲三角</option>
+        <option value="diamond" ${f.marker==='diamond'?'selected':''}>◆ダイヤ</option>
+      </select>
+      <span class="mi-name">(${f.name}, ${f.moment.length}点)</span>
+      <span class="mi-remove" onclick="removeFile(${i})" title="削除">&times;</span>
+    </div>`
+  ).join('');
+}
+
+function removeFile(idx){
+  fileList.splice(idx,1);
+  updateUI();
+  if(fileList.length===0){
+    document.getElementById('chartWrap').style.display='none';
+    document.getElementById('modeBar').style.display='none';
+  }
 }
 
 function showInfo(){
-  if(allData.length===0) return;
-  const d=allData[allData.length-1];
+  if(fileList.length===0) return;
+  const d=fileList[fileList.length-1];
   const tMin=Math.min(...d.temp).toFixed(1), tMax=Math.max(...d.temp).toFixed(1);
   const hMin=Math.min(...d.field).toFixed(0), hMax=Math.max(...d.field).toFixed(0);
   const mMin=d.moment.reduce((a,b)=>Math.min(a,b)).toExponential(3);
   const mMax=d.moment.reduce((a,b)=>Math.max(a,b)).toExponential(3);
   document.getElementById('infoContent').innerHTML=
-    `<div class="ib-row">ファイル: <span class="ib-val">${d.filename}</span></div>
+    `<div class="ib-row">ファイル: <span class="ib-val">${d.name}</span></div>
      <div class="ib-row">データ点数: <span class="ib-val">${d.moment.length}</span></div>
      <div class="ib-row">温度範囲: <span class="ib-val">${tMin} – ${tMax} K</span></div>
      <div class="ib-row">磁場範囲: <span class="ib-val">${hMin} – ${hMax} Oe</span></div>
@@ -274,27 +402,357 @@ function showInfo(){
   document.getElementById('infoBox').style.display='block';
 }
 
-function updateStyle(){
-  if(!chart) return;
-  const w=parseFloat(document.getElementById('lineWidth').value);
-  const p=parseFloat(document.getElementById('pointSize').value);
-  chart.data.datasets.forEach(ds=>{ds.borderWidth=w;ds.pointRadius=p;});
-  chart.update();
+// ===== 描画 =====
+function getPlotData(f){
+  let x=[],y=[];
+  if(currentMode==='mh'){
+    x=f.field.slice(); y=f.moment.slice();
+  } else if(currentMode==='mt'){
+    x=f.temp.slice(); y=f.moment.slice();
+  } else if(currentMode==='chi'){
+    x=f.temp.slice();
+    y=f.temp.map((t,j)=>f.field[j]!==0?f.moment[j]/f.field[j]:0);
+  } else { // invchi
+    x=f.temp.slice();
+    y=f.temp.map((t,j)=>{const chi=f.field[j]!==0?f.moment[j]/f.field[j]:0;return chi!==0?1/chi:0;});
+  }
+  // 質量正規化
+  if(f.mass>0 && (currentMode==='mh'||currentMode==='mt')){
+    const massG=f.mass/1000;
+    y=y.map(v=>v/massG);
+  }
+  return {x,y};
 }
-function updateGrid(){
-  if(!chart) return;
-  const g=document.getElementById('chkGrid').checked;
-  chart.options.scales.x.grid.display=g;chart.options.scales.y.grid.display=g;chart.update();
+
+function autoUnitScale(values, mode, axis){
+  // X軸（磁場）
+  if(axis==='x' && mode==='mh'){
+    const maxAbs=Math.max(...values.map(Math.abs));
+    if(maxAbs>=50000) return {divisor:10000, label:'Field (10kOe)'};
+    if(maxAbs>=5000) return {divisor:1000, label:'Field (kOe)'};
+    if(maxAbs>=0.5&&maxAbs<10) return {divisor:1, label:'Field (T)'}; // already in T?
+    return {divisor:1, label:'Field (Oe)'};
+  }
+  // X軸（温度）
+  if(axis==='x') return {divisor:1, label:'Temperature (K)'};
+
+  // Y軸
+  if(mode==='chi') return {divisor:1, label:'χ (emu/Oe)'};
+  if(mode==='invchi') return {divisor:1, label:'1/χ (Oe/emu)'};
+
+  const hasMass=fileList.some(f=>f.mass>0);
+  const unit=hasMass?'emu/g':'emu';
+  const maxAbs=Math.max(...values.map(Math.abs));
+  if(maxAbs===0) return {divisor:1, label:'Magnetization ('+unit+')'};
+
+  const exp=Math.floor(Math.log10(maxAbs));
+  if(exp<=-4) return {divisor:1e-5, label:'Magnetization (10⁻⁵'+unit+')'};
+  if(exp<=-3) return {divisor:1e-4, label:'Magnetization (10⁻⁴'+unit+')'};
+  if(exp<=-2) return {divisor:1e-3, label:'Magnetization (10⁻³'+unit+')'};
+  if(exp<=-1) return {divisor:1e-2, label:'Magnetization (10⁻²'+unit+')'};
+  return {divisor:1, label:'Magnetization ('+unit+')'};
 }
-function updateLineColor(){
-  if(!chart||!chart.data.datasets[0]) return;
-  chart.data.datasets[0].borderColor=document.getElementById('lineColor').value;
-  chart.update();
+
+function manualUnitScale(unitVal, axis){
+  if(axis==='x'){
+    switch(unitVal){
+      case 'Oe': return {divisor:1, label:'Field (Oe)'};
+      case 'kOe': return {divisor:1000, label:'Field (kOe)'};
+      case '10kOe': return {divisor:10000, label:'Field (10kOe)'};
+      case 'T': return {divisor:10000, label:'Field (T)'};
+      case 'K': return {divisor:1, label:'Temperature (K)'};
+    }
+  } else {
+    const hasMass=fileList.some(f=>f.mass>0);
+    const u=hasMass?'emu/g':'emu';
+    switch(unitVal){
+      case 'emu': case 'emu/g': return {divisor:1, label:'Magnetization ('+u+')'};
+      case '1e-2emu': case '1e-2emu/g': return {divisor:1e-2, label:'Magnetization (10⁻²'+u+')'};
+      case '1e-3emu': return {divisor:1e-3, label:'Magnetization (10⁻³'+u+')'};
+      case '1e-4emu': return {divisor:1e-4, label:'Magnetization (10⁻⁴'+u+')'};
+      case '1e-5emu': return {divisor:1e-5, label:'Magnetization (10⁻⁵'+u+')'};
+    }
+  }
+  return null;
 }
+
+function redraw(){
+  const canvas=document.getElementById('squidCanvas');
+  const dpr=window.devicePixelRatio||1;
+  const w=canvas.parentElement.clientWidth-32;
+  const h=Math.max(500, Math.min(700, w*0.7));
+  canvas.style.width=w+'px';
+  canvas.style.height=h+'px';
+  canvas.width=w*dpr;
+  canvas.height=h*dpr;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle='#fff';
+  ctx.fillRect(0,0,w,h);
+
+  if(fileList.length===0) return;
+
+  const margin={top:50, right:40, bottom:60, left:80};
+  const pw=w-margin.left-margin.right;
+  const ph=h-margin.top-margin.bottom;
+
+  const ptSize=parseFloat(document.getElementById('pointSize').value)||4;
+  const lineW=parseFloat(document.getElementById('lineWidth').value)||0;
+  const showGrid=document.getElementById('chkGrid').checked;
+  const showCross=document.getElementById('chkAxisCross').checked;
+  const dotShape=document.getElementById('dotShape').value;
+  const xUnitVal=document.getElementById('xUnit').value;
+  const yUnitVal=document.getElementById('yUnit').value;
+  const title=document.getElementById('plotTitle').value;
+
+  // 全データの値を集める
+  const allPlots=fileList.map(f=>getPlotData(f));
+  const allX=allPlots.flatMap(p=>p.x);
+  const allY=allPlots.flatMap(p=>p.y);
+
+  // 単位スケール
+  const xScale=xUnitVal==='auto'?autoUnitScale(allX,currentMode,'x'):manualUnitScale(xUnitVal,'x');
+  const yScale=yUnitVal==='auto'?autoUnitScale(allY,currentMode,'y'):manualUnitScale(yUnitVal,'y');
+  if(!xScale||!yScale) return;
+
+  const scaledAllX=allX.map(v=>v/xScale.divisor);
+  const scaledAllY=allY.map(v=>v/yScale.divisor);
+
+  // 範囲を対称にする（M-Hの場合）
+  let xMin,xMax,yMin,yMax;
+  if(currentMode==='mh'){
+    const xAbs=Math.max(...scaledAllX.map(Math.abs));
+    const yAbs=Math.max(...scaledAllY.map(Math.abs));
+    xMin=-xAbs*1.1; xMax=xAbs*1.1;
+    yMin=-yAbs*1.1; yMax=yAbs*1.1;
+  } else {
+    xMin=Math.min(0,...scaledAllX);
+    xMax=Math.max(...scaledAllX)*1.05;
+    yMin=Math.min(0,...scaledAllY)*1.1;
+    yMax=Math.max(...scaledAllY)*1.1;
+  }
+  if(xMax===xMin){xMax=xMin+1;}
+  if(yMax===yMin){yMax=yMin+1;}
+
+  // 座標変換
+  const xPx=v=>margin.left+(v-xMin)/(xMax-xMin)*pw;
+  const yPx=v=>margin.top+ph-(v-yMin)/(yMax-yMin)*ph;
+
+  // グリッド
+  const xStep=calcStep(xMax-xMin);
+  const yStep=calcStep(yMax-yMin);
+  if(showGrid){
+    ctx.strokeStyle='#e0e0e0';
+    ctx.lineWidth=0.5;
+    for(let v=Math.ceil(xMin/xStep)*xStep;v<=xMax;v+=xStep){
+      const px=xPx(v);
+      ctx.beginPath();ctx.moveTo(px,margin.top);ctx.lineTo(px,margin.top+ph);ctx.stroke();
+    }
+    for(let v=Math.ceil(yMin/yStep)*yStep;v<=yMax;v+=yStep){
+      const py=yPx(v);
+      ctx.beginPath();ctx.moveTo(margin.left,py);ctx.lineTo(margin.left+pw,py);ctx.stroke();
+    }
+  }
+
+  // 原点十字線
+  if(showCross){
+    ctx.strokeStyle='#000';
+    ctx.lineWidth=1;
+    if(xMin<=0&&xMax>=0){
+      const x0=xPx(0);
+      ctx.beginPath();ctx.moveTo(x0,margin.top);ctx.lineTo(x0,margin.top+ph);ctx.stroke();
+    }
+    if(yMin<=0&&yMax>=0){
+      const y0=yPx(0);
+      ctx.beginPath();ctx.moveTo(margin.left,y0);ctx.lineTo(margin.left+pw,y0);ctx.stroke();
+    }
+  }
+
+  // データプロット
+  for(let fi=0;fi<fileList.length;fi++){
+    const f=fileList[fi];
+    const pd=allPlots[fi];
+    const sx=pd.x.map(v=>v/xScale.divisor);
+    const sy=pd.y.map(v=>v/yScale.divisor);
+    const marker=f.marker||dotShape;
+
+    // 線
+    if(lineW>0){
+      ctx.strokeStyle=f.color;
+      ctx.lineWidth=lineW;
+      ctx.beginPath();
+      let started=false;
+      for(let j=0;j<sx.length;j++){
+        const px=xPx(sx[j]),py=yPx(sy[j]);
+        if(!started){ctx.moveTo(px,py);started=true;}
+        else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+    }
+
+    // 点
+    ctx.fillStyle=f.color;
+    for(let j=0;j<sx.length;j++){
+      const px=xPx(sx[j]),py=yPx(sy[j]);
+      drawMarker(ctx, px, py, ptSize, marker);
+    }
+  }
+
+  // 外枠
+  ctx.strokeStyle='#000';
+  ctx.lineWidth=1.5;
+  ctx.strokeRect(margin.left, margin.top, pw, ph);
+
+  // X軸目盛り
+  ctx.fillStyle='#000';
+  ctx.font='12px Arial, sans-serif';
+  ctx.textAlign='center';
+  for(let v=Math.ceil(xMin/xStep)*xStep;v<=xMax+xStep*0.01;v+=xStep){
+    if(Math.abs(v)<xStep*0.01) v=0;
+    const px=xPx(v);
+    ctx.fillText(formatTick(v), px, margin.top+ph+20);
+    ctx.beginPath();ctx.moveTo(px,margin.top+ph);ctx.lineTo(px,margin.top+ph+5);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(px,margin.top);ctx.lineTo(px,margin.top-5);ctx.stroke();
+  }
+
+  // Y軸目盛り
+  ctx.textAlign='right';
+  for(let v=Math.ceil(yMin/yStep)*yStep;v<=yMax+yStep*0.01;v+=yStep){
+    if(Math.abs(v)<yStep*0.01) v=0;
+    const py=yPx(v);
+    ctx.fillText(formatTick(v), margin.left-8, py+4);
+    ctx.beginPath();ctx.moveTo(margin.left,py);ctx.lineTo(margin.left-5,py);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(margin.left+pw,py);ctx.lineTo(margin.left+pw+5,py);ctx.stroke();
+  }
+
+  // 軸ラベル
+  ctx.fillStyle='#000';
+  ctx.font='bold 14px Arial, sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText(xScale.label, margin.left+pw/2, h-8);
+
+  ctx.save();
+  ctx.translate(16, margin.top+ph/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillText(yScale.label, 0, 0);
+  ctx.restore();
+
+  // タイトル
+  if(title){
+    ctx.font='bold 16px "Times New Roman", serif';
+    ctx.textAlign='center';
+    ctx.fillStyle='#000';
+    // イタリック部分を分けて描画
+    ctx.fillText(title, margin.left+pw/2, 28);
+  }
+
+  // 凡例（複数データの場合）
+  if(fileList.length>1){
+    const legX=margin.left+pw-10;
+    let legY=margin.top+20;
+    ctx.textAlign='right';
+    ctx.font='12px Arial, sans-serif';
+    for(const f of fileList){
+      ctx.fillStyle=f.color;
+      drawMarker(ctx, legX+8, legY-3, 4, f.marker||'circle');
+      ctx.fillText(f.label, legX, legY);
+      legY+=18;
+    }
+  }
+}
+
+function drawMarker(ctx, x, y, size, shape){
+  ctx.beginPath();
+  switch(shape){
+    case 'square':
+      ctx.rect(x-size/2, y-size/2, size, size);
+      break;
+    case 'triangle':
+      ctx.moveTo(x, y-size);
+      ctx.lineTo(x-size*0.87, y+size*0.5);
+      ctx.lineTo(x+size*0.87, y+size*0.5);
+      ctx.closePath();
+      break;
+    case 'diamond':
+      ctx.moveTo(x, y-size);
+      ctx.lineTo(x+size*0.7, y);
+      ctx.lineTo(x, y+size);
+      ctx.lineTo(x-size*0.7, y);
+      ctx.closePath();
+      break;
+    default: // circle
+      ctx.arc(x, y, size/2, 0, Math.PI*2);
+  }
+  ctx.fill();
+}
+
+function calcStep(range){
+  if(range<=0) return 1;
+  const raw=range/6;
+  const mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const norm=raw/mag;
+  if(norm<=1.5) return mag;
+  if(norm<=3.5) return 2*mag;
+  if(norm<=7.5) return 5*mag;
+  return 10*mag;
+}
+
+function formatTick(v){
+  if(v===0) return '0';
+  if(Math.abs(v)>=1000) return v.toFixed(0);
+  if(Math.abs(v)>=1) return parseFloat(v.toFixed(2)).toString();
+  return parseFloat(v.toPrecision(3)).toString();
+}
+
+// ===== Excel出力 =====
+function exportXLS(){
+  if(fileList.length===0){alert('データを先に読み込んでください');return;}
+  const canvas=document.getElementById('squidCanvas');
+  const imgDataUrl=canvas.toDataURL('image/png');
+  const firstName=fileList[0].label;
+
+  let html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">';
+  html+='<head><meta charset="UTF-8">';
+  html+='<style>td,th{font-family:Arial,sans-serif;font-size:11px;border:1px solid #ccc;padding:4px 8px}';
+  html+='th{background:#4472C4;color:#fff;font-weight:bold}';
+  html+='h2{font-family:Arial;color:#2F5496;margin:16px 0 8px}';
+  html+='</style></head><body>';
+
+  html+='<h2>'+escHtml(document.getElementById('plotTitle').value||'SQUID Plot')+'</h2>';
+  html+='<img src="'+imgDataUrl+'" width="'+Math.min(canvas.clientWidth,900)+'">';
+  html+='<br><br>';
+
+  for(const f of fileList){
+    html+='<h2>'+escHtml(f.label)+'</h2>';
+    html+='<table><thead><tr><th>Temperature (K)</th><th>Field (Oe)</th><th>Moment (emu)</th></tr></thead><tbody>';
+    for(let i=0;i<f.temp.length;i++){
+      html+='<tr><td>'+f.temp[i].toFixed(2)+'</td><td>'+f.field[i].toFixed(1)+'</td><td>'+f.moment[i].toExponential(6)+'</td></tr>';
+    }
+    html+='</tbody></table><br>';
+  }
+  html+='</body></html>';
+
+  const blob=new Blob([html],{type:'application/vnd.ms-excel'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=firstName+'_SQUID.xls';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ===== PNG出力 =====
 function exportPNG(){
-  if(!chart) return;
-  const a=document.createElement('a');a.download='squid-plot.png';a.href=chart.toBase64Image();a.click();
+  const canvas=document.getElementById('squidCanvas');
+  if(!canvas) return;
+  const a=document.createElement('a');
+  a.download='squid-plot.png';
+  a.href=canvas.toDataURL('image/png');
+  a.click();
 }
+
+window.addEventListener('resize',()=>{if(fileList.length>0)redraw();});
 </script>
 </body>
 </html>

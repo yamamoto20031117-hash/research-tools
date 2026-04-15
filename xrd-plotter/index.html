@@ -59,6 +59,8 @@
   .data-table td{padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.04);color:#bbb}
 
   #xrdCanvas{width:100%;background:#fff;border-radius:4px;cursor:crosshair}
+  #xrdCanvas.dragging{cursor:grabbing}
+  #xrdCanvas.hovering-label{cursor:grab}
 </style>
 </head>
 <body>
@@ -70,6 +72,7 @@
   <button class="btn" onclick="detectPeaks()">ピーク検出</button>
   <button class="btn" onclick="exportXLSX()">Excel出力</button>
   <button class="btn btn-primary" onclick="exportPNG()">PNG保存</button>
+  <a href="/xrd-plotter/manual.html" class="btn" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px">&#128214; 説明書</a>
 </div>
 
 <div class="container">
@@ -111,7 +114,6 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const COLORS=['#2F5496','#CC0000','#228B22','#FF8C00','#8B008B','#008B8B','#B22222','#4169E1'];
 let fileList=[]; // {name, label, color, x[], y[], peaks[]}
@@ -343,33 +345,52 @@ function redraw(){
     ctx.textAlign='right';
     ctx.fillText(f.label, margin.left+pw-5, bandTop+20);
 
-    // ピークラベル
+    // ピークラベル（ドラッグ可能）
     if(showPeakLabel&&f.peaks.length>0){
       ctx.font='bold 11px Arial, sans-serif';
       ctx.textAlign='center';
-      for(const pk of f.peaks){
+      for(let pi=0;pi<f.peaks.length;pi++){
+        const pk=f.peaks[pi];
         if(pk.x<xMin||pk.x>xMax) continue;
-        if(!pk.label) continue; // ラベルが空なら表示しない
-        const px=xPx(pk.x);
+        if(!pk.label) continue;
+        const peakPx=xPx(pk.x);
         const ty=transformY(pk.y);
-        const py=yPx(ty);
+        const peakPy=yPx(ty);
+
+        // オフセット初期化（初回のみ）
+        if(pk.offsetX===undefined){pk.offsetX=0;pk.offsetY=-25;}
+
+        const labelX=peakPx+pk.offsetX;
+        const labelY=peakPy+pk.offsetY;
+
+        // リーダーライン（ピーク頂点→ラベル）
+        ctx.strokeStyle=f.color;
+        ctx.lineWidth=0.8;
+        ctx.setLineDash([3,2]);
+        ctx.beginPath();
+        ctx.moveTo(peakPx, peakPy);
+        ctx.lineTo(labelX, labelY+6);
+        ctx.stroke();
+        ctx.setLineDash([]);
 
         // ラベルの背景
         const tw=ctx.measureText(pk.label).width;
-        ctx.fillStyle='rgba(255,255,255,0.85)';
-        ctx.fillRect(px-tw/2-3, py-20, tw+6, 15);
+        const boxX=labelX-tw/2-4;
+        const boxY=labelY-6;
+        const boxW=tw+8;
+        const boxH=16;
+        ctx.fillStyle='rgba(255,255,255,0.9)';
+        ctx.strokeStyle='rgba(0,0,0,0.15)';
+        ctx.lineWidth=0.5;
+        ctx.fillRect(boxX, boxY, boxW, boxH);
+        ctx.strokeRect(boxX, boxY, boxW, boxH);
 
         // ラベルテキスト
         ctx.fillStyle=f.color;
-        ctx.fillText(pk.label, px, py-9);
+        ctx.fillText(pk.label, labelX, labelY+5);
 
-        // ピークへの短い線
-        ctx.strokeStyle=f.color;
-        ctx.lineWidth=0.8;
-        ctx.beginPath();
-        ctx.moveTo(px, py-5);
-        ctx.lineTo(px, py);
-        ctx.stroke();
+        // ヒットエリアを保存（ドラッグ判定用）
+        pk._hitBox={x:boxX, y:boxY, w:boxW, h:boxH, fi:i, pi:pi};
       }
     }
   }
@@ -502,62 +523,62 @@ function toggleTable(){
   el.style.display='block';
 }
 
-// ===== Excel出力（グラフ画像を埋め込み） =====
+// ===== Excel出力（グラフ画像 + データ） =====
 function exportXLSX(){
   if(fileList.length===0){alert('データを先に読み込んでください');return;}
   const canvas=document.getElementById('xrdCanvas');
-
-  // Canvas画像をBase64で取得
   const imgDataUrl=canvas.toDataURL('image/png');
-  const imgBase64=imgDataUrl.split(',')[1];
+  const firstName=fileList[0].label;
 
-  const wb=XLSX.utils.book_new();
+  // HTML-Excel形式で画像付きエクスポート（.xls はExcelで正常に開ける）
+  const lambda=1.5406;
+  let html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">';
+  html+='<head><meta charset="UTF-8">';
+  html+='<style>td,th{font-family:Arial,sans-serif;font-size:11px;border:1px solid #ccc;padding:4px 8px}';
+  html+='th{background:#4472C4;color:#fff;font-weight:bold}';
+  html+='h2{font-family:Arial;color:#2F5496;margin:16px 0 8px}';
+  html+='</style></head><body>';
 
-  // グラフシート（画像を埋め込み）
-  const wsChart=XLSX.utils.aoa_to_sheet([['XRD Plot']]);
-  // 画像埋め込み
-  if(!wsChart['!images']) wsChart['!images']=[];
-  wsChart['!images'].push({
-    name:'xrd_plot.png',
-    data:imgBase64,
-    position:{type:'twoCellAnchor',attrs:{editAs:'oneCell'},
-      from:{col:0,row:2,colOff:0,rowOff:0},
-      to:{col:10,row:Math.max(25, fileList.length*15+5),colOff:0,rowOff:0}
-    }
-  });
-  XLSX.utils.book_append_sheet(wb, wsChart, 'XRD Chart');
+  // グラフ画像
+  html+='<h2>XRD Plot</h2>';
+  html+='<img src="'+imgDataUrl+'" width="'+Math.min(canvas.clientWidth,900)+'">';
+  html+='<br><br>';
 
-  // データシート（各ファイル）
+  // 各データセットのテーブル
   for(const f of fileList){
-    const sheetName=f.label.substring(0,28)+'_data';
-    const rows=[['2\u03B8 (°)', 'Intensity (cps)']];
-    for(let i=0;i<f.x.length;i++) rows.push([f.x[i], f.y[i]]);
-    const ws=XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols']=[{wch:12},{wch:16}];
-    XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0,31));
+    html+='<h2>'+escHtml(f.label)+'</h2>';
+    html+='<table><thead><tr><th>2\u03B8 (\u00B0)</th><th>Intensity (cps)</th></tr></thead><tbody>';
+    for(let i=0;i<f.x.length;i++){
+      html+='<tr><td>'+f.x[i].toFixed(4)+'</td><td>'+f.y[i].toFixed(2)+'</td></tr>';
+    }
+    html+='</tbody></table><br>';
   }
 
-  // ピークシート
+  // ピークテーブル
   const hasPeaks=fileList.some(f=>f.peaks&&f.peaks.length>0);
   if(hasPeaks){
-    const lambda=1.5406;
-    const rows=[['Dataset','#','2\u03B8 (°)','Intensity','d (Å)','Label']];
+    html+='<h2>Detected Peaks</h2>';
+    html+='<table><thead><tr><th>Dataset</th><th>#</th><th>2\u03B8 (\u00B0)</th><th>Intensity</th><th>d (\u00C5)</th><th>Label</th></tr></thead><tbody>';
     for(const f of fileList){
       if(!f.peaks) continue;
       f.peaks.forEach((p,i)=>{
         const theta=p.x*Math.PI/360;
         const d=lambda/(2*Math.sin(theta));
-        rows.push([f.label, i+1, p.x, p.y, d, p.label||'']);
+        html+='<tr><td>'+escHtml(f.label)+'</td><td>'+(i+1)+'</td><td>'+p.x.toFixed(3)+'</td><td>'+p.y.toFixed(1)+'</td><td>'+d.toFixed(4)+'</td><td>'+escHtml(p.label||'')+'</td></tr>';
       });
     }
-    const ws=XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols']=[{wch:20},{wch:5},{wch:10},{wch:14},{wch:10},{wch:12}];
-    XLSX.utils.book_append_sheet(wb, ws, 'Peaks');
+    html+='</tbody></table>';
   }
+  html+='</body></html>';
 
-  const firstName=fileList[0].label;
-  XLSX.writeFile(wb, firstName+'_XRD.xlsx');
+  const blob=new Blob([html],{type:'application/vnd.ms-excel'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=firstName+'_XRD.xls';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 // ===== PNG出力 =====
 function exportPNG(){
@@ -569,6 +590,80 @@ function exportPNG(){
 }
 
 window.addEventListener('resize',()=>{if(fileList.length>0)redraw();});
+
+// ===== ピークラベル ドラッグ機能 =====
+(function(){
+  const canvas=document.getElementById('xrdCanvas');
+  let dragging=null; // {fi, pi, startMouseX, startMouseY, startOffsetX, startOffsetY}
+
+  function getCanvasPos(e){
+    const rect=canvas.getBoundingClientRect();
+    const scaleX=canvas.width/(canvas.clientWidth*(window.devicePixelRatio||1));
+    const scaleY=canvas.height/(canvas.clientHeight*(window.devicePixelRatio||1));
+    // CSSピクセル座標を返す（dpr考慮不要、描画もCSS座標で行っているため）
+    const clientX=e.touches?e.touches[0].clientX:e.clientX;
+    const clientY=e.touches?e.touches[0].clientY:e.clientY;
+    return {x:clientX-rect.left, y:clientY-rect.top};
+  }
+
+  function findLabelAt(pos){
+    for(const f of fileList){
+      if(!f.peaks) continue;
+      for(const pk of f.peaks){
+        if(!pk._hitBox||!pk.label) continue;
+        const h=pk._hitBox;
+        if(pos.x>=h.x&&pos.x<=h.x+h.w&&pos.y>=h.y&&pos.y<=h.y+h.h){
+          return {fi:h.fi, pi:h.pi, pk};
+        }
+      }
+    }
+    return null;
+  }
+
+  function onDown(e){
+    const pos=getCanvasPos(e);
+    const hit=findLabelAt(pos);
+    if(hit){
+      e.preventDefault();
+      dragging={fi:hit.fi, pi:hit.pi, startMouseX:pos.x, startMouseY:pos.y,
+        startOffsetX:hit.pk.offsetX||0, startOffsetY:hit.pk.offsetY||-25};
+      canvas.classList.add('dragging');
+    }
+  }
+
+  function onMove(e){
+    if(dragging){
+      e.preventDefault();
+      const pos=getCanvasPos(e);
+      const dx=pos.x-dragging.startMouseX;
+      const dy=pos.y-dragging.startMouseY;
+      fileList[dragging.fi].peaks[dragging.pi].offsetX=dragging.startOffsetX+dx;
+      fileList[dragging.fi].peaks[dragging.pi].offsetY=dragging.startOffsetY+dy;
+      redraw();
+    } else {
+      // ホバー時にカーソル変更
+      const pos=getCanvasPos(e);
+      const hit=findLabelAt(pos);
+      canvas.classList.toggle('hovering-label', !!hit);
+    }
+  }
+
+  function onUp(){
+    if(dragging){
+      dragging=null;
+      canvas.classList.remove('dragging');
+    }
+  }
+
+  canvas.addEventListener('mousedown', onDown);
+  canvas.addEventListener('mousemove', onMove);
+  canvas.addEventListener('mouseup', onUp);
+  canvas.addEventListener('mouseleave', onUp);
+  // タッチ対応
+  canvas.addEventListener('touchstart', onDown, {passive:false});
+  canvas.addEventListener('touchmove', onMove, {passive:false});
+  canvas.addEventListener('touchend', onUp);
+})();
 </script>
 </body>
 </html>

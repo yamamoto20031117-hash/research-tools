@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TMD 結晶構造ビューア — 取扱説明書</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;
+    min-height:100vh;line-height:1.8}
+  .top-bar{background:rgba(8,11,18,0.95);backdrop-filter:blur(10px);padding:10px 20px;display:flex;
+    align-items:center;gap:14px;border-bottom:1px solid rgba(88,166,255,0.1)}
+  .top-bar a{color:#58a6ff;text-decoration:none;font-size:.85rem}
+  .top-bar h1{font-size:1rem;color:#fff}
+  .container{max-width:860px;margin:0 auto;padding:30px 20px 60px}
+  h2{color:#58a6ff;font-size:1.15rem;margin:36px 0 12px;padding-bottom:6px;border-bottom:1px solid rgba(88,166,255,0.15)}
+  h3{color:#7db8ff;font-size:.95rem;margin:20px 0 8px}
+  p{margin-bottom:12px;color:#bbb;font-size:.9rem}
+  .card{background:rgba(15,18,28,0.8);border:1px solid rgba(88,166,255,0.1);border-radius:8px;padding:16px 20px;margin-bottom:16px}
+  .card-title{color:#ffcc44;font-weight:bold;font-size:.88rem;margin-bottom:8px}
+  .step{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start}
+  .step-num{background:#58a6ff;color:#0a0e17;font-weight:bold;border-radius:50%;width:26px;height:26px;
+    display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;margin-top:2px}
+  .step-text{font-size:.88rem;color:#ccc}
+  .key{display:inline-block;background:#1a2030;border:1px solid #2a3040;border-radius:4px;padding:1px 8px;
+    font-size:.78rem;color:#58a6ff;font-family:monospace;margin:0 2px}
+  .tag{display:inline-block;background:rgba(88,166,255,0.12);color:#58a6ff;border-radius:3px;padding:1px 8px;
+    font-size:.76rem;margin-right:4px}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:.84rem}
+  th{background:rgba(88,166,255,0.1);color:#58a6ff;padding:6px 10px;text-align:left;font-size:.8rem}
+  td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.05);color:#bbb}
+  .note{background:rgba(255,200,60,0.06);border-left:3px solid #ffcc44;padding:10px 14px;border-radius:0 6px 6px 0;
+    margin:12px 0;font-size:.84rem;color:#dda}
+  .back-link{display:inline-block;margin-top:30px;color:#58a6ff;text-decoration:none;font-size:.88rem}
+  .back-link:hover{text-decoration:underline}
+  .mat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}
+  .mat-card{background:rgba(20,24,36,0.6);border:1px solid rgba(88,166,255,0.08);border-radius:6px;padding:10px 14px}
+  .mat-card h4{color:#7db8ff;font-size:.82rem;margin-bottom:4px}
+  .mat-card p{font-size:.78rem;margin-bottom:0;color:#999}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="/tmd-viewer/">&#8592; ビューアへ戻る</a>
+  <h1>TMD 結晶構造ビューア — 取扱説明書</h1>
+</div>
+
+<div class="container">
+
+  <h2>概要</h2>
+  <p>TMD結晶構造ビューアは、遷移金属ダイカルコゲナイド（TMD）の結晶構造をインタラクティブに
+    3D表示するWebツールです。1T型（八面体配位）と2H型（三角柱配位）の両方に対応し、
+    インターカレーション分子の挿入、層間距離の調整、原子間距離測定などが可能です。</p>
+
+  <h2>基本操作</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>操作</th><th>マウス</th><th>タッチ</th></tr></thead>
+      <tbody>
+        <tr><td>回転</td><td>ドラッグ</td><td>1本指スワイプ</td></tr>
+        <tr><td>ズーム</td><td>スクロールホイール</td><td>ピンチイン/アウト</td></tr>
+        <tr><td>パン（平行移動）</td><td>右クリック + ドラッグ</td><td>2本指スワイプ</td></tr>
+        <tr><td>原子クリック</td><td>左クリック</td><td>タップ</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>対応物質一覧</h2>
+  <div class="mat-grid">
+    <div class="mat-card">
+      <h4>1T型（八面体配位）</h4>
+      <p>VSe₂、TiS₂、TiSe₂、TaS₂、PtS₂、PtTe₂、ZrS₂</p>
+    </div>
+    <div class="mat-card">
+      <h4>2H型（三角柱配位）</h4>
+      <p>MoS₂、MoSe₂、WS₂、WSe₂、NbSe₂、NbS₂</p>
+    </div>
+  </div>
+  <p>各物質の格子定数 (a, c) は文献値に基づいています。物質を選択すると結晶データパネルに詳細が表示されます。</p>
+
+  <h2>ツールバーの各機能</h2>
+
+  <h3>構造パラメータ</h3>
+  <table>
+    <thead><tr><th>設定</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag">物質</span></td><td>表示する TMD を選択。1T / 2H がグループ分けされています。</td></tr>
+      <tr><td><span class="tag">層間</span></td><td>層間距離の倍率（1.0〜5.0）。1.0 = 文献値通り。インターカレーション時に広げて観察できます。</td></tr>
+      <tr><td><span class="tag">層数</span></td><td>表示する層の数（2〜5）。</td></tr>
+      <tr><td><span class="tag">a₁幅 / a₂幅</span></td><td>a₁方向・a₂方向のユニットセル繰り返し数（1〜10）。</td></tr>
+    </tbody>
+  </table>
+
+  <h3>インターカレーション</h3>
+  <div class="card">
+    <div class="card-title">挿入分子</div>
+    <p>層間にゲスト種を挿入する機能です。以下のプリセットが利用可能：</p>
+    <table>
+      <tbody>
+        <tr><td><strong>イオン</strong></td><td>Li⁺、Na⁺、K⁺</td></tr>
+        <tr><td><strong>分子</strong></td><td>H₂O、NH₃、ピリジン、CTA⁺（CTAB）、TBA⁺、ヒドラジン</td></tr>
+        <tr><td><strong>カスタム</strong></td><td>CIF / XYZ ファイルから任意の分子を読み込み可能</td></tr>
+      </tbody>
+    </table>
+    <div class="note">CIF/XYZ ファイルからの分子読み込みは「+ CIF/XYZ」ボタンから。読み込んだ分子は「読込分子」グループに追加されます。</div>
+  </div>
+
+  <h3>回転制御</h3>
+  <div class="card">
+    <p><span class="tag">a回転</span> <span class="tag">b回転</span> <span class="tag">c回転</span>
+      の3軸について結晶全体を回転できます（0〜360°）。スライダー、数値入力、±ボタンのいずれでも操作可能。</p>
+  </div>
+
+  <h3>表示オプション</h3>
+  <table>
+    <thead><tr><th>設定</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag">多面体</span></td><td>金属原子周りの配位多面体（八面体/三角柱）を半透明で表示。</td></tr>
+      <tr><td><span class="tag">単位胞</span></td><td>単位胞の枠線を表示。</td></tr>
+      <tr><td><span class="tag">層間距離</span></td><td>層間距離を数値付きで表示（初期: ON）。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>操作モード</h2>
+  <div class="card">
+    <div class="card-title">3つのクリックモード</div>
+    <table>
+      <thead><tr><th>モード</th><th>機能</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag">距離</span></td><td>2つの原子をクリックすると原子間距離 (Å) を表示。結合長の確認に便利。</td></tr>
+        <tr><td><span class="tag">移動</span></td><td>インターカレーション分子をクリック＆ドラッグで層間内の位置を移動。</td></tr>
+        <tr><td><span class="tag">四面体</span></td><td>原子をクリックすると周囲の原子との四面体角度を計算・表示。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>カメラ設定</h2>
+  <table>
+    <thead><tr><th>ボタン</th><th>機能</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag">透視</span> / <span class="tag">平行</span></td><td>投影法の切り替え。透視投影はパースがつき、平行投影は論文用に適しています。</td></tr>
+      <tr><td><span class="tag">a</span> <span class="tag">b</span> <span class="tag">c</span></td><td>それぞれ a軸・b軸・c軸方向からの正面視点に切り替え。</td></tr>
+      <tr><td><span class="tag">自由</span></td><td>自由回転モードに戻ります。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>撮影・出力</h2>
+  <div class="card">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text"><span class="key">撮影</span> ボタンで現在の表示をPNG画像として保存。背景は暗色 (#080b12) のまま保存されます。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text">論文用に白背景が必要な場合は、画像編集ソフトで背景色を変更してください。</div>
+    </div>
+  </div>
+
+  <h2>向き最適化</h2>
+  <div class="card">
+    <div class="card-title">自動最適ビュー</div>
+    <p><span class="key">向き最適化</span> ボタンをクリックすると、結晶構造が最も見やすい角度を
+      自動的に探索します。最適化の進行状況はポップアップパネルに表示されます。</p>
+  </div>
+
+  <h2>元に戻す（Undo）</h2>
+  <div class="card">
+    <p><span class="key">戻す</span> ボタンまたは <span class="key">Ctrl+Z</span> で
+      直前の操作を元に戻せます。回転・層間距離の変更・インターカレーション変更などの
+      パラメータ変更に対応しています。</p>
+  </div>
+
+  <h2>色のカスタマイズ</h2>
+  <div class="card">
+    <p>ツールバー右側のカラーピッカーで金属原子と配位子（カルコゲン）の色を変更できます。
+      凡例パネル（画面下部）に現在の色が反映されます。</p>
+  </div>
+
+  <h2>結晶データパネル</h2>
+  <div class="card">
+    <p>画面右上の「結晶データ」パネルには以下の情報が表示されます：</p>
+    <table>
+      <tbody>
+        <tr><td>相構造</td><td>1T または 2H</td></tr>
+        <tr><td>格子定数</td><td>a (Å) と c (Å)</td></tr>
+        <tr><td>空間群</td><td>対応する空間群</td></tr>
+        <tr><td>層間距離</td><td>現在の層間距離（倍率適用後）</td></tr>
+      </tbody>
+    </table>
+    <p>パネルは「結晶データ」ボタンで折りたたみ/展開できます。</p>
+  </div>
+
+  <h2>スマートフォン対応</h2>
+  <div class="card">
+    <p>スマホ・タブレットに最適化されています。横持ち・縦持ちの両方でレイアウトが調整されます。
+      ツールバーが長い場合はスクロール可能です。「メニュー」ボタンでツールバー全体を折りたたむことも可能。</p>
+  </div>
+
+  <h2>トラブルシューティング</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>症状</th><th>対処法</th></tr></thead>
+      <tbody>
+        <tr><td>3Dが表示されない</td><td>WebGL対応ブラウザが必要です。Chrome, Firefox, Safari, Edge の最新版を推奨。</td></tr>
+        <tr><td>動作が重い</td><td>a₁幅・a₂幅・層数を小さくしてください。原子数が多いと描画負荷が増えます。</td></tr>
+        <tr><td>CIF/XYZファイルが読めない</td><td>標準的なCIF形式またはXYZ形式であることを確認してください。原子座標が含まれている必要があります。</td></tr>
+        <tr><td>インターカレーション分子が見えない</td><td>層間距離を1.5以上に広げてみてください。分子が層内に埋もれている場合があります。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <a class="back-link" href="/tmd-viewer/">&larr; ビューアへ戻る</a>
+
+</div>
+
+</body>
+</html>
