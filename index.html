@@ -339,29 +339,9 @@ try{
   }
 }catch(e){console.warn('Firebase init failed:',e);}
 
-// =====================================================
-//  接続ステータス
-// =====================================================
+// 接続ステータス（非表示）
 const connEl=document.getElementById('conn-status');
-const connText=document.getElementById('conn-text');
-
-function setConnStatus(online,text){
-  connEl.className='conn-status '+(online?'online':'offline');
-  connText.textContent=text;
-  connEl.style.opacity='1';
-  // 5秒後にフェードアウト（オンラインの場合）
-  if(online){setTimeout(()=>{connEl.style.transition='opacity 1s';connEl.style.opacity='0.3';},4000);}
-}
-
-if(firebaseReady){
-  const connRef=firebase.database().ref('.info/connected');
-  connRef.on('value',snap=>{
-    if(snap.val()===true){setConnStatus(true,'リアルタイム接続中');}
-    else{setConnStatus(false,'再接続中...');}
-  });
-}else{
-  setConnStatus(false,'ローカルモード');
-}
+if(connEl) connEl.style.display='none';
 
 // =====================================================
 //  ローカルストレージ fallback + ポーリング
@@ -581,13 +561,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.querySelectorAll('.board-body').forEach(b=>{
       const n=document.createElement('div');n.className='setup-notice';
       n.innerHTML='&#128270; ローカルモード（このブラウザのみ保存）<br><small>全ユーザー共有にするには <a href="https://console.firebase.google.com" target="_blank">Firebase</a> を設定してください</small>';
-      b.prepend(n);
-    });
-  }else{
-    // リアルタイムモード表示
-    document.querySelectorAll('.board-body').forEach(b=>{
-      const n=document.createElement('div');n.className='auto-refresh';
-      n.innerHTML='<span class="spinner"></span> リアルタイム更新中 — 他のユーザーの投稿が自動で反映されます';
       b.prepend(n);
     });
   }
