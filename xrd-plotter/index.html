@@ -16,7 +16,6 @@
   .btn:hover{border-color:#58a6ff;color:#58a6ff}
   .btn-primary{background:#58a6ff;color:#0a0e17;border-color:#58a6ff;font-weight:bold}
   .btn-primary:hover{background:#7db8ff}
-  .btn.active{background:#1a3050;color:#58a6ff;border-color:#58a6ff}
 
   .container{max-width:1200px;margin:0 auto;padding:20px}
   .drop-zone{border:2px dashed rgba(88,166,255,0.25);border-radius:12px;padding:48px 24px;text-align:center;
@@ -32,15 +31,16 @@
   .chart-toolbar input,.chart-toolbar select{background:#0e1220;border:1px solid #2a3040;border-radius:4px;
     padding:4px 8px;color:#ddd;font-size:.78rem}
   .chart-toolbar input:focus,.chart-toolbar select:focus{outline:none;border-color:#58a6ff}
+  .help-tip{font-size:.68rem;color:#666;cursor:help;border-bottom:1px dotted #666}
 
   .multi-list{display:none;margin-bottom:16px}
   .multi-item{display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(20,24,36,0.6);
     border-radius:4px;margin-bottom:4px;font-size:.8rem}
-  .multi-item .mi-name{flex:1;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .multi-item .mi-name{color:#888;font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .multi-item input[type=color]{width:24px;height:24px;border:none;cursor:pointer;background:transparent;
     -webkit-appearance:none;border-radius:3px}
-  .multi-item input[type=text]{width:160px;background:#0e1220;border:1px solid #2a3040;border-radius:4px;
-    padding:3px 8px;color:#ddd;font-size:.78rem}
+  .multi-item input[type=text]{width:180px;background:#0e1220;border:1px solid #2a3040;border-radius:4px;
+    padding:3px 8px;color:#ddd;font-size:.8rem}
   .multi-item input[type=text]:focus{outline:none;border-color:#58a6ff}
   .multi-item .mi-remove{color:#666;cursor:pointer;font-size:1.1rem;padding:0 4px}
   .multi-item .mi-remove:hover{color:#ff6666}
@@ -52,7 +52,12 @@
   .peak-list th{color:#888;text-align:left;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,0.08)}
   .peak-list td{padding:3px 6px;color:#ddd}
 
-  /* Canvas for custom rendering */
+  .data-table{display:none;max-height:300px;overflow:auto;background:rgba(15,18,28,0.8);
+    border:1px solid rgba(88,166,255,0.1);border-radius:8px;padding:12px;margin-bottom:20px}
+  .data-table table{width:100%;border-collapse:collapse;font-size:.75rem;font-family:monospace}
+  .data-table th{background:rgba(88,166,255,0.1);color:#58a6ff;padding:4px 8px;text-align:left;position:sticky;top:0}
+  .data-table td{padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.04);color:#bbb}
+
   #xrdCanvas{width:100%;background:#fff;border-radius:4px;cursor:crosshair}
 </style>
 </head>
@@ -61,6 +66,7 @@
 <div class="top-bar">
   <a href="/">&#8592; Research Tools</a>
   <h1>XRD データプロッター</h1>
+  <button class="btn" onclick="toggleTable()">データ表示</button>
   <button class="btn" onclick="detectPeaks()">ピーク検出</button>
   <button class="btn" onclick="exportXLSX()">Excel出力</button>
   <button class="btn btn-primary" onclick="exportPNG()">PNG保存</button>
@@ -82,6 +88,12 @@
       <input type="number" id="xMax" placeholder="max" style="width:60px" onchange="redraw()">
       <label>線幅:</label>
       <input type="range" id="lineWidth" min="0.5" max="4" step="0.5" value="1.5" oninput="redraw()">
+      <label>Y軸:</label>
+      <select id="yScale" onchange="redraw()" title="リニア=そのまま / 対数=桁違いのピークを見やすく / √=中間">
+        <option value="linear">リニア（そのまま）</option>
+        <option value="log">対数（弱ピーク強調）</option>
+        <option value="sqrt">平方根（中間）</option>
+      </select>
       <label><input type="checkbox" id="chkGrid" checked onchange="redraw()"> グリッド</label>
       <label><input type="checkbox" id="chkPeakLabel" onchange="redraw()"> ピークラベル</label>
     </div>
@@ -89,8 +101,13 @@
   </div>
 
   <div class="peak-list" id="peakList">
-    <h3>検出ピーク</h3>
+    <h3>検出ピーク（ラベル欄に (001) 等を入力するとグラフに表示されます）</h3>
     <div id="peakTables"></div>
+  </div>
+
+  <div class="data-table" id="dataTable">
+    <table><thead><tr><th>2&#952; (°)</th><th>Intensity</th></tr></thead>
+    <tbody id="tableBody"></tbody></table>
   </div>
 </div>
 
@@ -150,7 +167,6 @@ function updateUI(){
   updateMultiList();
   if(fileList.length>0){
     document.getElementById('chartWrap').style.display='block';
-    // X範囲自動設定
     const allX=fileList.flatMap(f=>f.x);
     const el1=document.getElementById('xMin'), el2=document.getElementById('xMax');
     if(!el1.value) el1.value=Math.floor(Math.min(...allX));
@@ -166,19 +182,22 @@ function updateMultiList(){
   el.innerHTML=fileList.map((f,i)=>
     `<div class="multi-item">
       <input type="color" value="${f.color}" onchange="fileList[${i}].color=this.value;redraw()">
-      <input type="text" value="${f.label}" onchange="fileList[${i}].label=this.value;redraw()" title="表示ラベル">
-      <span class="mi-name">${f.name}</span>
-      <span class="mi-remove" onclick="removeFile(${i})">&times;</span>
+      <input type="text" value="${f.label}" onchange="fileList[${i}].label=this.value;redraw()" placeholder="グラフに表示するラベル">
+      <span class="mi-name">(${f.name})</span>
+      <span class="mi-remove" onclick="removeFile(${i})" title="削除">&times;</span>
     </div>`
   ).join('');
 }
 
 function removeFile(idx){
   fileList.splice(idx,1);
-  // 色をリセット
-  fileList.forEach((f,i)=>{if(f.color===COLORS[(idx)%COLORS.length])f.color=COLORS[i%COLORS.length];});
+  fileList.forEach((f,i)=>f.color=COLORS[i%COLORS.length]);
   updateUI();
-  if(fileList.length===0) document.getElementById('chartWrap').style.display='none';
+  if(fileList.length===0){
+    document.getElementById('chartWrap').style.display='none';
+    document.getElementById('xMin').value='';
+    document.getElementById('xMax').value='';
+  }
 }
 
 // ===== 描画 =====
@@ -200,7 +219,7 @@ function redraw(){
 
   if(fileList.length===0) return;
 
-  const margin={top:30, right:30, bottom:50, left:70};
+  const margin={top:30, right:40, bottom:50, left:70};
   const pw=w-margin.left-margin.right;
   const ph=h-margin.top-margin.bottom;
 
@@ -209,14 +228,20 @@ function redraw(){
   const lineW=parseFloat(document.getElementById('lineWidth').value)||1.5;
   const showGrid=document.getElementById('chkGrid').checked;
   const showPeakLabel=document.getElementById('chkPeakLabel').checked;
+  const yScaleMode=document.getElementById('yScale').value;
 
   const n=fileList.length;
-  // 各データセットの高さ割り当て
   const bandH=ph/n;
 
   // X軸変換
-  const xScale=v=>margin.left+(v-xMin)/(xMax-xMin)*pw;
-  const xInv=px=>(px-margin.left)/pw*(xMax-xMin)+xMin;
+  const xPx=v=>margin.left+(v-xMin)/(xMax-xMin)*pw;
+
+  // Y軸変換関数（スケールモード適用）
+  function transformY(val){
+    if(yScaleMode==='log') return val>0?Math.log10(val):0;
+    if(yScaleMode==='sqrt') return val>0?Math.sqrt(val):0;
+    return val;
+  }
 
   // グリッド
   if(showGrid){
@@ -224,32 +249,34 @@ function redraw(){
     ctx.lineWidth=0.5;
     const xStep=calcStep(xMax-xMin);
     for(let v=Math.ceil(xMin/xStep)*xStep;v<=xMax;v+=xStep){
-      const px=xScale(v);
+      const px=xPx(v);
       ctx.beginPath();ctx.moveTo(px,margin.top);ctx.lineTo(px,h-margin.bottom);ctx.stroke();
     }
   }
 
-  // 各データセット描画（上から下）
+  // 各データセット描画
   for(let i=0;i<n;i++){
     const f=fileList[i];
     const bandTop=margin.top+i*bandH;
-    const bandBot=bandTop+bandH;
     const plotH=bandH*0.8;
-    const plotBot=bandBot-bandH*0.1;
+    const plotBot=bandTop+bandH-bandH*0.1;
 
-    // フィルタリングされたデータ
+    // フィルタリング＋変換
     const filtered=[];
     for(let j=0;j<f.x.length;j++){
-      if(f.x[j]>=xMin&&f.x[j]<=xMax) filtered.push({x:f.x[j],y:f.y[j]});
+      if(f.x[j]>=xMin&&f.x[j]<=xMax){
+        filtered.push({x:f.x[j], y:f.y[j], ty:transformY(f.y[j])});
+      }
     }
     if(filtered.length===0) continue;
 
-    // 各データセットの最大値で正規化
-    const yMax=Math.max(...filtered.map(p=>p.y));
-    const yScale=v=>plotBot-(v/yMax)*plotH;
+    const tyMax=Math.max(...filtered.map(p=>p.ty));
+    const tyMin=Math.min(...filtered.map(p=>p.ty));
+    const tyRange=tyMax-tyMin||1;
+    const yPx=ty=>plotBot-((ty-tyMin)/tyRange)*plotH;
 
     // ベースライン
-    ctx.strokeStyle='#ccc';
+    ctx.strokeStyle='#bbb';
     ctx.lineWidth=0.5;
     ctx.beginPath();
     ctx.moveTo(margin.left,plotBot);
@@ -262,14 +289,14 @@ function redraw(){
     ctx.beginPath();
     let started=false;
     for(const p of filtered){
-      const px=xScale(p.x);
-      const py=yScale(p.y);
+      const px=xPx(p.x);
+      const py=yPx(p.ty);
       if(!started){ctx.moveTo(px,py);started=true;}
       else ctx.lineTo(px,py);
     }
     ctx.stroke();
 
-    // ラベル（右上）
+    // ラベル（右上）— 編集可能なテキストで表示
     ctx.fillStyle=f.color;
     ctx.font='bold 14px Arial, sans-serif';
     ctx.textAlign='right';
@@ -277,15 +304,31 @@ function redraw(){
 
     // ピークラベル
     if(showPeakLabel&&f.peaks.length>0){
-      ctx.font='11px Arial, sans-serif';
+      ctx.font='bold 11px Arial, sans-serif';
       ctx.textAlign='center';
-      ctx.fillStyle=f.color;
       for(const pk of f.peaks){
         if(pk.x<xMin||pk.x>xMax) continue;
-        const px=xScale(pk.x);
-        const py=yScale(pk.y);
-        const labelText=pk.label||pk.x.toFixed(1)+'°';
-        ctx.fillText(labelText, px, py-8);
+        if(!pk.label) continue; // ラベルが空なら表示しない
+        const px=xPx(pk.x);
+        const ty=transformY(pk.y);
+        const py=yPx(ty);
+
+        // ラベルの背景
+        const tw=ctx.measureText(pk.label).width;
+        ctx.fillStyle='rgba(255,255,255,0.85)';
+        ctx.fillRect(px-tw/2-3, py-20, tw+6, 15);
+
+        // ラベルテキスト
+        ctx.fillStyle=f.color;
+        ctx.fillText(pk.label, px, py-9);
+
+        // ピークへの短い線
+        ctx.strokeStyle=f.color;
+        ctx.lineWidth=0.8;
+        ctx.beginPath();
+        ctx.moveTo(px, py-5);
+        ctx.lineTo(px, py);
+        ctx.stroke();
       }
     }
   }
@@ -298,15 +341,14 @@ function redraw(){
   ctx.lineTo(w-margin.right,h-margin.bottom);
   ctx.stroke();
 
-  // X軸ラベル
+  // X軸目盛り
   ctx.fillStyle='#333';
   ctx.font='12px Arial, sans-serif';
   ctx.textAlign='center';
   const xStep=calcStep(xMax-xMin);
   for(let v=Math.ceil(xMin/xStep)*xStep;v<=xMax;v+=xStep){
-    const px=xScale(v);
+    const px=xPx(v);
     ctx.fillText(v.toFixed(0), px, h-margin.bottom+20);
-    // 目盛り線
     ctx.beginPath();ctx.moveTo(px,h-margin.bottom);ctx.lineTo(px,h-margin.bottom+5);ctx.stroke();
   }
 
@@ -317,10 +359,11 @@ function redraw(){
   ctx.fillText('2\u03B8 / deg', margin.left+pw/2, h-8);
 
   // Y軸タイトル
+  const yLabel = yScaleMode==='log'?'log(Intensity)':yScaleMode==='sqrt'?'\u221AIntensity':'Intensity / a.u.';
   ctx.save();
   ctx.translate(16, margin.top+ph/2);
   ctx.rotate(-Math.PI/2);
-  ctx.fillText('Intensity / a.u.', 0, 0);
+  ctx.fillText(yLabel, 0, 0);
   ctx.restore();
 
   // Y軸線
@@ -348,21 +391,19 @@ function detectPeaks(){
   const tablesEl=document.getElementById('peakTables');
   tablesEl.innerHTML='';
 
-  for(const f of fileList){
-    const x=f.x, y=f.y, n=y.length;
+  fileList.forEach((f, fi)=>{
+    const x=f.x, y=f.y, nn=y.length;
     const peaks=[];
 
-    // 移動平均スムージング
-    const win=Math.max(3, Math.floor(n/200));
+    const win=Math.max(3, Math.floor(nn/200));
     const sy=y.map((_,i)=>{
       let s=0,c=0;
-      for(let j=Math.max(0,i-win);j<=Math.min(n-1,i+win);j++){s+=y[j];c++;}
+      for(let j=Math.max(0,i-win);j<=Math.min(nn-1,i+win);j++){s+=y[j];c++;}
       return s/c;
     });
 
-    // ローカルマキシマ
     const threshold=Math.max(...sy)*0.03;
-    for(let i=3;i<n-3;i++){
+    for(let i=3;i<nn-3;i++){
       if(sy[i]>sy[i-1]&&sy[i]>sy[i+1]&&sy[i]>sy[i-2]&&sy[i]>sy[i+2]&&sy[i]>threshold){
         if(peaks.length>0&&Math.abs(x[i]-peaks[peaks.length-1].x)<0.5){
           if(sy[i]>peaks[peaks.length-1].y) peaks[peaks.length-1]={x:x[i],y:y[i],label:''};
@@ -373,23 +414,41 @@ function detectPeaks(){
     }
     f.peaks=peaks;
 
-    // テーブル生成
     const lambda=1.5406;
     let html=`<h4 style="color:${f.color};margin:12px 0 6px">${f.label} (${peaks.length}ピーク)</h4>`;
     html+=`<table><thead><tr><th>#</th><th>2\u03B8 (°)</th><th>強度</th><th>d値 (Å)</th><th>ラベル</th></tr></thead><tbody>`;
-    peaks.forEach((p,i)=>{
+    peaks.forEach((p,pi)=>{
       const theta=p.x*Math.PI/360;
       const d=lambda/(2*Math.sin(theta));
-      html+=`<tr><td>${i+1}</td><td>${p.x.toFixed(3)}</td><td>${p.y.toFixed(1)}</td><td>${d.toFixed(4)}</td>`;
-      html+=`<td><input type="text" value="${p.label}" style="width:80px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;color:#ddd;padding:2px 4px;font-size:.72rem" onchange="fileList[${fileList.indexOf(f)}].peaks[${i}].label=this.value;redraw()"></td></tr>`;
+      html+=`<tr><td>${pi+1}</td><td>${p.x.toFixed(3)}</td><td>${p.y.toFixed(1)}</td><td>${d.toFixed(4)}</td>`;
+      html+=`<td><input type="text" value="${p.label}" placeholder="(001)等" style="width:80px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;color:#ddd;padding:2px 4px;font-size:.72rem" onchange="updatePeakLabel(${fi},${pi},this.value)"></td></tr>`;
     });
     html+='</tbody></table>';
     tablesEl.innerHTML+=html;
-  }
+  });
 
   document.getElementById('peakList').style.display='block';
   document.getElementById('chkPeakLabel').checked=true;
   redraw();
+}
+
+function updatePeakLabel(fi, pi, val){
+  fileList[fi].peaks[pi].label=val;
+  redraw();
+}
+
+// ===== データテーブル =====
+function toggleTable(){
+  const el=document.getElementById('dataTable');
+  if(el.style.display==='block'){el.style.display='none';return;}
+  if(fileList.length===0) return;
+  const f=fileList[0];
+  const tbody=document.getElementById('tableBody');
+  tbody.innerHTML=f.x.slice(0,500).map((x,i)=>
+    `<tr><td>${x.toFixed(4)}</td><td>${f.y[i].toFixed(2)}</td></tr>`
+  ).join('');
+  if(f.x.length>500) tbody.innerHTML+=`<tr><td colspan="2" style="color:#666;text-align:center">...${f.x.length-500}行省略</td></tr>`;
+  el.style.display='block';
 }
 
 // ===== Excel出力 =====
@@ -414,7 +473,6 @@ function exportXLSX(){
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   }
 
-  // ピークシート
   for(const f of fileList){
     if(!f.peaks||f.peaks.length===0) continue;
     const lambda=1.5406;
@@ -441,7 +499,6 @@ function exportPNG(){
   a.click();
 }
 
-// リサイズ対応
 window.addEventListener('resize',()=>{if(fileList.length>0)redraw();});
 </script>
 </body>
