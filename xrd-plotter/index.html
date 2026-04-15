@@ -63,6 +63,7 @@
   <h1>XRD データプロッター</h1>
   <button class="btn" onclick="toggleTable()">データ表示</button>
   <button class="btn" onclick="detectPeaks()">ピーク検出</button>
+  <button class="btn" onclick="exportXLSX()">Excel出力</button>
   <button class="btn btn-primary" onclick="exportPNG()">PNG保存</button>
 </div>
 
@@ -108,6 +109,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const COLORS=['#58a6ff','#ff6b6b','#44cc88','#ffcc44','#cc66ff','#ff8844','#66cccc','#ff66aa'];
 let datasets=[];
@@ -376,6 +378,73 @@ function toggleTable(){
   ).join('');
   if(data.x.length>500) tbody.innerHTML+=`<tr><td colspan="2" style="color:#666;text-align:center">...${data.x.length-500}行省略</td></tr>`;
   el.style.display='block';
+}
+
+// ===== Excel出力 =====
+function exportXLSX(){
+  if(datasets.length===0){alert('データを先に読み込んでください');return;}
+
+  const wb=XLSX.utils.book_new();
+
+  // 各データセットをシートとして追加
+  for(const ds of datasets){
+    const data=rawData[ds.name];
+    if(!data) continue;
+
+    const sheetName=ds.name.replace(/\.[^.]+$/,'').substring(0,31);
+
+    // ヘッダー情報行
+    const rows=[];
+    rows.push(['XRD Data: '+ds.name]);
+    rows.push([]);
+
+    // データヘッダー
+    rows.push(['2θ (°)', 'Intensity (cps)']);
+
+    // データ行
+    for(let i=0;i<data.x.length;i++){
+      rows.push([data.x[i], data.y[i]]);
+    }
+
+    // 統計情報
+    rows.push([]);
+    rows.push(['--- Statistics ---']);
+    rows.push(['Data Points', data.x.length]);
+    rows.push(['2θ Start (°)', data.x[0]]);
+    rows.push(['2θ End (°)', data.x[data.x.length-1]]);
+    rows.push(['Step Size (°)', data.x.length>1 ? Math.round((data.x[1]-data.x[0])*10000)/10000 : '']);
+    rows.push(['Max Intensity', Math.max(...data.y)]);
+    rows.push(['Min Intensity', Math.min(...data.y)]);
+    rows.push(['Average Intensity', Math.round(data.y.reduce((a,b)=>a+b,0)/data.y.length*10)/10]);
+
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+
+    // 列幅設定
+    ws['!cols']=[{wch:14},{wch:18}];
+
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  }
+
+  // ピーク検出データがあればピークシートも追加
+  const peakBody=document.getElementById('peakBody');
+  if(peakBody&&peakBody.rows.length>0){
+    const peakRows=[['#','2θ (°)','Intensity (cps)','d値 (Å)']];
+    for(const row of peakBody.rows){
+      peakRows.push([
+        parseInt(row.cells[0].textContent),
+        parseFloat(row.cells[1].textContent),
+        parseFloat(row.cells[2].textContent),
+        parseFloat(row.cells[3].textContent)
+      ]);
+    }
+    const wsPeak=XLSX.utils.aoa_to_sheet(peakRows);
+    wsPeak['!cols']=[{wch:6},{wch:12},{wch:16},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsPeak, 'Peaks');
+  }
+
+  // ダウンロード
+  const firstName=datasets[0].name.replace(/\.[^.]+$/,'');
+  XLSX.writeFile(wb, firstName+'_XRD.xlsx');
 }
 
 // ===== PNG書き出し =====
