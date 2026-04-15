@@ -443,10 +443,20 @@ function detectPeaks(){
       return s/c;
     });
 
-    const threshold=Math.max(...sy)*0.03;
-    for(let i=3;i<nn-3;i++){
+    // 閾値: 最大値の10%以上のピークのみ検出（ノイズ除去）
+    const maxSy=Math.max(...sy);
+    const threshold=maxSy*0.10;
+    // プロミネンス（突出度）も考慮
+    for(let i=5;i<nn-5;i++){
       if(sy[i]>sy[i-1]&&sy[i]>sy[i+1]&&sy[i]>sy[i-2]&&sy[i]>sy[i+2]&&sy[i]>threshold){
-        if(peaks.length>0&&Math.abs(x[i]-peaks[peaks.length-1].x)<0.5){
+        // 左右の谷を探してプロミネンスを計算
+        let leftMin=sy[i], rightMin=sy[i];
+        for(let j=i-1;j>=Math.max(0,i-50);j--){if(sy[j]<leftMin)leftMin=sy[j];if(sy[j]>sy[i])break;}
+        for(let j=i+1;j<=Math.min(nn-1,i+50);j++){if(sy[j]<rightMin)rightMin=sy[j];if(sy[j]>sy[i])break;}
+        const prominence=sy[i]-Math.max(leftMin,rightMin);
+        if(prominence<maxSy*0.03) continue; // プロミネンスが小さすぎるピークは除外
+
+        if(peaks.length>0&&Math.abs(x[i]-peaks[peaks.length-1].x)<1.0){
           if(sy[i]>peaks[peaks.length-1].y) peaks[peaks.length-1]={x:x[i],y:y[i],label:''};
         } else {
           peaks.push({x:x[i],y:y[i],label:''});
@@ -492,43 +502,61 @@ function toggleTable(){
   el.style.display='block';
 }
 
-// ===== Excel出力 =====
+// ===== Excel出力（グラフ画像を埋め込み） =====
 function exportXLSX(){
   if(fileList.length===0){alert('データを先に読み込んでください');return;}
+  const canvas=document.getElementById('xrdCanvas');
+
+  // Canvas画像をBase64で取得
+  const imgDataUrl=canvas.toDataURL('image/png');
+  const imgBase64=imgDataUrl.split(',')[1];
+
   const wb=XLSX.utils.book_new();
 
+  // グラフシート（画像を埋め込み）
+  const wsChart=XLSX.utils.aoa_to_sheet([['XRD Plot']]);
+  // 画像埋め込み
+  if(!wsChart['!images']) wsChart['!images']=[];
+  wsChart['!images'].push({
+    name:'xrd_plot.png',
+    data:imgBase64,
+    position:{type:'twoCellAnchor',attrs:{editAs:'oneCell'},
+      from:{col:0,row:2,colOff:0,rowOff:0},
+      to:{col:10,row:Math.max(25, fileList.length*15+5),colOff:0,rowOff:0}
+    }
+  });
+  XLSX.utils.book_append_sheet(wb, wsChart, 'XRD Chart');
+
+  // データシート（各ファイル）
   for(const f of fileList){
-    const sheetName=f.label.substring(0,31);
-    const rows=[['XRD Data: '+f.label],[]];
-    rows.push(['2\u03B8 (°)', 'Intensity (cps)']);
+    const sheetName=f.label.substring(0,28)+'_data';
+    const rows=[['2\u03B8 (°)', 'Intensity (cps)']];
     for(let i=0;i<f.x.length;i++) rows.push([f.x[i], f.y[i]]);
-    rows.push([],['--- Statistics ---']);
-    rows.push(['Data Points', f.x.length]);
-    rows.push(['2\u03B8 Start (°)', f.x[0]]);
-    rows.push(['2\u03B8 End (°)', f.x[f.x.length-1]]);
-    rows.push(['Max Intensity', Math.max(...f.y)]);
-    rows.push(['Min Intensity', Math.min(...f.y)]);
-    rows.push(['Average', Math.round(f.y.reduce((a,b)=>a+b,0)/f.y.length*10)/10]);
     const ws=XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols']=[{wch:14},{wch:18}];
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    ws['!cols']=[{wch:12},{wch:16}];
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0,31));
   }
 
-  for(const f of fileList){
-    if(!f.peaks||f.peaks.length===0) continue;
+  // ピークシート
+  const hasPeaks=fileList.some(f=>f.peaks&&f.peaks.length>0);
+  if(hasPeaks){
     const lambda=1.5406;
-    const rows=[['#','2\u03B8 (°)','Intensity','d (Å)','Label']];
-    f.peaks.forEach((p,i)=>{
-      const theta=p.x*Math.PI/360;
-      const d=lambda/(2*Math.sin(theta));
-      rows.push([i+1, p.x, p.y, d, p.label||'']);
-    });
+    const rows=[['Dataset','#','2\u03B8 (°)','Intensity','d (Å)','Label']];
+    for(const f of fileList){
+      if(!f.peaks) continue;
+      f.peaks.forEach((p,i)=>{
+        const theta=p.x*Math.PI/360;
+        const d=lambda/(2*Math.sin(theta));
+        rows.push([f.label, i+1, p.x, p.y, d, p.label||'']);
+      });
+    }
     const ws=XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols']=[{wch:6},{wch:12},{wch:14},{wch:10},{wch:12}];
-    XLSX.utils.book_append_sheet(wb, ws, (f.label+' Peaks').substring(0,31));
+    ws['!cols']=[{wch:20},{wch:5},{wch:10},{wch:14},{wch:10},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Peaks');
   }
 
-  XLSX.writeFile(wb, fileList[0].label+'_XRD.xlsx');
+  const firstName=fileList[0].label;
+  XLSX.writeFile(wb, firstName+'_XRD.xlsx');
 }
 
 // ===== PNG出力 =====
