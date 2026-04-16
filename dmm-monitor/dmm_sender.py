@@ -196,7 +196,19 @@ def check_command(smu):
     elif action == "OUTPUT_ON":
         print("\n  *** Web からの指令: OUTPUT ON ***")
         safe_write(smu, "*CLS", 0.3)
-        safe_write(smu, ":OUTP ON", 0.5)
+        safe_write(smu, ":OUTP ON", 1.0)
+        # 確認
+        if smu:
+            try:
+                flush_buffer(smu)
+                state = smu.query(":OUTP?").strip()
+                print(f"  OUTPUT 状態確認: {state}")
+                if state not in ("1", "ON"):
+                    print("  OUTPUT ON に失敗。リトライ...")
+                    safe_write(smu, "*CLS", 0.5)
+                    safe_write(smu, ":OUTP ON", 1.0)
+            except Exception as e:
+                print(f"  OUTPUT 確認エラー: {e}")
         update_output_status(True)
         return "ON"
 
@@ -220,8 +232,24 @@ def check_command(smu):
         # ソース設定（内部でOUTPUT OFF → 設定変更）
         configure_source(smu, mode, value, compliance)
 
-        # OUTPUT ON
+        # OUTPUT ON（確認付き）
         safe_write(smu, ":OUTP ON", 1.0)
+
+        # OUTPUT状態を確認
+        if smu:
+            try:
+                flush_buffer(smu)
+                state = smu.query(":OUTP?").strip()
+                print(f"  OUTPUT 状態確認: {state}")
+                if state not in ("1", "ON"):
+                    print("  OUTPUT ON に失敗。リトライ...")
+                    safe_write(smu, "*CLS", 0.5)
+                    safe_write(smu, ":OUTP ON", 1.0)
+                    state = smu.query(":OUTP?").strip()
+                    print(f"  OUTPUT 状態確認（リトライ後）: {state}")
+            except Exception as e:
+                print(f"  OUTPUT 確認エラー: {e}")
+
         update_output_status(True)
 
         # タイマー設定
@@ -423,20 +451,44 @@ def main():
     errors = 0
     output_on = False  # OUTPUT状態トラッキング（起動時はOFF）
 
+    # 自動単位フォーマット関数
+    def fmt_i(i):
+        a = abs(i)
+        if a < 1e-6: return f"{i*1e9:>8.3f} nA"
+        if a < 1e-3: return f"{i*1e6:>8.3f} μA"
+        if a < 1:    return f"{i*1e3:>8.4f} mA"
+        return f"{i:>8.5f} A"
+
+    def fmt_v(v):
+        a = abs(v)
+        if a < 1e-3: return f"{v*1e6:>8.2f} μV"
+        if a < 1:    return f"{v*1e3:>8.4f} mV"
+        return f"{v:>8.5f} V"
+
+    print("\n  OUTPUT OFF — Webダッシュボードからの指令を待機中...")
+
     while running:
         try:
             # Webダッシュボードからのコマンドをチェック
             cmd_result = check_command(smu)
             if cmd_result == "OFF":
                 output_on = False
+                print("\n  OUTPUT OFF — 測定停止。コマンド待機中...")
             elif cmd_result == "ON":
                 output_on = True
+                print("\n  OUTPUT ON — 測定開始")
 
             # タイマー自動停止チェック
             if check_auto_stop(smu):
                 output_on = False
+                print("\n  OUTPUT OFF（タイマー満了）— コマンド待機中...")
 
-            # 測定
+            # OUTPUT OFF の間は測定スキップ（:READ? がハングするのを防ぐ）
+            if not output_on:
+                time.sleep(INTERVAL)
+                continue
+
+            # 測定（OUTPUT ON 時のみ）
             if mode == "live" and smu:
                 voltage, current = read_keithley(smu)
             else:
@@ -457,20 +509,6 @@ def main():
             count += 1
             ts = datetime.now().strftime("%H:%M:%S")
             status = "OK" if (ok1 and ok2) else "WARN"
-
-            # 自動単位
-            def fmt_i(i):
-                a = abs(i)
-                if a < 1e-6: return f"{i*1e9:>8.3f} nA"
-                if a < 1e-3: return f"{i*1e6:>8.3f} μA"
-                if a < 1:    return f"{i*1e3:>8.4f} mA"
-                return f"{i:>8.5f} A"
-
-            def fmt_v(v):
-                a = abs(v)
-                if a < 1e-3: return f"{v*1e6:>8.2f} μV"
-                if a < 1:    return f"{v*1e3:>8.4f} mV"
-                return f"{v:>8.5f} V"
 
             # タイマー残り表示
             timer_str = ""
