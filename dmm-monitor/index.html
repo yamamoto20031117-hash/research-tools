@@ -521,12 +521,21 @@ function redrawChart(){
     ctx.moveTo(xPx(t),margin.top);ctx.lineTo(xPx(t),h-margin.bottom);ctx.stroke();
   }
 
-  // データ線
-  ctx.strokeStyle=color;ctx.lineWidth=1.8;ctx.beginPath();
-  let started=false;
+  // データ線（ギャップがあれば線を切る）
+  const GAP_MS=3000; // 3秒以上空いたら別セグメント
+  ctx.strokeStyle=color;ctx.lineWidth=1.8;
+  let prevTime=0;
+  ctx.beginPath();
   for(const d of filtered){
     const x=xPx(d.time), y=yPx(d[key]);
-    if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+    if(prevTime===0 || d.time-prevTime>GAP_MS){
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x,y);
+    } else {
+      ctx.lineTo(x,y);
+    }
+    prevTime=d.time;
   }
   ctx.stroke();
 
