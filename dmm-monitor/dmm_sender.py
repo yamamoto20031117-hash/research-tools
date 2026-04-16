@@ -328,17 +328,17 @@ def connect_keithley():
     safe_write(smu, ":SENS:FUNC 'VOLT:DC','CURR:DC'", 0.5)
     safe_write(smu, ":FORM:ELEM VOLT,CURR", 0.5)
 
-    # ソース設定（電流源モード・0A出力 → OUTPUT ONで測定可能にする）
+    # ソース設定（電流源モード・0A — OUTPUT はOFFのまま待機）
     safe_write(smu, ":SOUR:FUNC CURR", 0.5)
     safe_write(smu, ":SOUR:CURR:RANG MIN", 0.5)
     safe_write(smu, ":SOUR:CURR 0", 0.5)
-    safe_write(smu, ":OUTP ON", 1.0)
+    # OUTPUT OFF のまま（Webダッシュボードからの指令で ON にする）
 
     print("初期設定完了")
     print("  モード: 電圧・電流 同時測定")
-    print("  ソース: 0A（測定のみ）")
-    print("  OUTPUT: ON")
-    update_output_status(True)
+    print("  ソース: 0A（待機中）")
+    print("  OUTPUT: OFF（Webから制御）")
+    update_output_status(False)
     return smu
 
 
@@ -421,7 +421,7 @@ def main():
 
     count = 0
     errors = 0
-    output_on = True  # OUTPUT状態トラッキング
+    output_on = False  # OUTPUT状態トラッキング（起動時はOFF）
 
     while running:
         try:
