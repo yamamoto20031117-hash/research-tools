@@ -336,7 +336,11 @@ function startListening(){
       const entries=Object.values(d).sort((a,b)=>a.time-b.time);
       entries.forEach(e=>{
         if(!dataLog.some(x=>x.time===e.time)){
-          dataLog.push({time:e.time, voltage:e.voltage||0, current:e.current||0});
+          let v=parseFloat(e.voltage)||0;
+          let i=parseFloat(e.current)||0;
+          if(Math.abs(v)>1e6) v=0;
+          if(Math.abs(i)>1e6) i=0;
+          dataLog.push({time:e.time, voltage:v, current:i});
         }
       });
       updateStats();redrawChart();updateLogTable();
@@ -529,6 +533,12 @@ function redrawChart(){
     ctx.moveTo(xPx(t),margin.top);ctx.lineTo(xPx(t),h-margin.bottom);ctx.stroke();
   }
 
+  // クリッピング: チャート領域外に描画しない
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(margin.left, margin.top, pw, ph);
+  ctx.clip();
+
   // データ線（ギャップがあれば線を切る）
   const GAP_MS=3000; // 3秒以上空いたら別セグメント
   ctx.strokeStyle=color;ctx.lineWidth=1.8;
@@ -546,6 +556,8 @@ function redrawChart(){
     prevTime=d.time;
   }
   ctx.stroke();
+
+  ctx.restore(); // クリッピング解除
 
   // 枠
   ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=1;
