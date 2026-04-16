@@ -62,12 +62,23 @@
   #xrdCanvas.dragging{cursor:grabbing}
   #xrdCanvas.hovering-label{cursor:grab}
 
+  /* カスタマイズパネル開閉時のレイアウト */
+  .chart-body{display:flex;flex-direction:column;gap:12px}
+  .chart-body.side-by-side{flex-direction:row;align-items:flex-start}
+  .chart-body.side-by-side .canvas-col{flex:1;min-width:0;position:sticky;top:52px;align-self:flex-start}
+  .chart-body.side-by-side .settings-panel{width:340px;flex-shrink:0;max-height:calc(100vh - 70px);overflow-y:auto}
+  @media(max-width:960px){
+    .chart-body.side-by-side{flex-direction:column}
+    .chart-body.side-by-side .canvas-col{position:sticky;top:52px;z-index:5;width:100%;
+      background:rgba(15,18,28,0.95);padding-bottom:8px;border-radius:0 0 8px 8px}
+    .chart-body.side-by-side .settings-panel{width:100%;max-height:none}
+  }
+
   .settings-panel{display:none;background:rgba(15,18,28,0.9);border:1px solid rgba(88,166,255,0.15);
-    border-radius:8px;padding:16px;margin-bottom:16px}
+    border-radius:8px;padding:16px}
   .settings-panel.open{display:block}
   .settings-panel h3{font-size:.85rem;color:#58a6ff;margin-bottom:10px}
-  .settings-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 16px}
-  @media(max-width:768px){.settings-grid{grid-template-columns:1fr 1fr}}
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
   .sg-item{display:flex;flex-direction:column;gap:3px}
   .sg-item label{font-size:.72rem;color:#888}
   .sg-item input,.sg-item select{background:#0e1220;border:1px solid #2a3040;border-radius:4px;
@@ -120,52 +131,55 @@
       <button class="btn" onclick="toggleSettings()" id="btnSettings">カスタマイズ &#9881;</button>
     </div>
 
-    <div class="settings-panel" id="settingsPanel">
-      <h3>グラフカスタマイズ</h3>
-      <div class="settings-grid">
-        <div class="sg-section">タイトル・ラベル</div>
-        <div class="sg-item"><label>グラフタイトル</label><input type="text" id="plotTitle" placeholder="（空欄で非表示）" oninput="redraw()"></div>
-        <div class="sg-item"><label>X軸ラベル</label><input type="text" id="xLabel" value="2θ / deg" oninput="redraw()"></div>
-        <div class="sg-item"><label>Y軸ラベル</label><input type="text" id="yLabel" value="Intensity / a.u." oninput="redraw()"></div>
+    <div class="chart-body" id="chartBody">
+      <div class="canvas-col">
+        <canvas id="xrdCanvas"></canvas>
+      </div>
+      <div class="settings-panel" id="settingsPanel">
+        <h3>グラフカスタマイズ</h3>
+        <div class="settings-grid">
+          <div class="sg-section">タイトル・ラベル</div>
+          <div class="sg-item"><label>グラフタイトル</label><input type="text" id="plotTitle" placeholder="（空欄で非表示）" oninput="redraw()"></div>
+          <div class="sg-item"><label>X軸ラベル</label><input type="text" id="xLabel" value="2θ / deg" oninput="redraw()"></div>
+          <div class="sg-item"><label>Y軸ラベル</label><input type="text" id="yLabel" value="Intensity / a.u." oninput="redraw()"></div>
 
-        <div class="sg-section">フォント</div>
-        <div class="sg-item"><label>フォント</label>
-          <select id="fontFamily" onchange="redraw()">
-            <option value="Arial, sans-serif">Arial</option>
-            <option value="'Times New Roman', serif">Times New Roman</option>
-            <option value="'Helvetica Neue', Helvetica, sans-serif">Helvetica</option>
-            <option value="Georgia, serif">Georgia</option>
-            <option value="'Courier New', monospace">Courier New</option>
-          </select>
+          <div class="sg-section">フォント</div>
+          <div class="sg-item"><label>フォント</label>
+            <select id="fontFamily" onchange="redraw()">
+              <option value="Arial, sans-serif">Arial</option>
+              <option value="'Times New Roman', serif">Times New Roman</option>
+              <option value="'Helvetica Neue', Helvetica, sans-serif">Helvetica</option>
+              <option value="Georgia, serif">Georgia</option>
+              <option value="'Courier New', monospace">Courier New</option>
+            </select>
+          </div>
+          <div class="sg-item"><label>タイトルサイズ</label><input type="number" id="titleSize" value="16" min="8" max="32" onchange="redraw()"></div>
+          <div class="sg-item"><label>軸ラベルサイズ</label><input type="number" id="axisLabelSize" value="14" min="8" max="28" onchange="redraw()"></div>
+          <div class="sg-item"><label>目盛りサイズ</label><input type="number" id="tickSize" value="12" min="6" max="24" onchange="redraw()"></div>
+          <div class="sg-item"><label>データラベルサイズ</label><input type="number" id="dataLabelSize" value="14" min="8" max="28" onchange="redraw()"></div>
+          <div class="sg-item"><label>ピークラベルサイズ</label><input type="number" id="peakLabelSize" value="11" min="6" max="24" onchange="redraw()"></div>
+
+          <div class="sg-section">色・背景</div>
+          <div class="sg-item"><label>背景色</label><div class="sg-row"><input type="color" id="bgColor" value="#ffffff" onchange="redraw()"><label style="font-size:.7rem"><input type="checkbox" id="chkTransparent" onchange="redraw()"> 透過</label></div></div>
+          <div class="sg-item"><label>軸・文字色</label><input type="color" id="axisColor" value="#333333" onchange="redraw()"></div>
+          <div class="sg-item"><label>グリッド色</label><input type="color" id="gridColor" value="#e0e0e0" onchange="redraw()"></div>
+          <div class="sg-item"><label>ベースライン色</label><input type="color" id="baseColor" value="#bbbbbb" onchange="redraw()"></div>
+
+          <div class="sg-section">レイアウト</div>
+          <div class="sg-item"><label>余白 上</label><input type="number" id="mTop" value="30" min="0" max="100" onchange="redraw()"></div>
+          <div class="sg-item"><label>余白 下</label><input type="number" id="mBottom" value="50" min="20" max="120" onchange="redraw()"></div>
+          <div class="sg-item"><label>余白 左</label><input type="number" id="mLeft" value="70" min="20" max="120" onchange="redraw()"></div>
+          <div class="sg-item"><label>余白 右</label><input type="number" id="mRight" value="40" min="0" max="100" onchange="redraw()"></div>
+          <div class="sg-item"><label>グラフ高さ(px)</label><input type="number" id="canvasH" value="0" min="0" max="2000" placeholder="0=自動" onchange="redraw()"></div>
+          <div class="sg-item"><label><input type="checkbox" id="chkFrame" onchange="redraw()"> 外枠表示</label></div>
+
+          <div class="sg-section">目盛り・軸</div>
+          <div class="sg-item"><label>グリッド線幅</label><input type="number" id="gridWidth" value="0.5" min="0.1" max="3" step="0.1" onchange="redraw()"></div>
+          <div class="sg-item"><label>軸線幅</label><input type="number" id="axisWidth" value="1" min="0.5" max="4" step="0.5" onchange="redraw()"></div>
+          <div class="sg-item"><label><input type="checkbox" id="chkYTicks" onchange="redraw()"> Y軸目盛り</label></div>
         </div>
-        <div class="sg-item"><label>タイトルサイズ</label><input type="number" id="titleSize" value="16" min="8" max="32" onchange="redraw()"></div>
-        <div class="sg-item"><label>軸ラベルサイズ</label><input type="number" id="axisLabelSize" value="14" min="8" max="28" onchange="redraw()"></div>
-        <div class="sg-item"><label>目盛りサイズ</label><input type="number" id="tickSize" value="12" min="6" max="24" onchange="redraw()"></div>
-        <div class="sg-item"><label>データラベルサイズ</label><input type="number" id="dataLabelSize" value="14" min="8" max="28" onchange="redraw()"></div>
-        <div class="sg-item"><label>ピークラベルサイズ</label><input type="number" id="peakLabelSize" value="11" min="6" max="24" onchange="redraw()"></div>
-
-        <div class="sg-section">色・背景</div>
-        <div class="sg-item"><label>背景色</label><div class="sg-row"><input type="color" id="bgColor" value="#ffffff" onchange="redraw()"><label style="font-size:.7rem"><input type="checkbox" id="chkTransparent" onchange="redraw()"> 透過</label></div></div>
-        <div class="sg-item"><label>軸・文字色</label><input type="color" id="axisColor" value="#333333" onchange="redraw()"></div>
-        <div class="sg-item"><label>グリッド色</label><input type="color" id="gridColor" value="#e0e0e0" onchange="redraw()"></div>
-        <div class="sg-item"><label>ベースライン色</label><input type="color" id="baseColor" value="#bbbbbb" onchange="redraw()"></div>
-
-        <div class="sg-section">レイアウト</div>
-        <div class="sg-item"><label>余白 上</label><input type="number" id="mTop" value="30" min="0" max="100" onchange="redraw()"></div>
-        <div class="sg-item"><label>余白 下</label><input type="number" id="mBottom" value="50" min="20" max="120" onchange="redraw()"></div>
-        <div class="sg-item"><label>余白 左</label><input type="number" id="mLeft" value="70" min="20" max="120" onchange="redraw()"></div>
-        <div class="sg-item"><label>余白 右</label><input type="number" id="mRight" value="40" min="0" max="100" onchange="redraw()"></div>
-        <div class="sg-item"><label>グラフ高さ(px)</label><input type="number" id="canvasH" value="0" min="0" max="2000" placeholder="0=自動" onchange="redraw()"></div>
-        <div class="sg-item"><label><input type="checkbox" id="chkFrame" onchange="redraw()"> 外枠表示</label></div>
-
-        <div class="sg-section">目盛り・軸</div>
-        <div class="sg-item"><label>グリッド線幅</label><input type="number" id="gridWidth" value="0.5" min="0.1" max="3" step="0.1" onchange="redraw()"></div>
-        <div class="sg-item"><label>軸線幅</label><input type="number" id="axisWidth" value="1" min="0.5" max="4" step="0.5" onchange="redraw()"></div>
-        <div class="sg-item"><label><input type="checkbox" id="chkYTicks" onchange="redraw()"> Y軸目盛り</label></div>
       </div>
     </div>
-
-    <canvas id="xrdCanvas"></canvas>
   </div>
 
   <div class="peak-list" id="peakList">
@@ -289,6 +303,9 @@ function parseSmartLab(text){
 // ===== UI更新 =====
 function updateUI(){
   updateMultiList();
+  // 手動ピーク追加用ドロップダウンを更新
+  const manualDs=document.getElementById('manualPeakDs');
+  manualDs.innerHTML=fileList.map((f,i)=>`<option value="${i}">${f.label}</option>`).join('');
   if(fileList.length>0){
     document.getElementById('chartWrap').style.display='block';
     const allX=fileList.flatMap(f=>f.x);
@@ -327,15 +344,19 @@ function removeFile(idx){
 // ===== 設定パネル =====
 function toggleSettings(){
   const p=document.getElementById('settingsPanel');
+  const body=document.getElementById('chartBody');
   p.classList.toggle('open');
+  body.classList.toggle('side-by-side', p.classList.contains('open'));
   document.getElementById('btnSettings').classList.toggle('active');
+  // キャンバス幅が変わるため再描画
+  setTimeout(()=>redraw(),50);
 }
 
 // ===== 描画 =====
 function redraw(){
   const canvas=document.getElementById('xrdCanvas');
   const dpr=window.devicePixelRatio||1;
-  const w=canvas.parentElement.clientWidth-32;
+  const w=canvas.parentElement.clientWidth;
   const customH=parseInt(document.getElementById('canvasH').value)||0;
   const h=customH>0?customH:Math.max(400, fileList.length*250+100);
   canvas.style.width=w+'px';
@@ -525,20 +546,14 @@ function redraw(){
     ctx.beginPath();ctx.moveTo(px,h-margin.bottom);ctx.lineTo(px,h-margin.bottom+5);ctx.stroke();
   }
 
-  // X軸ラベル
-  ctx.font=axisLabelSz+'px '+fontFam;
-  ctx.fillStyle=axisCol;
-  ctx.textAlign='center';
-  ctx.fillText(xLabelText, margin.left+pw/2, h-6);
+  // X軸ラベル（単位を斜体で描画）
+  drawAxisLabel(ctx, xLabelText, margin.left+pw/2, h-6, axisLabelSz, fontFam, axisCol, false);
 
-  // Y軸ラベル
+  // Y軸ラベル（単位を斜体で描画、回転）
   ctx.save();
   ctx.translate(14, margin.top+ph/2);
   ctx.rotate(-Math.PI/2);
-  ctx.font=axisLabelSz+'px '+fontFam;
-  ctx.fillStyle=axisCol;
-  ctx.textAlign='center';
-  ctx.fillText(yLabelText, 0, 0);
+  drawAxisLabel(ctx, yLabelText, 0, 0, axisLabelSz, fontFam, axisCol, false);
   ctx.restore();
 
   // タイトル
@@ -548,6 +563,42 @@ function redraw(){
     ctx.textAlign='center';
     ctx.fillText(plotTitle, margin.left+pw/2, margin.top-8);
   }
+}
+
+// ===== 軸ラベル描画（単位部分を斜体） =====
+// "2θ / deg" → "2θ / " は通常、"deg" は italic
+// "Intensity / a.u." → "Intensity / " は通常、"a.u." は italic
+// " / " で分割し、後半（単位）を斜体にする。√ や log 接頭語は通常体に保つ
+function drawAxisLabel(ctx, text, cx, cy, fontSize, fontFam, color, isBold){
+  ctx.fillStyle=color;
+  const prefix=isBold?'bold ':'';
+  const slashIdx=text.indexOf(' / ');
+  if(slashIdx===-1){
+    // スラッシュ区切りがなければそのまま描画
+    ctx.font=prefix+fontSize+'px '+fontFam;
+    ctx.textAlign='center';
+    ctx.fillText(text, cx, cy);
+    return;
+  }
+  const quantityPart=text.substring(0, slashIdx+3); // "2θ / " まで
+  const unitPart=text.substring(slashIdx+3);          // "deg" 等
+
+  // 各パーツの幅を測定
+  ctx.font=prefix+fontSize+'px '+fontFam;
+  const qw=ctx.measureText(quantityPart).width;
+  ctx.font=prefix+'italic '+fontSize+'px '+fontFam;
+  const uw=ctx.measureText(unitPart).width;
+  const totalW=qw+uw;
+  const startX=cx-totalW/2;
+
+  // 量の部分（通常体）
+  ctx.font=prefix+fontSize+'px '+fontFam;
+  ctx.textAlign='left';
+  ctx.fillText(quantityPart, startX, cy);
+
+  // 単位の部分（斜体）
+  ctx.font=prefix+'italic '+fontSize+'px '+fontFam;
+  ctx.fillText(unitPart, startX+qw, cy);
 }
 
 function calcStep(range){
@@ -598,22 +649,43 @@ function detectPeaks(){
       }
     }
     f.peaks=peaks;
+  });
 
-    const lambda=1.5406;
-    let html=`<h4 style="color:${f.color};margin:12px 0 6px">${f.label} (${peaks.length}ピーク)</h4>`;
-    html+=`<table><thead><tr><th>#</th><th>2\u03B8 (°)</th><th>強度</th><th>d値 (Å)</th><th>ラベル</th></tr></thead><tbody>`;
-    peaks.forEach((p,pi)=>{
+  refreshPeakTables();
+  document.getElementById('peakList').style.display='block';
+  document.getElementById('chkPeakLabel').checked=true;
+  redraw();
+}
+
+// ===== ピークテーブル再描画（検出・手動追加共通） =====
+function refreshPeakTables(){
+  const tablesEl=document.getElementById('peakTables');
+  tablesEl.innerHTML='';
+  const lambda=1.5406;
+
+  fileList.forEach((f, fi)=>{
+    if(!f.peaks||f.peaks.length===0) return;
+    let html=`<h4 style="color:${f.color};margin:12px 0 6px">${f.label} (${f.peaks.length}ピーク)</h4>`;
+    html+=`<table><thead><tr><th>#</th><th>2\u03B8 (°)</th><th>強度</th><th>d値 (Å)</th><th>ラベル</th><th></th></tr></thead><tbody>`;
+    f.peaks.forEach((p,pi)=>{
       const theta=p.x*Math.PI/360;
       const d=lambda/(2*Math.sin(theta));
       html+=`<tr><td>${pi+1}</td><td>${p.x.toFixed(3)}</td><td>${p.y.toFixed(1)}</td><td>${d.toFixed(4)}</td>`;
-      html+=`<td><input type="text" value="${p.label}" placeholder="(001)等" style="width:80px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;color:#ddd;padding:2px 4px;font-size:.72rem" onchange="updatePeakLabel(${fi},${pi},this.value)"></td></tr>`;
+      html+=`<td><input type="text" value="${p.label}" placeholder="(001)等" style="width:80px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;color:#ddd;padding:2px 4px;font-size:.72rem" onchange="updatePeakLabel(${fi},${pi},this.value)"></td>`;
+      html+=`<td><button class="btn" style="padding:1px 6px;font-size:.65rem;color:#f66;border-color:#f66" onclick="deletePeak(${fi},${pi})" title="ピーク削除">&times;</button></td></tr>`;
     });
     html+='</tbody></table>';
     tablesEl.innerHTML+=html;
   });
 
-  document.getElementById('peakList').style.display='block';
-  document.getElementById('chkPeakLabel').checked=true;
+  // 手動追加ドロップダウンも更新
+  const dsSel=document.getElementById('manualPeakDs');
+  dsSel.innerHTML=fileList.map((f,i)=>`<option value="${i}">${f.label}</option>`).join('');
+}
+
+function deletePeak(fi, pi){
+  fileList[fi].peaks.splice(pi,1);
+  refreshPeakTables();
   redraw();
 }
 
