@@ -129,6 +129,7 @@ def check_auto_stop(smu):
         print("\n  *** タイマー満了: OUTPUT OFF (自動停止) ***")
         safe_write(smu, "*CLS", 0.3)
         safe_write(smu, ":OUTP OFF", 0.5)
+        safe_write(smu, ":SYST:LOC", 0.3)  # フロントパネル操作を復帰
         auto_stop_time = 0
         update_output_status(False)
         return True
@@ -146,24 +147,17 @@ def configure_source(smu, mode, value, compliance):
     # エラーキュークリア
     safe_write(smu, "*CLS", 0.5)
 
-    # ソースモード設定
+    # ソースモード設定（レンジは AUTO に任せる — 手動レンジはエラー101の原因）
     if mode == "CURR":
         safe_write(smu, ":SOUR:FUNC CURR", 0.5)
-        # レンジ：0の場合はMINレンジ
-        if abs(value) > 0:
-            safe_write(smu, f":SOUR:CURR:RANG {abs(value)}", 0.5)
-        else:
-            safe_write(smu, ":SOUR:CURR:RANG MIN", 0.5)
+        safe_write(smu, ":SOUR:CURR:RANG:AUTO ON", 0.5)
         safe_write(smu, f":SOUR:CURR {value}", 0.5)
         # コンプライアンス（電圧上限）
         safe_write(smu, f":SENS:VOLT:PROT {compliance}", 0.5)
         print(f"  設定: 定電流モード {value} A, コンプライアンス {compliance} V")
     elif mode == "VOLT":
         safe_write(smu, ":SOUR:FUNC VOLT", 0.5)
-        if abs(value) > 0:
-            safe_write(smu, f":SOUR:VOLT:RANG {abs(value)}", 0.5)
-        else:
-            safe_write(smu, ":SOUR:VOLT:RANG MIN", 0.5)
+        safe_write(smu, ":SOUR:VOLT:RANG:AUTO ON", 0.5)
         safe_write(smu, f":SOUR:VOLT {value}", 0.5)
         # コンプライアンス（電流上限）
         safe_write(smu, f":SENS:CURR:PROT {compliance}", 0.5)
@@ -173,6 +167,16 @@ def configure_source(smu, mode, value, compliance):
     safe_write(smu, ":SENS:FUNC:CONC ON", 0.5)
     safe_write(smu, ":SENS:FUNC 'VOLT:DC','CURR:DC'", 0.5)
     safe_write(smu, ":FORM:ELEM VOLT,CURR", 0.5)
+
+    # エラーチェック
+    if smu:
+        try:
+            flush_buffer(smu)
+            err = smu.query(":SYST:ERR?").strip()
+            if not err.startswith("0") and not err.startswith("+0"):
+                print(f"  ⚠ Keithley エラー: {err}")
+        except:
+            pass
 
 
 def check_command(smu):
@@ -189,6 +193,7 @@ def check_command(smu):
         print("\n  *** Web からの指令: OUTPUT OFF ***")
         safe_write(smu, "*CLS", 0.3)
         safe_write(smu, ":OUTP OFF", 0.5)
+        safe_write(smu, ":SYST:LOC", 0.3)  # フロントパネル操作を復帰
         auto_stop_time = 0
         update_output_status(False)
         return "OFF"
@@ -540,9 +545,12 @@ def main():
     # クリーンアップ
     if smu:
         try:
-            smu.write(":OUTP OFF")  # 出力OFF
+            smu.write(":OUTP OFF")   # 出力OFF
+            time.sleep(0.3)
+            smu.write(":SYST:LOC")   # フロントパネル操作を復帰
+            time.sleep(0.3)
             smu.close()
-            print("Keithley 2400 切断完了")
+            print("Keithley 2400 切断完了（フロントパネル復帰済み）")
         except:
             pass
     print("終了しました。")
