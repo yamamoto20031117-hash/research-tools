@@ -145,6 +145,7 @@
         <option value="stack">スタック</option>
         <option value="overlay">重ね合わせ</option>
       </select>
+      <button class="btn" onclick="normalizeOverlay()" title="最大ピークに合わせて正規化">正規化</button>
       <label><input type="checkbox" id="chkGrid" checked onchange="redraw()"> グリッド</label>
       <label><input type="checkbox" id="chkPeakLabel" onchange="redraw()"> ピークラベル</label>
       <label><input type="checkbox" id="chkFWHM" onchange="redraw()"> FWHM</label>
@@ -347,8 +348,8 @@ function updateMultiList(){
       <span class="mi-name">(${f.name})</span>`;
     if(isOverlay){
       html+=`<div class="mi-controls">
-        <label>Yオフセット</label><input type="number" value="${f.yOffset||0}" step="100" onchange="fileList[${i}].yOffset=parseFloat(this.value)||0;redraw()">
-        <label>Yスケール</label><input type="number" value="${f.yScale||1}" step="0.1" min="0.01" onchange="fileList[${i}].yScale=parseFloat(this.value)||1;redraw()">
+        <label>Yスケール</label><input type="number" value="${f.yScale||1}" step="0.1" min="0.01" style="width:60px" onchange="fileList[${i}].yScale=parseFloat(this.value)||1;updateMultiList();redraw()">
+        <label>Yオフセット</label><input type="number" value="${f.yOffset||0}" step="100" style="width:70px" onchange="fileList[${i}].yOffset=parseFloat(this.value)||0;redraw()">
       </div>`;
     }
     html+=`<span class="mi-remove" onclick="removeFile(${i})" title="削除">&times;</span></div>`;
@@ -365,6 +366,23 @@ function removeFile(idx){
     document.getElementById('xMin').value='';
     document.getElementById('xMax').value='';
   }
+}
+
+// ===== 重ね合わせ正規化 =====
+function normalizeOverlay(){
+  if(fileList.length===0) return;
+  document.getElementById('displayMode').value='overlay';
+  // 各データセットの最大Y値を取得
+  const maxVals=fileList.map(f=>Math.max(...f.y));
+  const globalMax=Math.max(...maxVals);
+  if(globalMax<=0) return;
+  // 最大ピークに合わせてスケールを設定
+  fileList.forEach((f,i)=>{
+    f.yScale=maxVals[i]>0?globalMax/maxVals[i]:1;
+    f.yOffset=0;
+  });
+  updateMultiList();
+  redraw();
 }
 
 // ===== 設定パネル =====
