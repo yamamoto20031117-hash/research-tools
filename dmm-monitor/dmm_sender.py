@@ -85,8 +85,56 @@ def update_output_status(on):
     """OUTPUT状態をFirebaseに送信（ダッシュボードで監視）"""
     firebase_put("dmm/status", {"output": on, "time": int(time.time()*1000)})
 
+
+# ===== タイマー自動停止 =====
+auto_stop_time = 0  # 0 = 無制限
+
+
+def check_auto_stop(smu):
+    """タイマー自動停止をチェック"""
+    global auto_stop_time
+    if auto_stop_time > 0 and time.time() >= auto_stop_time:
+        print("\n  *** タイマー満了: OUTPUT OFF (自動停止) ***")
+        if smu:
+            smu.write(":OUTP OFF")
+            time.sleep(0.3)
+        auto_stop_time = 0
+        update_output_status(False)
+        return True
+    return False
+
+
+def configure_source(smu, mode, value, compliance):
+    """ソースモードと値を設定"""
+    if not smu:
+        print(f"  [テストモード] SOURCE設定: {mode} = {value}, Compliance = {compliance}")
+        return
+
+    # ソースモード設定
+    if mode == "CURR":
+        smu.write(":SOUR:FUNC CURR"); time.sleep(0.2)
+        smu.write(f":SOUR:CURR:RANG {abs(value)}"); time.sleep(0.2)
+        smu.write(f":SOUR:CURR {value}"); time.sleep(0.2)
+        # コンプライアンス（電圧上限）
+        smu.write(f":SENS:VOLT:PROT {compliance}"); time.sleep(0.2)
+        print(f"  設定: 定電流モード {value} A, コンプライアンス {compliance} V")
+    elif mode == "VOLT":
+        smu.write(":SOUR:FUNC VOLT"); time.sleep(0.2)
+        smu.write(f":SOUR:VOLT:RANG {abs(value)}"); time.sleep(0.2)
+        smu.write(f":SOUR:VOLT {value}"); time.sleep(0.2)
+        # コンプライアンス（電流上限）
+        smu.write(f":SENS:CURR:PROT {compliance}"); time.sleep(0.2)
+        print(f"  設定: 定電圧モード {value} V, コンプライアンス {compliance} A")
+
+    # 測定関数は常に電圧・電流同時
+    smu.write(":SENS:FUNC:CONC ON"); time.sleep(0.2)
+    smu.write(":SENS:FUNC 'VOLT:DC','CURR:DC'"); time.sleep(0.2)
+    smu.write(":FORM:ELEM VOLT,CURR"); time.sleep(0.2)
+
+
 def check_command(smu):
     """Firebaseからコマンドを取得して実行"""
+    global auto_stop_time
     cmd = firebase_get("dmm/command")
     if not cmd or not cmd.get("action"):
         return None
@@ -99,6 +147,7 @@ def check_command(smu):
         if smu:
             smu.write(":OUTP OFF")
             time.sleep(0.3)
+        auto_stop_time = 0
         update_output_status(False)
         return "OFF"
 
@@ -108,6 +157,41 @@ def check_command(smu):
             smu.write(":OUTP ON")
             time.sleep(0.3)
         update_output_status(True)
+        return "ON"
+
+    elif action == "SOURCE_START":
+        mode = cmd.get("mode", "CURR")       # "CURR" or "VOLT"
+        value = float(cmd.get("value", 0))    # 実値（A or V）
+        compliance = float(cmd.get("compliance", 21))
+        duration = float(cmd.get("duration", 0))  # 秒（0=無制限）
+
+        mode_label = "定電流" if mode == "CURR" else "定電圧"
+        unit = "A" if mode == "CURR" else "V"
+        print(f"\n  *** Web からの指令: SOURCE START ***")
+        print(f"  モード: {mode_label} ({mode})")
+        print(f"  ソース値: {value} {unit}")
+        print(f"  コンプライアンス: {compliance}")
+        if duration > 0:
+            print(f"  出力時間: {duration} 秒（自動停止あり）")
+        else:
+            print(f"  出力時間: 無制限")
+
+        # ソース設定
+        configure_source(smu, mode, value, compliance)
+
+        # OUTPUT ON
+        if smu:
+            smu.write(":OUTP ON")
+            time.sleep(0.5)
+        update_output_status(True)
+
+        # タイマー設定
+        if duration > 0:
+            auto_stop_time = time.time() + duration
+            print(f"  自動停止予定: {datetime.fromtimestamp(auto_stop_time).strftime('%H:%M:%S')}")
+        else:
+            auto_stop_time = 0
+
         return "ON"
 
     return None
@@ -302,6 +386,10 @@ def main():
             elif cmd_result == "ON":
                 output_on = True
 
+            # タイマー自動停止チェック
+            if check_auto_stop(smu):
+                output_on = False
+
             # 測定
             if mode == "live" and smu:
                 voltage, current = read_keithley(smu)
@@ -323,7 +411,6 @@ def main():
             count += 1
             ts = datetime.now().strftime("%H:%M:%S")
             status = "OK" if (ok1 and ok2) else "WARN"
-            power = voltage * current
 
             # 自動単位
             def fmt_i(i):
@@ -339,7 +426,14 @@ def main():
                 if a < 1:    return f"{v*1e3:>8.4f} mV"
                 return f"{v:>8.5f} V"
 
-            print(f"[{ts}] #{count:>5}  {fmt_v(voltage)}  {fmt_i(current)}  P={power:.6e} W  [{status}]")
+            # タイマー残り表示
+            timer_str = ""
+            if auto_stop_time > 0:
+                remain = max(0, int(auto_stop_time - time.time()))
+                m, s = divmod(remain, 60)
+                timer_str = f"  ⏱{m:02d}:{s:02d}"
+
+            print(f"[{ts}] #{count:>5}  {fmt_v(voltage)}  {fmt_i(current)}{timer_str}  [{status}]")
 
             errors = 0  # 成功したらエラーカウントリセット
 

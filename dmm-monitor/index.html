@@ -16,7 +16,6 @@
   .back-link{color:#58a6ff;text-decoration:none;font-size:.8rem}
   .back-link:hover{text-decoration:underline}
 
-  /* 接続ステータス */
   .status-bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
   .status-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
   .status-dot.live{background:#22c55e;box-shadow:0 0 6px #22c55e;animation:pulse 2s infinite}
@@ -34,12 +33,34 @@
   .val-card .unit{font-size:1rem;color:#888;margin-left:4px}
   .val-card.voltage .value{color:#58a6ff}
   .val-card.current .value{color:#f97316}
-  .val-card.resistance .value{color:#a78bfa}
-  .val-card.power .value{color:#22c55e}
   .val-card .sub{font-size:.7rem;color:#555;margin-top:6px}
   .val-card .minmax{font-size:.68rem;color:#666;margin-top:4px;display:flex;justify-content:center;gap:12px}
 
-  /* グラフエリア */
+  /* 制御パネル */
+  .control-section{padding:0 24px 16px}
+  .control-panel{background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px}
+  .control-panel h2{font-size:.9rem;color:#fff;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .control-row{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
+  .control-field{display:flex;flex-direction:column;gap:4px}
+  .control-field label{font-size:.75rem;color:#888}
+  .control-field select,.control-field input{background:#0e1220;border:1px solid #2a3040;border-radius:4px;
+    color:#ddd;padding:6px 10px;font-size:.82rem;min-width:100px}
+  .control-field input:focus,.control-field select:focus{outline:none;border-color:#58a6ff}
+  .btn-start{padding:8px 24px;background:#22c55e;color:#0a0e17;border:none;border-radius:6px;
+    font-size:.9rem;font-weight:bold;cursor:pointer;transition:.15s}
+  .btn-start:hover{background:#16a34a}
+  .btn-stop{padding:8px 24px;background:#dc2626;color:#fff;border:none;border-radius:6px;
+    font-size:.9rem;font-weight:bold;cursor:pointer;transition:.15s}
+  .btn-stop:hover{background:#b91c1c;box-shadow:0 0 12px rgba(239,68,68,0.3)}
+  .btn-stop:active{transform:scale(0.97)}
+  .output-status{display:flex;align-items:center;gap:8px;font-size:.82rem}
+  .output-status .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .output-status .dot.on{background:#22c55e;box-shadow:0 0 6px #22c55e}
+  .output-status .dot.off{background:#ef4444}
+  .timer-display{font-size:1.5rem;font-family:'Courier New',monospace;color:#eab308;font-weight:bold}
+  .timer-label{font-size:.7rem;color:#888}
+
+  /* グラフ */
   .chart-section{padding:0 24px 20px}
   .chart-controls{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
   .chart-controls label{font-size:.78rem;color:#888}
@@ -76,22 +97,6 @@
   .setting-row input,.setting-row select{flex:1;background:#0e1220;border:1px solid #2a3040;border-radius:4px;
     color:#ddd;padding:4px 8px;font-size:.78rem}
 
-  /* 緊急停止・制御ボタン */
-  .control-bar{display:flex;gap:12px;padding:0 24px 16px;flex-wrap:wrap;align-items:center}
-  .btn-stop{padding:10px 28px;background:#dc2626;color:#fff;border:2px solid #ef4444;border-radius:8px;
-    font-size:1rem;font-weight:bold;cursor:pointer;transition:.15s;letter-spacing:0.05em}
-  .btn-stop:hover{background:#b91c1c;box-shadow:0 0 16px rgba(239,68,68,0.4)}
-  .btn-stop:active{transform:scale(0.97)}
-  .btn-stop.disabled{background:#555;border-color:#666;color:#999;cursor:not-allowed;box-shadow:none}
-  .btn-output{padding:8px 20px;border-radius:6px;font-size:.85rem;font-weight:bold;cursor:pointer;transition:.15s;border:2px solid}
-  .btn-output.on{background:rgba(34,197,94,0.15);color:#22c55e;border-color:#22c55e}
-  .btn-output.on:hover{background:rgba(34,197,94,0.25)}
-  .btn-output.off{background:rgba(239,68,68,0.15);color:#ef4444;border-color:#ef4444}
-  .output-status{font-size:.8rem;color:#888;display:flex;align-items:center;gap:6px}
-  .output-status .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-  .output-status .dot.on{background:#22c55e}
-  .output-status .dot.off{background:#ef4444}
-
   footer{padding:16px 24px;color:#444;font-size:.7rem;text-align:center;border-top:1px solid rgba(255,255,255,0.04)}
 </style>
 </head>
@@ -109,16 +114,6 @@
   </div>
 </header>
 
-<!-- 制御バー -->
-<div class="control-bar">
-  <button class="btn-stop" id="btnEmergencyStop" onclick="emergencyStop()">&#9888; 緊急停止 (OUTPUT OFF)</button>
-  <button class="btn-output on" id="btnOutputToggle" onclick="toggleOutput()">OUTPUT ON</button>
-  <div class="output-status">
-    <span class="dot on" id="outputDot"></span>
-    <span id="outputStatusText">OUTPUT: 確認中...</span>
-  </div>
-</div>
-
 <!-- 現在値 -->
 <div class="current-values">
   <div class="val-card voltage">
@@ -133,10 +128,74 @@
     <div class="minmax"><span id="iMin">Min: ---</span><span id="iMax">Max: ---</span></div>
     <div class="sub" id="iTime">最終更新: ---</div>
   </div>
-  <div class="val-card power">
-    <div class="label">電力 (Power)</div>
-    <div><span class="value" id="curPower">---</span><span class="unit">W</span></div>
-    <div class="sub">P = V × I</div>
+</div>
+
+<!-- 制御パネル -->
+<div class="control-section">
+  <div class="control-panel">
+    <h2>&#9881; ソース制御</h2>
+    <div class="control-row">
+      <div class="control-field">
+        <label>ソースモード</label>
+        <select id="srcMode">
+          <option value="CURR">定電流 (CC)</option>
+          <option value="VOLT">定電圧 (CV)</option>
+        </select>
+      </div>
+      <div class="control-field">
+        <label>ソース値</label>
+        <input type="number" id="srcValue" value="0" step="any" placeholder="0">
+      </div>
+      <div class="control-field">
+        <label>単位</label>
+        <select id="srcUnit">
+          <option value="1">A / V</option>
+          <option value="0.001" selected>mA / mV</option>
+          <option value="0.000001">μA / μV</option>
+        </select>
+      </div>
+      <div class="control-field">
+        <label>コンプライアンス</label>
+        <input type="number" id="srcCompliance" value="21" step="any" placeholder="上限">
+      </div>
+      <div class="control-field">
+        <label>コンプ単位</label>
+        <select id="compUnit">
+          <option value="1">V / A</option>
+          <option value="0.001">mV / mA</option>
+        </select>
+      </div>
+    </div>
+    <div class="control-row">
+      <div class="control-field">
+        <label>出力時間</label>
+        <input type="number" id="srcDuration" value="0" min="0" step="1" placeholder="秒（0=無制限）">
+      </div>
+      <div class="control-field">
+        <label>&nbsp;</label>
+        <select id="durUnit">
+          <option value="1">秒</option>
+          <option value="60">分</option>
+          <option value="3600">時間</option>
+        </select>
+      </div>
+      <div class="control-field">
+        <label>&nbsp;</label>
+        <button class="btn-start" id="btnStart" onclick="startSource()">&#9654; OUTPUT ON</button>
+      </div>
+      <div class="control-field">
+        <label>&nbsp;</label>
+        <button class="btn-stop" id="btnStop" onclick="emergencyStop()">&#9632; OUTPUT OFF</button>
+      </div>
+      <div class="output-status">
+        <span class="dot off" id="outputDot"></span>
+        <span id="outputStatusText">OUTPUT: OFF</span>
+      </div>
+      <div style="margin-left:auto;text-align:center">
+        <div class="timer-label">残り時間</div>
+        <div class="timer-display" id="timerDisplay">--:--</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -171,7 +230,7 @@
   </div>
   <div class="log-table-wrap" id="logWrap">
     <table>
-      <thead><tr><th>時刻</th><th>電圧 (V)</th><th>電流 (A)</th><th>電力 (W)</th></tr></thead>
+      <thead><tr><th>時刻</th><th>電圧 (V)</th><th>電流 (A)</th></tr></thead>
       <tbody id="logBody"></tbody>
     </table>
   </div>
@@ -187,7 +246,6 @@
     </div>
     <div class="setting-group">
       <h3>表示設定</h3>
-      <div class="setting-row"><label>更新間隔:</label><select id="refreshRate"><option value="1000">1秒</option><option value="500">0.5秒</option><option value="2000">2秒</option><option value="5000">5秒</option></select></div>
       <div class="setting-row"><label>グラフ高さ:</label><input type="number" id="chartH" value="350" min="200" max="800" onchange="redrawChart()"></div>
       <div class="setting-row"><label>電圧アラート上限:</label><input type="number" id="alertVMax" value="" step="0.1" placeholder="未設定"></div>
       <div class="setting-row"><label>電流アラート上限:</label><input type="number" id="alertIMax" value="" step="0.01" placeholder="未設定"></div>
@@ -195,13 +253,12 @@
   </div>
 </div>
 
-<footer>DMM Monitor v1.0 — Research Tools</footer>
+<footer>DMM Monitor v1.1 — Keithley 2400 SourceMeter — Research Tools</footer>
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
-// ===== Firebase設定（既存プロジェクトと共有） =====
 const firebaseConfig = {
   apiKey: "AIzaSyClK3vIE_SQ7SGdXWbmWzZ51MdeBappDKY",
   authDomain: "research-tools-board.firebaseapp.com",
@@ -220,11 +277,14 @@ try{
 }catch(e){ console.warn('Firebase init error',e); }
 
 // ===== 状態 =====
-let dataLog=[]; // {time, voltage, current}
+let dataLog=[];
 let showV=true, showI=true;
 let vMin=Infinity, vMax=-Infinity, iMin=Infinity, iMax=-Infinity;
 let lastUpdate=0;
 let listener=null;
+let outputState=false;
+let timerInterval=null;
+let timerEndTime=0;
 
 // ===== Firebase リアルタイムリスナー =====
 function startListening(){
@@ -234,11 +294,8 @@ function startListening(){
     return;
   }
   const path=document.getElementById('fbPath').value||'dmm/live';
-
-  // 既存リスナー解除
   if(listener) listener();
 
-  // 最新値の監視
   const ref=db.ref(path);
   ref.on('value',snap=>{
     const d=snap.val();
@@ -247,7 +304,6 @@ function startListening(){
   });
   listener=()=>ref.off('value');
 
-  // 過去ログの読み込み（最新500件）
   db.ref('dmm/log').orderByKey().limitToLast(500).once('value').then(snap=>{
     const d=snap.val();
     if(d){
@@ -257,18 +313,13 @@ function startListening(){
           dataLog.push({time:e.time, voltage:e.voltage||0, current:e.current||0});
         }
       });
-      updateStats();
-      redrawChart();
-      updateLogTable();
+      updateStats();redrawChart();updateLogTable();
     }
   });
 
-  // 新規ログのリアルタイム監視
   db.ref('dmm/log').orderByKey().limitToLast(1).on('child_added',snap=>{
     const e=snap.val();
-    if(e && e.time > lastUpdate){
-      onNewData(e);
-    }
+    if(e && e.time > lastUpdate) onNewData(e);
   });
 
   document.getElementById('fbStatus').textContent='接続中';
@@ -281,36 +332,26 @@ function onNewData(d){
   const now=d.time||Date.now();
   const v=parseFloat(d.voltage)||0;
   const i=parseFloat(d.current)||0;
-
-  // 重複チェック
   if(now<=lastUpdate) return;
   lastUpdate=now;
 
   dataLog.push({time:now, voltage:v, current:i});
-
-  // メモリ制限（最大10000件）
   if(dataLog.length>10000) dataLog=dataLog.slice(-8000);
 
-  // 表示更新
   updateCurrentValues(v, i, now);
-  updateStats();
-  redrawChart();
-  updateLogTable();
+  updateStats();redrawChart();updateLogTable();
   checkAlerts(v, i);
 }
 
 function updateCurrentValues(v, i, time){
-  const p=v*i;
   document.getElementById('curVoltage').textContent=formatValue(v, 'V');
   document.getElementById('curCurrent').textContent=formatValue(i, 'A');
-  document.getElementById('curPower').textContent=formatValue(p, 'W');
 
   const t=new Date(time);
   const ts=t.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   document.getElementById('vTime').textContent='最終更新: '+ts;
   document.getElementById('iTime').textContent='最終更新: '+ts;
 
-  // ステータス更新
   document.getElementById('statusDot').className='status-dot live';
   document.getElementById('statusText').textContent='リアルタイム監視中 — '+ts;
 }
@@ -325,12 +366,6 @@ function formatValue(val, unit){
   }
   if(unit==='V'){
     if(abs<1e-3) return (val*1e6).toFixed(1);
-    if(abs<1) return (val*1e3).toFixed(3);
-    return val.toFixed(4);
-  }
-  if(unit==='W'){
-    if(abs<1e-6) return (val*1e9).toFixed(2);
-    if(abs<1e-3) return (val*1e6).toFixed(2);
     if(abs<1) return (val*1e3).toFixed(3);
     return val.toFixed(4);
   }
@@ -351,6 +386,11 @@ function getAutoUnit(val, base){
     return {scale:1, prefix:''};
   }
   return {scale:1, prefix:''};
+}
+
+function getAutoUnitStr(val, base){
+  const u=getAutoUnit(val, base);
+  return {scale:u.scale, str:u.prefix+base};
 }
 
 function updateStats(){
@@ -382,7 +422,7 @@ function redrawChart(){
   ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,w,h);
 
-  if(dataLog.length<2) {
+  if(dataLog.length<2){
     ctx.fillStyle='#555';ctx.font='14px sans-serif';ctx.textAlign='center';
     ctx.fillText('データ待機中...',w/2,h/2);
     return;
@@ -392,7 +432,6 @@ function redrawChart(){
   const pw=w-margin.left-margin.right;
   const ph=h-margin.top-margin.bottom;
 
-  // 時間範囲
   const rangeSec=parseInt(document.getElementById('timeRange').value)||600;
   const now=dataLog[dataLog.length-1].time;
   const tMin=rangeSec>0?now-rangeSec*1000:dataLog[0].time;
@@ -400,16 +439,13 @@ function redrawChart(){
   const filtered=dataLog.filter(d=>d.time>=tMin);
   if(filtered.length<2) return;
 
-  // X軸（時間）
   const xPx=t=>margin.left+((t-tMin)/(tMax-tMin))*pw;
 
-  // Y軸計算（電圧・電流それぞれ）
   let vyMin=Infinity,vyMax=-Infinity,iyMin=Infinity,iyMax=-Infinity;
   for(const d of filtered){
     if(showV){if(d.voltage<vyMin)vyMin=d.voltage;if(d.voltage>vyMax)vyMax=d.voltage;}
     if(showI){if(d.current<iyMin)iyMin=d.current;if(d.current>iyMax)iyMax=d.current;}
   }
-  // 余裕を持たせる
   const vPad=(vyMax-vyMin)*0.1||0.1;
   vyMin-=vPad;vyMax+=vPad;
   const iPad=(iyMax-iyMin)*0.1||0.001;
@@ -418,14 +454,12 @@ function redrawChart(){
   const vPx=v=>margin.top+ph-((v-vyMin)/(vyMax-vyMin))*ph;
   const iPxFn=i=>margin.top+ph-((i-iyMin)/(iyMax-iyMin))*ph;
 
-  // グリッド
   ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.5;
   for(let j=0;j<=5;j++){
     const y=margin.top+ph*j/5;
     ctx.beginPath();ctx.moveTo(margin.left,y);ctx.lineTo(w-margin.right,y);ctx.stroke();
   }
 
-  // 時間軸ラベル
   ctx.fillStyle='#666';ctx.font='11px sans-serif';ctx.textAlign='center';
   const timeSpan=tMax-tMin;
   const tickCount=Math.min(8, Math.floor(pw/80));
@@ -439,35 +473,30 @@ function redrawChart(){
     ctx.moveTo(x,margin.top);ctx.lineTo(x,h-margin.bottom);ctx.stroke();
   }
 
-  // Y軸ラベル（左: 電圧）
   if(showV){
     const vu=getAutoUnit(vyMax,'V');
     ctx.fillStyle='#58a6ff';ctx.font='11px sans-serif';ctx.textAlign='right';
     for(let j=0;j<=5;j++){
       const val=vyMin+(vyMax-vyMin)*j/5;
-      const y=margin.top+ph-ph*j/5;
-      ctx.fillText((val*vu.scale).toFixed(2),margin.left-6,y+4);
+      ctx.fillText((val*vu.scale).toFixed(2),margin.left-6,margin.top+ph-ph*j/5+4);
     }
     ctx.save();ctx.translate(14,margin.top+ph/2);ctx.rotate(-Math.PI/2);
     ctx.fillStyle='#58a6ff';ctx.textAlign='center';ctx.font='12px sans-serif';
     ctx.fillText('Voltage / '+vu.prefix+'V',0,0);ctx.restore();
   }
 
-  // Y軸ラベル（右: 電流）
   if(showI){
     const iu=getAutoUnit(iyMax,'A');
     ctx.fillStyle='#f97316';ctx.font='11px sans-serif';ctx.textAlign='left';
     for(let j=0;j<=5;j++){
       const val=iyMin+(iyMax-iyMin)*j/5;
-      const y=margin.top+ph-ph*j/5;
-      ctx.fillText((val*iu.scale).toFixed(3),w-margin.right+6,y+4);
+      ctx.fillText((val*iu.scale).toFixed(3),w-margin.right+6,margin.top+ph-ph*j/5+4);
     }
     ctx.save();ctx.translate(w-10,margin.top+ph/2);ctx.rotate(Math.PI/2);
     ctx.fillStyle='#f97316';ctx.textAlign='center';ctx.font='12px sans-serif';
     ctx.fillText('Current / '+iu.prefix+'A',0,0);ctx.restore();
   }
 
-  // 電圧ライン
   if(showV){
     ctx.strokeStyle='#58a6ff';ctx.lineWidth=1.5;ctx.beginPath();
     let started=false;
@@ -478,7 +507,6 @@ function redrawChart(){
     ctx.stroke();
   }
 
-  // 電流ライン
   if(showI){
     ctx.strokeStyle='#f97316';ctx.lineWidth=1.5;ctx.beginPath();
     let started=false;
@@ -489,7 +517,6 @@ function redrawChart(){
     ctx.stroke();
   }
 
-  // 枠
   ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=1;
   ctx.strokeRect(margin.left,margin.top,pw,ph);
 }
@@ -505,8 +532,7 @@ function updateLogTable(){
     const ts=t.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+'.'+String(t.getMilliseconds()).padStart(3,'0');
     const vu=getAutoUnit(d.voltage,'V');
     const iu=getAutoUnit(d.current,'A');
-    const p=d.voltage*d.current;
-    return `<tr><td>${ts}</td><td>${(d.voltage*vu.scale).toFixed(4)} ${vu.prefix}V</td><td>${(d.current*iu.scale).toFixed(4)} ${iu.prefix}A</td><td>${formatValue(p,'W')} W</td></tr>`;
+    return `<tr><td>${ts}</td><td>${(d.voltage*vu.scale).toFixed(4)} ${vu.prefix}V</td><td>${(d.current*iu.scale).toFixed(4)} ${iu.prefix}A</td></tr>`;
   }).join('');
 }
 
@@ -514,21 +540,13 @@ function updateLogTable(){
 function checkAlerts(v, i){
   const vAlert=parseFloat(document.getElementById('alertVMax').value);
   const iAlert=parseFloat(document.getElementById('alertIMax').value);
-  if(vAlert && Math.abs(v)>vAlert){
-    showAlert('電圧アラート: '+v.toFixed(4)+' V が上限 '+vAlert+' V を超えました');
-  }
-  if(iAlert && Math.abs(i)>iAlert){
-    showAlert('電流アラート: '+i.toFixed(6)+' A が上限 '+iAlert+' A を超えました');
-  }
+  if(vAlert && Math.abs(v)>vAlert) showAlert('電圧アラート: '+v.toFixed(4)+' V > '+vAlert+' V');
+  if(iAlert && Math.abs(i)>iAlert) showAlert('電流アラート: '+i.toFixed(6)+' A > '+iAlert+' A');
 }
 
 function showAlert(msg){
-  // ブラウザ通知
-  if(Notification.permission==='granted'){
-    new Notification('DMM Monitor',{body:msg,icon:'&#9889;'});
-  } else if(Notification.permission!=='denied'){
-    Notification.requestPermission();
-  }
+  if(Notification.permission==='granted') new Notification('DMM Monitor',{body:msg});
+  else if(Notification.permission!=='denied') Notification.requestPermission();
   console.warn(msg);
 }
 
@@ -546,27 +564,21 @@ function toggleSettings(){
 }
 
 function clearData(){
-  if(!confirm('表示データをクリアしますか？（Firebase上のデータは残ります）')) return;
+  if(!confirm('表示データをクリアしますか？')) return;
   dataLog=[];
   vMin=Infinity;vMax=-Infinity;iMin=Infinity;iMax=-Infinity;lastUpdate=0;
   document.getElementById('curVoltage').textContent='---';
   document.getElementById('curCurrent').textContent='---';
-  document.getElementById('curPower').textContent='---';
-  redrawChart();
-  updateLogTable();
+  redrawChart();updateLogTable();
 }
 
-function reconnect(){
-  if(listener) listener();
-  startListening();
-}
+function reconnect(){ if(listener) listener(); startListening(); }
 
 function exportCSV(){
   if(dataLog.length===0){alert('データがありません');return;}
-  let csv='Time,Voltage(V),Current(A),Power(W)\n';
+  let csv='Time,Voltage(V),Current(A)\n';
   for(const d of dataLog){
-    const t=new Date(d.time).toISOString();
-    csv+=`${t},${d.voltage},${d.current},${d.voltage*d.current}\n`;
+    csv+=`${new Date(d.time).toISOString()},${d.voltage},${d.current}\n`;
   }
   const blob=new Blob([csv],{type:'text/csv'});
   const url=URL.createObjectURL(blob);
@@ -575,48 +587,114 @@ function exportCSV(){
   a.click();URL.revokeObjectURL(url);
 }
 
-// ===== 機器制御（Firebase経由でPythonスクリプトにコマンド送信） =====
-let outputState=true; // 現在のOUTPUT状態
-
-function sendCommand(cmd){
+// ===== 機器制御 =====
+function sendCommand(cmd, params){
   if(!firebaseReady) return;
   db.ref('dmm/command').set({
     action: cmd,
+    ...params,
     time: Date.now(),
     from: 'web'
   });
 }
 
-function emergencyStop(){
-  if(!confirm('OUTPUT を OFF にします。電流が停止します。よろしいですか？')) return;
-  sendCommand('OUTPUT_OFF');
-  setOutputUI(false);
+function startSource(){
+  const mode=document.getElementById('srcMode').value; // CURR or VOLT
+  const rawVal=parseFloat(document.getElementById('srcValue').value)||0;
+  const unitMul=parseFloat(document.getElementById('srcUnit').value)||0.001;
+  const value=rawVal*unitMul; // 実値（A or V）
+
+  const rawComp=parseFloat(document.getElementById('srcCompliance').value)||21;
+  const compMul=parseFloat(document.getElementById('compUnit').value)||1;
+  const compliance=rawComp*compMul;
+
+  const durVal=parseFloat(document.getElementById('srcDuration').value)||0;
+  const durMul=parseFloat(document.getElementById('durUnit').value)||1;
+  const durationSec=durVal*durMul;
+
+  const modeLabel=mode==='CURR'?'定電流':'定電圧';
+  const valUnit=mode==='CURR'?'A':'V';
+  const vu=getAutoUnitStr(value, valUnit);
+  const dispVal=(value*vu.scale).toFixed(4)+' '+vu.str;
+
+  let msg=`${modeLabel}モードで ${dispVal} を出力します。`;
+  if(durationSec>0) msg+=`\n出力時間: ${formatDuration(durationSec)}（自動停止）`;
+  else msg+='\n出力時間: 無制限（手動停止）';
+  msg+='\nよろしいですか？';
+
+  if(!confirm(msg)) return;
+
+  sendCommand('SOURCE_START',{
+    mode: mode,
+    value: value,
+    compliance: compliance,
+    duration: durationSec
+  });
+
+  setOutputUI(true);
+
+  // タイマー開始
+  if(durationSec>0){
+    timerEndTime=Date.now()+durationSec*1000;
+    startTimer();
+  } else {
+    document.getElementById('timerDisplay').textContent='∞';
+  }
 }
 
-function toggleOutput(){
-  if(outputState){
-    if(!confirm('OUTPUT を OFF にしますか？')) return;
-    sendCommand('OUTPUT_OFF');
-    setOutputUI(false);
-  } else {
-    if(!confirm('OUTPUT を ON にしますか？電流が流れます。')) return;
-    sendCommand('OUTPUT_ON');
-    setOutputUI(true);
-  }
+function emergencyStop(){
+  sendCommand('OUTPUT_OFF',{});
+  setOutputUI(false);
+  stopTimer();
+  document.getElementById('timerDisplay').textContent='--:--';
 }
 
 function setOutputUI(on){
   outputState=on;
-  const btn=document.getElementById('btnOutputToggle');
   const dot=document.getElementById('outputDot');
   const txt=document.getElementById('outputStatusText');
   if(on){
-    btn.className='btn-output on'; btn.textContent='OUTPUT ON';
-    dot.className='dot on'; txt.textContent='OUTPUT: ON';
+    dot.className='dot on'; txt.textContent='OUTPUT: ON'; txt.style.color='#22c55e';
   } else {
-    btn.className='btn-output off'; btn.textContent='OUTPUT OFF';
-    dot.className='dot off'; txt.textContent='OUTPUT: OFF';
+    dot.className='dot off'; txt.textContent='OUTPUT: OFF'; txt.style.color='#ef4444';
   }
+}
+
+function formatDuration(sec){
+  if(sec<60) return sec+'秒';
+  if(sec<3600) return Math.floor(sec/60)+'分'+((sec%60)>0?(sec%60)+'秒':'');
+  const h=Math.floor(sec/3600);
+  const m=Math.floor((sec%3600)/60);
+  return h+'時間'+(m>0?m+'分':'');
+}
+
+// タイマー
+function startTimer(){
+  stopTimer();
+  updateTimerDisplay();
+  timerInterval=setInterval(()=>{
+    const remain=timerEndTime-Date.now();
+    if(remain<=0){
+      stopTimer();
+      document.getElementById('timerDisplay').textContent='00:00';
+      // Python側で自動停止されるのでUIも更新
+      setTimeout(()=>setOutputUI(false),2000);
+      return;
+    }
+    updateTimerDisplay();
+  },500);
+}
+
+function stopTimer(){
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
+}
+
+function updateTimerDisplay(){
+  const remain=Math.max(0,Math.ceil((timerEndTime-Date.now())/1000));
+  const m=Math.floor(remain/60);
+  const s=remain%60;
+  document.getElementById('timerDisplay').textContent=
+    (m>59?Math.floor(m/60)+':'+String(m%60).padStart(2,'0'):String(m).padStart(2,'0'))+':'+String(s).padStart(2,'0');
 }
 
 // OUTPUT状態の監視
@@ -624,29 +702,8 @@ function watchOutputState(){
   if(!firebaseReady) return;
   db.ref('dmm/status').on('value',snap=>{
     const d=snap.val();
-    if(d && d.output!==undefined){
-      setOutputUI(d.output);
-    }
+    if(d && d.output!==undefined) setOutputUI(d.output);
   });
-}
-
-// ===== デモモード（Firebaseからデータが来ない場合のテスト用） =====
-let demoInterval=null;
-function startDemo(){
-  if(demoInterval) return;
-  let t=Date.now();
-  let v=3.3, i=0.015;
-  demoInterval=setInterval(()=>{
-    t=Date.now();
-    v+=( Math.random()-0.5)*0.02;
-    i+=(Math.random()-0.5)*0.001;
-    if(i<0)i=0.001;
-    onNewData({time:t, voltage:v, current:i});
-  },1000);
-  document.getElementById('statusText').textContent='デモモード動作中';
-}
-function stopDemo(){
-  if(demoInterval){clearInterval(demoInterval);demoInterval=null;}
 }
 
 // ===== 初期化 =====
@@ -655,7 +712,6 @@ window.addEventListener('load',()=>{
   watchOutputState();
   redrawChart();
 
-  // ステータスチェック: 10秒以上データが来なければstaleに
   setInterval(()=>{
     if(lastUpdate>0 && Date.now()-lastUpdate>10000){
       document.getElementById('statusDot').className='status-dot stale';
