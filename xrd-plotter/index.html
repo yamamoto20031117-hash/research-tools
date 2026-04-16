@@ -204,12 +204,12 @@
   </div>
 
   <div class="peak-list" id="peakList">
-    <h3>検出ピーク（ラベル欄に (001) 等を入力するとグラフに表示されます）</h3>
+    <h3>検出ピーク（n欄に回折次数 1,2,3.. を入力 → グラフに (001) 等で表示）</h3>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
       <label style="font-size:.78rem;color:#888">手動追加:</label>
       <select id="manualPeakDs" style="background:#0e1220;border:1px solid #2a3040;border-radius:4px;padding:3px 6px;color:#ddd;font-size:.78rem"></select>
       <input type="number" id="manualPeak2t" placeholder="2θ (°)" step="0.01" style="width:80px;background:#0e1220;border:1px solid #2a3040;border-radius:4px;padding:3px 6px;color:#ddd;font-size:.78rem">
-      <input type="text" id="manualPeakLbl" placeholder="ラベル (001)等" style="width:100px;background:#0e1220;border:1px solid #2a3040;border-radius:4px;padding:3px 6px;color:#ddd;font-size:.78rem">
+      <input type="number" id="manualPeakLbl" placeholder="n (1,2..)" min="1" style="width:60px;background:#0e1220;border:1px solid #2a3040;border-radius:4px;padding:3px 6px;color:#ddd;font-size:.78rem;text-align:center">
       <button class="btn" onclick="addManualPeak()">+ ピーク追加</button>
     </div>
     <div id="peakTables"></div>
@@ -635,11 +635,23 @@ function drawAxisLabel(ctx, text, cx, cy, fontSize, fontFam, color, isBold){
 }
 
 // ===== ラベルから回折次数nを抽出 =====
-// (001)→1, (002)→2, (003)→3, (00 10)→10 等
+// ラベルは数値("1","2","3"等)で保存。(001)形式も後方互換で対応
 function extractDiffOrder(label){
   if(!label) return null;
-  const m=label.match(/\(\s*0+\s*(\d+)\s*\)/);
+  const s=label.trim();
+  // 純粋な数値
+  if(/^\d+$/.test(s)) return parseInt(s,10);
+  // (001)形式（後方互換）
+  const m=s.match(/\(\s*0+\s*(\d+)\s*\)/);
   return m?parseInt(m[1],10):null;
+}
+// ラベル数値 → グラフ表示用 (00n) 形式
+function formatPeakLabel(label){
+  const n=extractDiffOrder(label);
+  if(n!==null && n>0){
+    return '(00'+n+')';
+  }
+  return label||'';
 }
 // 層間距離計算: d = nλ/(2sinθ)
 function calcDspacing(twoTheta, label){
@@ -649,7 +661,7 @@ function calcDspacing(twoTheta, label){
   if(n && n>0){
     return n*lambda/(2*Math.sin(thetaRad));
   }
-  // ラベルなし or 非(00l)系: 通常のBragg式
+  // ラベルなし: 通常のBragg式
   return lambda/(2*Math.sin(thetaRad));
 }
 
@@ -671,7 +683,7 @@ function drawPeakAnnotation(ctx, pk, peakPx, peakPy, color, fi, pi, showLabel, s
 
   // テキスト行を構築
   const lines=[];
-  if(hasLabel) lines.push({text:pk.label, bold:true, size:fontSize});
+  if(hasLabel) lines.push({text:formatPeakLabel(pk.label), bold:true, size:fontSize});
   if(hasFWHM) lines.push({text:'FWHM '+pk.fwhm.toFixed(3)+'°', bold:false, size:Math.max(8,fontSize-2)});
 
   // ボックスサイズ計算
@@ -877,7 +889,7 @@ function analyzePeaks(){
         <td class="num">${fwhmDeg?fwhmDeg.toFixed(4):'—'}</td>
         <td class="num">${fwhmRad>0?fwhmRad.toFixed(6):'—'}</td>
         <td class="num" style="font-weight:bold;color:#ff8c00">${corrLen>0?corrLen.toFixed(2):'—'}</td>
-        <td>${p.label||'—'}</td>
+        <td>${formatPeakLabel(p.label)||'—'}</td>
       </tr>`;
     });
     html+='</tbody></table>';
@@ -899,14 +911,14 @@ function refreshPeakTables(){
   fileList.forEach((f, fi)=>{
     if(!f.peaks||f.peaks.length===0) return;
     let html=`<h4 style="color:${f.color};margin:12px 0 6px">${f.label} (${f.peaks.length}ピーク)</h4>`;
-    html+=`<table><thead><tr><th>#</th><th>2θ (°)</th><th>強度</th><th>d (Å)</th><th>FWHM (°)</th><th>ラベル</th><th></th></tr></thead><tbody>`;
+    html+=`<table><thead><tr><th>#</th><th>2θ (°)</th><th>強度</th><th>d (Å)</th><th>FWHM (°)</th><th>n</th><th></th></tr></thead><tbody>`;
     f.peaks.forEach((p,pi)=>{
       const d=calcDspacing(p.x, p.label);
       const n=extractDiffOrder(p.label);
       html+=`<tr><td>${pi+1}</td><td>${p.x.toFixed(3)}</td><td>${p.y.toFixed(1)}</td>`;
       html+=`<td style="color:#58a6ff">${d.toFixed(4)}${n?' (n='+n+')':''}</td>`;
       html+=`<td>${p.fwhm?p.fwhm.toFixed(4):'—'}</td>`;
-      html+=`<td><input type="text" value="${p.label}" placeholder="(001)等" style="width:70px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;color:#ddd;padding:2px 4px;font-size:.72rem" onchange="updatePeakLabel(${fi},${pi},this.value)"></td>`;
+      html+=`<td><input type="number" value="${p.label}" placeholder="n" min="1" style="width:40px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;color:#ddd;padding:2px 4px;font-size:.72rem;text-align:center" onchange="updatePeakLabel(${fi},${pi},this.value)"></td>`;
       html+=`<td><button class="btn" style="padding:1px 6px;font-size:.65rem;color:#f66;border-color:#f66" onclick="deletePeak(${fi},${pi})" title="削除">&times;</button></td></tr>`;
     });
     html+='</tbody></table>';
