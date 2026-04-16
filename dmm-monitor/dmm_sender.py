@@ -487,6 +487,7 @@ def main():
     print("\n  OUTPUT OFF — Webダッシュボードからの指令を待機中...")
 
     while running:
+        loop_start = time.time()
         try:
             # Webダッシュボードからのコマンドをチェック
             cmd_result = check_command(smu)
@@ -504,7 +505,9 @@ def main():
 
             # OUTPUT OFF の間は測定スキップ（:READ? がハングするのを防ぐ）
             if not output_on:
-                time.sleep(interval)
+                elapsed = time.time() - loop_start
+                wait = max(0.05, interval - elapsed)
+                time.sleep(wait)
                 continue
 
             # 測定（OUTPUT ON 時のみ）
@@ -554,7 +557,10 @@ def main():
                     except:
                         pass
 
-        time.sleep(interval)
+        # ループ内の処理時間を差し引いて残りだけ待つ
+        elapsed = time.time() - loop_start
+        wait = max(0.01, interval - elapsed)
+        time.sleep(wait)
 
     # クリーンアップ
     if smu:
