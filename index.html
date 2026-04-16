@@ -61,6 +61,9 @@
   .res .res-header .res-num{color:#58a6ff;font-weight:bold}
   .res .res-header .res-name{color:#4a9}
   .res .res-body{font-size:.82rem;color:#ccc;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+  .res .res-del{display:none;float:right;background:none;border:none;color:#666;cursor:pointer;font-size:.72rem;padding:0 4px}
+  .res .res-del:hover{color:#ff6666}
+  .res:hover .res-del{display:inline}
 
   .post-form{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.06)}
   .post-form .pf-row{display:flex;gap:8px;margin-bottom:8px;align-items:center}
@@ -408,34 +411,61 @@ function countPosts(th){
   return Object.keys(th.replies).length+1;
 }
 
+// UID（自分のコメント識別用）
+function getUid(){
+  let uid=localStorage.getItem('rt_uid');
+  if(!uid){uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);localStorage.setItem('rt_uid',uid);}
+  return uid;
+}
+
 function renderThread(t,th,isUpdate){
   document.getElementById('vtitle-'+t).textContent=th.title;
   const el=document.getElementById('replies-'+t);
-  let posts=[{name:th.name||'名無しさん',body:th.body,time:th.created}];
+  const uid=getUid();
+
+  // replies をキー付きで保持（削除用）
+  let posts=[{name:th.name||'名無しさん',body:th.body,time:th.created,uid:th.uid||'',key:'__op__'}];
   if(th.replies){
-    const rArr=Array.isArray(th.replies)?th.replies:Object.values(th.replies);
-    posts=posts.concat(rArr);
+    if(Array.isArray(th.replies)){
+      th.replies.forEach((r,i)=>posts.push({...r,key:''+i}));
+    } else {
+      Object.entries(th.replies).forEach(([k,r])=>posts.push({...r,key:k}));
+    }
   }
 
   const prevCount=window['_postCount_'+t]||0;
   const newCount=posts.length;
   window['_postCount_'+t]=newCount;
-
-  // 新着があるかチェック
   const hasNew=isUpdate&&newCount>prevCount&&prevCount>0;
 
   el.innerHTML=posts.map((r,i)=>{
     const d=new Date(r.time);
     const ds=d.toLocaleDateString('ja-JP')+' '+d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
     const isNewRes=hasNew&&i>=prevCount;
-    return `<div class="res${isNewRes?' new-res':''}"><div class="res-header"><span class="res-num">${i+1}</span> <span class="res-name">${esc(r.name||'名無しさん')}</span> ${ds}${isNewRes?'<span class="new-badge">NEW</span>':''}</div><div class="res-body">${esc(r.body)}</div></div>`;
+    const isMine=r.uid&&r.uid===uid;
+    const delBtn=isMine&&i>0?`<button class="res-del" onclick="deleteReply('${t}','${r.key}')" title="削除">&times; 削除</button>`:'';
+    return `<div class="res${isNewRes?' new-res':''}"><div class="res-header">${delBtn}<span class="res-num">${i+1}</span> <span class="res-name">${esc(r.name||'名無しさん')}</span> ${ds}${isNewRes?'<span class="new-badge">NEW</span>':''}</div><div class="res-body">${esc(r.body)}</div></div>`;
   }).join('');
 
-  // 新着があれば自動スクロール
   if(hasNew||!isUpdate){
     const boardBody=el.closest('.board-body');
-    if(boardBody){
-      setTimeout(()=>{boardBody.scrollTop=boardBody.scrollHeight;},50);
+    if(boardBody) setTimeout(()=>{boardBody.scrollTop=boardBody.scrollHeight;},50);
+  }
+}
+
+function deleteReply(t,key){
+  if(!confirm('このコメントを削除しますか？')) return;
+  const id=window['_curThread_'+t];if(!id)return;
+  if(firebaseReady){
+    db.ref('boards/'+t+'/threads/'+id+'/replies/'+key).remove();
+  }else{
+    const arr=getLocal(t);
+    const th=arr.find(x=>x.id===id);
+    if(th&&th.replies){
+      if(Array.isArray(th.replies)){th.replies.splice(parseInt(key),1);}
+      else{delete th.replies[key];}
+      setLocal(t,arr);
+      renderThread(t,th,false);
     }
   }
 }
@@ -531,7 +561,7 @@ function postReply(t){
   const body=document.getElementById('rp-body-'+t).value.trim();
   if(!body){alert('本文を入力してください');return;}
   const now=Date.now();
-  const replyData={name:name||'名無しさん',body,time:now};
+  const replyData={name:name||'名無しさん',body,time:now,uid:getUid()};
 
   if(firebaseReady){
     // push で新しいキーにレスを追加（リアルタイム反映）
