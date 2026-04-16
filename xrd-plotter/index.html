@@ -14,6 +14,7 @@
   .btn{padding:5px 14px;border:1px solid #2a3040;background:transparent;color:#888;border-radius:4px;
     cursor:pointer;font-size:.8rem;transition:.15s}
   .btn:hover{border-color:#58a6ff;color:#58a6ff}
+  .btn.active{border-color:#58a6ff;color:#58a6ff;background:rgba(88,166,255,0.1)}
   .btn-primary{background:#58a6ff;color:#0a0e17;border-color:#58a6ff;font-weight:bold}
   .btn-primary:hover{background:#7db8ff}
 
@@ -31,26 +32,29 @@
   .chart-toolbar input,.chart-toolbar select{background:#0e1220;border:1px solid #2a3040;border-radius:4px;
     padding:4px 8px;color:#ddd;font-size:.78rem}
   .chart-toolbar input:focus,.chart-toolbar select:focus{outline:none;border-color:#58a6ff}
-  .help-tip{font-size:.68rem;color:#666;cursor:help;border-bottom:1px dotted #666}
 
   .multi-list{display:none;margin-bottom:16px}
   .multi-item{display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(20,24,36,0.6);
-    border-radius:4px;margin-bottom:4px;font-size:.8rem}
+    border-radius:4px;margin-bottom:4px;font-size:.8rem;flex-wrap:wrap}
   .multi-item .mi-name{color:#888;font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .multi-item input[type=color]{width:24px;height:24px;border:none;cursor:pointer;background:transparent;
     -webkit-appearance:none;border-radius:3px}
-  .multi-item input[type=text]{width:180px;background:#0e1220;border:1px solid #2a3040;border-radius:4px;
+  .multi-item input[type=text]{width:160px;background:#0e1220;border:1px solid #2a3040;border-radius:4px;
     padding:3px 8px;color:#ddd;font-size:.8rem}
   .multi-item input[type=text]:focus{outline:none;border-color:#58a6ff}
   .multi-item .mi-remove{color:#666;cursor:pointer;font-size:1.1rem;padding:0 4px}
   .multi-item .mi-remove:hover{color:#ff6666}
+  .mi-controls{display:flex;gap:6px;align-items:center;font-size:.72rem;color:#888}
+  .mi-controls input[type=range]{width:70px;accent-color:#58a6ff}
+  .mi-controls input[type=number]{width:55px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;
+    padding:2px 4px;color:#ddd;font-size:.72rem;text-align:center}
 
   .peak-list{display:none;margin-bottom:20px;background:rgba(15,18,28,0.8);border:1px solid rgba(88,166,255,0.1);
     border-radius:8px;padding:12px}
   .peak-list h3{font-size:.85rem;color:#58a6ff;margin-bottom:8px}
-  .peak-list table{width:100%;font-size:.75rem;border-collapse:collapse}
-  .peak-list th{color:#888;text-align:left;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,0.08)}
-  .peak-list td{padding:3px 6px;color:#ddd}
+  .peak-list table{width:100%;font-size:.72rem;border-collapse:collapse}
+  .peak-list th{color:#888;text-align:left;padding:3px 5px;border-bottom:1px solid rgba(255,255,255,0.08);white-space:nowrap}
+  .peak-list td{padding:3px 5px;color:#ddd}
 
   .data-table{display:none;max-height:300px;overflow:auto;background:rgba(15,18,28,0.8);
     border:1px solid rgba(88,166,255,0.1);border-radius:8px;padding:12px;margin-bottom:20px}
@@ -62,7 +66,6 @@
   #xrdCanvas.dragging{cursor:grabbing}
   #xrdCanvas.hovering-label{cursor:grab}
 
-  /* カスタマイズパネル開閉時のレイアウト */
   .chart-body{display:flex;flex-direction:column;gap:12px}
   .chart-body.side-by-side{flex-direction:row;align-items:flex-start}
   .chart-body.side-by-side .canvas-col{flex:1;min-width:0;position:sticky;top:52px;align-self:flex-start}
@@ -90,6 +93,16 @@
   .sg-row{display:flex;align-items:center;gap:6px}
   .sg-section{grid-column:1/-1;border-top:1px solid rgba(88,166,255,0.08);padding-top:10px;margin-top:4px;
     font-size:.78rem;color:#58a6ff;font-weight:bold}
+
+  /* 解析結果パネル */
+  .analysis-panel{display:none;background:rgba(15,18,28,0.8);border:1px solid rgba(88,166,255,0.1);
+    border-radius:8px;padding:12px;margin-bottom:20px}
+  .analysis-panel.open{display:block}
+  .analysis-panel h3{font-size:.85rem;color:#58a6ff;margin-bottom:8px}
+  .analysis-panel table{width:100%;font-size:.72rem;border-collapse:collapse}
+  .analysis-panel th{color:#888;text-align:left;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.1);white-space:nowrap}
+  .analysis-panel td{padding:4px 6px;color:#ddd;border-bottom:1px solid rgba(255,255,255,0.04)}
+  .analysis-panel td.num{font-family:monospace;text-align:right}
 </style>
 </head>
 <body>
@@ -99,6 +112,7 @@
   <h1>XRD データプロッター</h1>
   <button class="btn" onclick="toggleTable()">データ表示</button>
   <button class="btn" onclick="detectPeaks()">ピーク検出</button>
+  <button class="btn" onclick="analyzePeaks()">解析</button>
   <button class="btn" onclick="exportXLSX()">Excel出力</button>
   <button class="btn btn-primary" onclick="exportPNG()">PNG保存</button>
   <a href="/xrd-plotter/manual.html" class="btn" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px">&#128214; 説明書</a>
@@ -107,7 +121,7 @@
 <div class="container">
   <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
     <h2>XRDデータファイル（TXT）をドロップ</h2>
-    <p>Rigaku SmartLab TXT形式対応（複数ファイル → スタック表示）</p>
+    <p>Rigaku SmartLab TXT形式対応（複数ファイル → スタック / 重ね合わせ表示）</p>
     <input type="file" id="fileInput" multiple accept=".txt,.TXT" style="display:none">
   </div>
 
@@ -126,8 +140,16 @@
         <option value="log">対数</option>
         <option value="sqrt">平方根</option>
       </select>
+      <label>表示:</label>
+      <select id="displayMode" onchange="updateMultiList();redraw()">
+        <option value="stack">スタック</option>
+        <option value="overlay">重ね合わせ</option>
+      </select>
       <label><input type="checkbox" id="chkGrid" checked onchange="redraw()"> グリッド</label>
       <label><input type="checkbox" id="chkPeakLabel" onchange="redraw()"> ピークラベル</label>
+      <label><input type="checkbox" id="chkFWHM" onchange="redraw()"> FWHM</label>
+      <label>λ:</label>
+      <input type="number" id="xrayLambda" value="1.5406" step="0.0001" style="width:72px" title="X線波長 (Å)">
       <button class="btn" onclick="toggleSettings()" id="btnSettings">カスタマイズ &#9881;</button>
     </div>
 
@@ -194,6 +216,13 @@
     <div id="peakTables"></div>
   </div>
 
+  <!-- 解析結果パネル -->
+  <div class="analysis-panel" id="analysisPanel">
+    <h3>ピーク解析結果（層間距離・FWHM・相関距離）</h3>
+    <p style="font-size:.72rem;color:#888;margin-bottom:8px">λ = <span id="analysisLambda">1.5406</span> Å (Cu Kα) &nbsp;|&nbsp; Scherrer定数 K = 0.9</p>
+    <div id="analysisTables"></div>
+  </div>
+
   <div class="data-table" id="dataTable">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
       <label style="font-size:.78rem;color:#888">2θジャンプ:</label>
@@ -211,7 +240,7 @@
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script>
 const COLORS=['#2F5496','#CC0000','#228B22','#FF8C00','#8B008B','#008B8B','#B22222','#4169E1'];
-let fileList=[]; // {name, label, color, x[], y[], peaks[]}
+let fileList=[]; // {name, label, color, x[], y[], peaks[], yOffset, yScale}
 
 // ===== ファイル読み込み =====
 const dropZone=document.getElementById('dropZone');
@@ -229,10 +258,8 @@ function handleFiles(files){
 }
 
 function readFile(file){
-  // Shift-JIS → UTF-8 の順で試す（Rigaku SmartLabはShift-JISが多い）
   const encodings=['shift_jis','utf-8','euc-jp','iso-8859-1'];
   let tryIdx=0;
-
   function tryRead(){
     const reader=new FileReader();
     reader.onload=e=>{
@@ -240,45 +267,34 @@ function readFile(file){
       if(data&&data.x.length>10){
         const idx=fileList.length;
         const label=file.name.replace(/\.txt$/i,'');
-        fileList.push({name:file.name, label, color:COLORS[idx%COLORS.length], x:data.x, y:data.y, peaks:[]});
+        fileList.push({name:file.name, label, color:COLORS[idx%COLORS.length], x:data.x, y:data.y, peaks:[], yOffset:0, yScale:1});
         updateUI();
       } else {
         tryIdx++;
-        if(tryIdx<encodings.length){
-          tryRead();
-        } else {
-          // 最終手段: バイナリとして読んでASCII部分だけ抽出
+        if(tryIdx<encodings.length){ tryRead(); }
+        else {
           const binReader=new FileReader();
           binReader.onload=ev=>{
             const arr=new Uint8Array(ev.target.result);
             let text='';
             for(let i=0;i<arr.length;i++){
               const b=arr[i];
-              if(b===0x09) text+='\t';
-              else if(b===0x0A) text+='\n';
-              else if(b===0x0D) continue;
-              else if(b>=0x20&&b<=0x7E) text+=String.fromCharCode(b);
-              else text+=' ';
+              if(b===0x09) text+='\t'; else if(b===0x0A) text+='\n'; else if(b===0x0D) continue;
+              else if(b>=0x20&&b<=0x7E) text+=String.fromCharCode(b); else text+=' ';
             }
             const data=parseSmartLab(text);
             if(data&&data.x.length>0){
               const idx2=fileList.length;
               const label2=file.name.replace(/\.txt$/i,'');
-              fileList.push({name:file.name, label:label2, color:COLORS[idx2%COLORS.length], x:data.x, y:data.y, peaks:[]});
+              fileList.push({name:file.name, label:label2, color:COLORS[idx2%COLORS.length], x:data.x, y:data.y, peaks:[], yOffset:0, yScale:1});
               updateUI();
-            } else {
-              alert('データを読み取れませんでした: '+file.name);
-            }
+            } else { alert('データを読み取れませんでした: '+file.name); }
           };
           binReader.readAsArrayBuffer(file);
         }
       }
     };
-    reader.onerror=()=>{
-      tryIdx++;
-      if(tryIdx<encodings.length) tryRead();
-      else alert('ファイルの読み込みに失敗しました: '+file.name);
-    };
+    reader.onerror=()=>{ tryIdx++; if(tryIdx<encodings.length) tryRead(); else alert('読み込み失敗: '+file.name); };
     reader.readAsText(file, encodings[tryIdx]);
   }
   tryRead();
@@ -290,7 +306,6 @@ function parseSmartLab(text){
   for(const line of lines){
     const trimmed=line.trim();
     if(!trimmed) continue;
-    // タブ、カンマ、複数スペースのいずれかで区切り
     const parts=trimmed.split(/[\t,]+|\s{2,}/).map(s=>s.trim()).filter(s=>s);
     if(parts.length>=2){
       const a=parseFloat(parts[0]), b=parseFloat(parts[1]);
@@ -303,7 +318,6 @@ function parseSmartLab(text){
 // ===== UI更新 =====
 function updateUI(){
   updateMultiList();
-  // 手動ピーク追加用ドロップダウンを更新
   const manualDs=document.getElementById('manualPeakDs');
   manualDs.innerHTML=fileList.map((f,i)=>`<option value="${i}">${f.label}</option>`).join('');
   if(fileList.length>0){
@@ -320,14 +334,21 @@ function updateMultiList(){
   const el=document.getElementById('multiList');
   if(fileList.length===0){el.style.display='none';return;}
   el.style.display='block';
-  el.innerHTML=fileList.map((f,i)=>
-    `<div class="multi-item">
+  const isOverlay=document.getElementById('displayMode').value==='overlay';
+  el.innerHTML=fileList.map((f,i)=>{
+    let html=`<div class="multi-item">
       <input type="color" value="${f.color}" onchange="fileList[${i}].color=this.value;redraw()">
-      <input type="text" value="${f.label}" onchange="fileList[${i}].label=this.value;redraw()" placeholder="グラフに表示するラベル">
-      <span class="mi-name">(${f.name})</span>
-      <span class="mi-remove" onclick="removeFile(${i})" title="削除">&times;</span>
-    </div>`
-  ).join('');
+      <input type="text" value="${f.label}" onchange="fileList[${i}].label=this.value;redraw()" placeholder="ラベル">
+      <span class="mi-name">(${f.name})</span>`;
+    if(isOverlay){
+      html+=`<div class="mi-controls">
+        <label>Yオフセット</label><input type="number" value="${f.yOffset||0}" step="100" onchange="fileList[${i}].yOffset=parseFloat(this.value)||0;redraw()">
+        <label>Yスケール</label><input type="number" value="${f.yScale||1}" step="0.1" min="0.01" onchange="fileList[${i}].yScale=parseFloat(this.value)||1;redraw()">
+      </div>`;
+    }
+    html+=`<span class="mi-remove" onclick="removeFile(${i})" title="削除">&times;</span></div>`;
+    return html;
+  }).join('');
 }
 
 function removeFile(idx){
@@ -348,7 +369,6 @@ function toggleSettings(){
   p.classList.toggle('open');
   body.classList.toggle('side-by-side', p.classList.contains('open'));
   document.getElementById('btnSettings').classList.toggle('active');
-  // キャンバス幅が変わるため再描画
   setTimeout(()=>redraw(),50);
 }
 
@@ -357,8 +377,9 @@ function redraw(){
   const canvas=document.getElementById('xrdCanvas');
   const dpr=window.devicePixelRatio||1;
   const w=canvas.parentElement.clientWidth;
+  const isOverlay=document.getElementById('displayMode').value==='overlay';
   const customH=parseInt(document.getElementById('canvasH').value)||0;
-  const h=customH>0?customH:Math.max(400, fileList.length*250+100);
+  const h=customH>0?customH:(isOverlay?Math.max(450,400):Math.max(400, fileList.length*250+100));
   canvas.style.width=w+'px';
   canvas.style.height=h+'px';
   canvas.width=w*dpr;
@@ -368,16 +389,13 @@ function redraw(){
   ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,w,h);
 
-  // 背景
   const transparent=document.getElementById('chkTransparent').checked;
   if(!transparent){
     ctx.fillStyle=document.getElementById('bgColor').value||'#fff';
     ctx.fillRect(0,0,w,h);
   }
-
   if(fileList.length===0) return;
 
-  // 設定値取得
   const margin={
     top:parseInt(document.getElementById('mTop').value)||30,
     right:parseInt(document.getElementById('mRight').value)||40,
@@ -386,17 +404,16 @@ function redraw(){
   };
   const pw=w-margin.left-margin.right;
   const ph=h-margin.top-margin.bottom;
-
   const xMin=parseFloat(document.getElementById('xMin').value)||0;
   const xMax=parseFloat(document.getElementById('xMax').value)||90;
   const lineW=parseFloat(document.getElementById('lineWidth').value)||1.5;
   const showGrid=document.getElementById('chkGrid').checked;
   const showPeakLabel=document.getElementById('chkPeakLabel').checked;
+  const showFWHM=document.getElementById('chkFWHM').checked;
   const yScaleMode=document.getElementById('yScale').value;
   const showFrame=document.getElementById('chkFrame').checked;
   const showYTicks=document.getElementById('chkYTicks').checked;
 
-  // カスタマイズ値
   const fontFam=document.getElementById('fontFamily').value;
   const titleSz=parseInt(document.getElementById('titleSize').value)||16;
   const axisLabelSz=parseInt(document.getElementById('axisLabelSize').value)||14;
@@ -411,10 +428,9 @@ function redraw(){
   const plotTitle=document.getElementById('plotTitle').value;
   const xLabelText=document.getElementById('xLabel').value;
   const yLabelText=document.getElementById('yLabel').value||
-    (yScaleMode==='log'?'log(Intensity)':yScaleMode==='sqrt'?'\u221AIntensity':'Intensity / a.u.');
+    (yScaleMode==='log'?'log(Intensity)':yScaleMode==='sqrt'?'√Intensity':'Intensity / a.u.');
 
   const n=fileList.length;
-  const bandH=ph/n;
   const xPx=v=>margin.left+(v-xMin)/(xMax-xMin)*pw;
 
   function transformY(val){
@@ -425,8 +441,7 @@ function redraw(){
 
   // グリッド
   if(showGrid){
-    ctx.strokeStyle=gridCol;
-    ctx.lineWidth=gridW;
+    ctx.strokeStyle=gridCol; ctx.lineWidth=gridW;
     const xStep=calcStep(xMax-xMin);
     for(let v=Math.ceil(xMin/xStep)*xStep;v<=xMax;v+=xStep){
       const px=xPx(v);
@@ -434,110 +449,212 @@ function redraw(){
     }
   }
 
-  // 各データセット描画
-  for(let i=0;i<n;i++){
-    const f=fileList[i];
-    const bandTop=margin.top+i*bandH;
-    const plotH=bandH*0.8;
-    const plotBot=bandTop+bandH-bandH*0.1;
-
-    const filtered=[];
-    for(let j=0;j<f.x.length;j++){
-      if(f.x[j]>=xMin&&f.x[j]<=xMax) filtered.push({x:f.x[j], y:f.y[j], ty:transformY(f.y[j])});
+  if(isOverlay){
+    // ===== 重ね合わせモード =====
+    // 全データセットの変換後Y値の範囲を計算
+    let globalTyMin=Infinity, globalTyMax=-Infinity;
+    for(const f of fileList){
+      for(let j=0;j<f.x.length;j++){
+        if(f.x[j]>=xMin&&f.x[j]<=xMax){
+          const ty=transformY(f.y[j]*(f.yScale||1))+(f.yOffset||0);
+          if(ty<globalTyMin) globalTyMin=ty;
+          if(ty>globalTyMax) globalTyMax=ty;
+        }
+      }
     }
-    if(filtered.length===0) continue;
+    const tyRange=globalTyMax-globalTyMin||1;
+    const plotH=ph*0.9;
+    const plotBot=margin.top+ph-ph*0.05;
+    const yPx=ty=>plotBot-((ty-globalTyMin)/tyRange)*plotH;
 
-    const tyMax=Math.max(...filtered.map(p=>p.ty));
-    const tyMin=Math.min(...filtered.map(p=>p.ty));
-    const tyRange=tyMax-tyMin||1;
-    const yPx=ty=>plotBot-((ty-tyMin)/tyRange)*plotH;
+    // 各データセット描画
+    for(let i=0;i<n;i++){
+      const f=fileList[i];
+      const scale=f.yScale||1;
+      const offset=f.yOffset||0;
 
-    // ベースライン
-    ctx.strokeStyle=baseCol;
-    ctx.lineWidth=gridW;
-    ctx.beginPath();ctx.moveTo(margin.left,plotBot);ctx.lineTo(margin.left+pw,plotBot);ctx.stroke();
+      ctx.strokeStyle=f.color; ctx.lineWidth=lineW;
+      ctx.beginPath();
+      let started=false;
+      for(let j=0;j<f.x.length;j++){
+        if(f.x[j]<xMin||f.x[j]>xMax) continue;
+        const ty=transformY(f.y[j]*scale)+offset;
+        const px=xPx(f.x[j]), py=yPx(ty);
+        if(!started){ctx.moveTo(px,py);started=true;}else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
 
-    // データプロット
-    ctx.strokeStyle=f.color;
-    ctx.lineWidth=lineW;
-    ctx.beginPath();
-    let started=false;
-    for(const p of filtered){
-      const px=xPx(p.x),py=yPx(p.ty);
-      if(!started){ctx.moveTo(px,py);started=true;}else ctx.lineTo(px,py);
-    }
-    ctx.stroke();
-
-    // データセットラベル（右上）
-    ctx.fillStyle=f.color;
-    ctx.font='bold '+dataLabelSz+'px '+fontFam;
-    ctx.textAlign='right';
-    ctx.fillText(f.label, margin.left+pw-5, bandTop+dataLabelSz+4);
-
-    // Y軸目盛り（各バンド）
-    if(showYTicks){
-      ctx.font=tickSz+'px '+fontFam;
-      ctx.fillStyle=axisCol;
+      // ラベル
+      ctx.fillStyle=f.color;
+      ctx.font='bold '+dataLabelSz+'px '+fontFam;
       ctx.textAlign='right';
+      ctx.fillText(f.label, margin.left+pw-5, margin.top+dataLabelSz*(i+1)+4);
+
+      // FWHM表示
+      if(showFWHM&&f.peaks){
+        for(const pk of f.peaks){
+          if(!pk.fwhm||pk.x<xMin||pk.x>xMax) continue;
+          const halfY=transformY(pk.y*scale*0.5+pk._baseY*(scale*0.5))+offset;
+          const py=yPx(halfY);
+          const leftX=xPx(pk.x-pk.fwhm/2);
+          const rightX=xPx(pk.x+pk.fwhm/2);
+          ctx.strokeStyle=f.color; ctx.lineWidth=1.2; ctx.setLineDash([4,3]);
+          ctx.beginPath();ctx.moveTo(leftX,py);ctx.lineTo(rightX,py);ctx.stroke();
+          ctx.setLineDash([]);
+          // 矢印
+          ctx.beginPath();ctx.moveTo(leftX,py-4);ctx.lineTo(leftX,py+4);ctx.stroke();
+          ctx.beginPath();ctx.moveTo(rightX,py-4);ctx.lineTo(rightX,py+4);ctx.stroke();
+          ctx.font=9+'px '+fontFam; ctx.fillStyle=f.color; ctx.textAlign='center';
+          ctx.fillText(pk.fwhm.toFixed(3)+'°', (leftX+rightX)/2, py-5);
+        }
+      }
+
+      // ピークラベル
+      if(showPeakLabel&&f.peaks.length>0){
+        ctx.font='bold '+peakLabelSz+'px '+fontFam; ctx.textAlign='center';
+        for(let pi=0;pi<f.peaks.length;pi++){
+          const pk=f.peaks[pi];
+          if(pk.x<xMin||pk.x>xMax||!pk.label) continue;
+          const peakTy=transformY(pk.y*scale)+offset;
+          const peakPx=xPx(pk.x), peakPy=yPx(peakTy);
+          if(pk.offsetX===undefined){pk.offsetX=0;pk.offsetY=-25;}
+          const labelX=peakPx+pk.offsetX, labelY=peakPy+pk.offsetY;
+          ctx.strokeStyle=f.color;ctx.lineWidth=0.8;ctx.setLineDash([3,2]);
+          ctx.beginPath();ctx.moveTo(peakPx,peakPy);ctx.lineTo(labelX,labelY+6);ctx.stroke();
+          ctx.setLineDash([]);
+          const tw=ctx.measureText(pk.label).width;
+          const boxX=labelX-tw/2-4,boxY=labelY-6,boxW=tw+8,boxH=peakLabelSz+5;
+          const bg=document.getElementById('bgColor').value||'#fff';
+          ctx.fillStyle=transparent?'rgba(255,255,255,0.9)':bg+'e6';
+          ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=0.5;
+          ctx.fillRect(boxX,boxY,boxW,boxH);ctx.strokeRect(boxX,boxY,boxW,boxH);
+          ctx.fillStyle=f.color;
+          ctx.fillText(pk.label, labelX, labelY+peakLabelSz-6);
+          pk._hitBox={x:boxX,y:boxY,w:boxW,h:boxH,fi:i,pi:pi};
+        }
+      }
+    }
+
+    // Y軸目盛り
+    if(showYTicks){
+      ctx.font=tickSz+'px '+fontFam; ctx.fillStyle=axisCol; ctx.textAlign='right';
       const yStep=calcStep(tyRange);
-      for(let v=Math.ceil(tyMin/yStep)*yStep;v<=tyMax;v+=yStep){
+      for(let v=Math.ceil(globalTyMin/yStep)*yStep;v<=globalTyMax;v+=yStep){
         const py=yPx(v);
-        if(py<bandTop||py>plotBot+5) continue;
+        if(py<margin.top||py>h-margin.bottom+5) continue;
         ctx.fillText(v.toPrecision(3), margin.left-6, py+4);
         ctx.strokeStyle=axisCol;ctx.lineWidth=0.5;
         ctx.beginPath();ctx.moveTo(margin.left,py);ctx.lineTo(margin.left-4,py);ctx.stroke();
       }
     }
 
-    // ピークラベル（ドラッグ可能）
-    if(showPeakLabel&&f.peaks.length>0){
-      ctx.font='bold '+peakLabelSz+'px '+fontFam;
-      ctx.textAlign='center';
-      for(let pi=0;pi<f.peaks.length;pi++){
-        const pk=f.peaks[pi];
-        if(pk.x<xMin||pk.x>xMax) continue;
-        if(!pk.label) continue;
-        const peakPx=xPx(pk.x);
-        const ty=transformY(pk.y);
-        const peakPy=yPx(ty);
-        if(pk.offsetX===undefined){pk.offsetX=0;pk.offsetY=-25;}
-        const labelX=peakPx+pk.offsetX, labelY=peakPy+pk.offsetY;
+  } else {
+    // ===== スタックモード =====
+    const bandH=ph/n;
+    for(let i=0;i<n;i++){
+      const f=fileList[i];
+      const bandTop=margin.top+i*bandH;
+      const plotH=bandH*0.8;
+      const plotBot=bandTop+bandH-bandH*0.1;
 
-        ctx.strokeStyle=f.color;ctx.lineWidth=0.8;ctx.setLineDash([3,2]);
-        ctx.beginPath();ctx.moveTo(peakPx,peakPy);ctx.lineTo(labelX,labelY+6);ctx.stroke();
-        ctx.setLineDash([]);
+      const filtered=[];
+      for(let j=0;j<f.x.length;j++){
+        if(f.x[j]>=xMin&&f.x[j]<=xMax) filtered.push({x:f.x[j], y:f.y[j], ty:transformY(f.y[j])});
+      }
+      if(filtered.length===0) continue;
 
-        const tw=ctx.measureText(pk.label).width;
-        const boxX=labelX-tw/2-4,boxY=labelY-6,boxW=tw+8,boxH=peakLabelSz+5;
-        const bg=document.getElementById('bgColor').value||'#fff';
-        ctx.fillStyle=transparent?'rgba(255,255,255,0.9)':bg+'e6';
-        ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=0.5;
-        ctx.fillRect(boxX,boxY,boxW,boxH);ctx.strokeRect(boxX,boxY,boxW,boxH);
-        ctx.fillStyle=f.color;
-        ctx.fillText(pk.label, labelX, labelY+peakLabelSz-6);
-        pk._hitBox={x:boxX, y:boxY, w:boxW, h:boxH, fi:i, pi:pi};
+      const tyMax=Math.max(...filtered.map(p=>p.ty));
+      const tyMin=Math.min(...filtered.map(p=>p.ty));
+      const tyRange=tyMax-tyMin||1;
+      const yPx=ty=>plotBot-((ty-tyMin)/tyRange)*plotH;
+
+      ctx.strokeStyle=baseCol; ctx.lineWidth=gridW;
+      ctx.beginPath();ctx.moveTo(margin.left,plotBot);ctx.lineTo(margin.left+pw,plotBot);ctx.stroke();
+
+      ctx.strokeStyle=f.color; ctx.lineWidth=lineW;
+      ctx.beginPath();
+      let started=false;
+      for(const p of filtered){
+        const px=xPx(p.x),py=yPx(p.ty);
+        if(!started){ctx.moveTo(px,py);started=true;}else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle=f.color;
+      ctx.font='bold '+dataLabelSz+'px '+fontFam;
+      ctx.textAlign='right';
+      ctx.fillText(f.label, margin.left+pw-5, bandTop+dataLabelSz+4);
+
+      if(showYTicks){
+        ctx.font=tickSz+'px '+fontFam; ctx.fillStyle=axisCol; ctx.textAlign='right';
+        const yStep=calcStep(tyRange);
+        for(let v=Math.ceil(tyMin/yStep)*yStep;v<=tyMax;v+=yStep){
+          const py=yPx(v);
+          if(py<bandTop||py>plotBot+5) continue;
+          ctx.fillText(v.toPrecision(3), margin.left-6, py+4);
+          ctx.strokeStyle=axisCol;ctx.lineWidth=0.5;
+          ctx.beginPath();ctx.moveTo(margin.left,py);ctx.lineTo(margin.left-4,py);ctx.stroke();
+        }
+      }
+
+      // FWHM表示（スタックモード）
+      if(showFWHM&&f.peaks){
+        for(const pk of f.peaks){
+          if(!pk.fwhm||pk.x<xMin||pk.x>xMax) continue;
+          const baseY=pk._baseY||0;
+          const halfInt=(pk.y+baseY)/2;
+          const halfTy=transformY(halfInt);
+          const py=yPx(halfTy);
+          const leftX=xPx(pk.x-pk.fwhm/2);
+          const rightX=xPx(pk.x+pk.fwhm/2);
+          ctx.strokeStyle=f.color; ctx.lineWidth=1.2; ctx.setLineDash([4,3]);
+          ctx.beginPath();ctx.moveTo(leftX,py);ctx.lineTo(rightX,py);ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.beginPath();ctx.moveTo(leftX,py-4);ctx.lineTo(leftX,py+4);ctx.stroke();
+          ctx.beginPath();ctx.moveTo(rightX,py-4);ctx.lineTo(rightX,py+4);ctx.stroke();
+          ctx.font=9+'px '+fontFam; ctx.fillStyle=f.color; ctx.textAlign='center';
+          ctx.fillText(pk.fwhm.toFixed(3)+'°', (leftX+rightX)/2, py-5);
+        }
+      }
+
+      // ピークラベル
+      if(showPeakLabel&&f.peaks.length>0){
+        ctx.font='bold '+peakLabelSz+'px '+fontFam; ctx.textAlign='center';
+        for(let pi=0;pi<f.peaks.length;pi++){
+          const pk=f.peaks[pi];
+          if(pk.x<xMin||pk.x>xMax||!pk.label) continue;
+          const peakPx=xPx(pk.x);
+          const ty=transformY(pk.y);
+          const peakPy=yPx(ty);
+          if(pk.offsetX===undefined){pk.offsetX=0;pk.offsetY=-25;}
+          const labelX=peakPx+pk.offsetX, labelY=peakPy+pk.offsetY;
+          ctx.strokeStyle=f.color;ctx.lineWidth=0.8;ctx.setLineDash([3,2]);
+          ctx.beginPath();ctx.moveTo(peakPx,peakPy);ctx.lineTo(labelX,labelY+6);ctx.stroke();
+          ctx.setLineDash([]);
+          const tw=ctx.measureText(pk.label).width;
+          const boxX=labelX-tw/2-4,boxY=labelY-6,boxW=tw+8,boxH=peakLabelSz+5;
+          const bg=document.getElementById('bgColor').value||'#fff';
+          ctx.fillStyle=transparent?'rgba(255,255,255,0.9)':bg+'e6';
+          ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=0.5;
+          ctx.fillRect(boxX,boxY,boxW,boxH);ctx.strokeRect(boxX,boxY,boxW,boxH);
+          ctx.fillStyle=f.color;
+          ctx.fillText(pk.label, labelX, labelY+peakLabelSz-6);
+          pk._hitBox={x:boxX,y:boxY,w:boxW,h:boxH,fi:i,pi:pi};
+        }
       }
     }
   }
 
   // 外枠
-  if(showFrame){
-    ctx.strokeStyle=axisCol;ctx.lineWidth=axisW;
-    ctx.strokeRect(margin.left,margin.top,pw,ph);
-  }
+  if(showFrame){ ctx.strokeStyle=axisCol;ctx.lineWidth=axisW; ctx.strokeRect(margin.left,margin.top,pw,ph); }
 
   // X軸
-  ctx.strokeStyle=axisCol;
-  ctx.lineWidth=axisW;
+  ctx.strokeStyle=axisCol; ctx.lineWidth=axisW;
   ctx.beginPath();ctx.moveTo(margin.left,h-margin.bottom);ctx.lineTo(w-margin.right,h-margin.bottom);ctx.stroke();
-
-  // Y軸線
   ctx.beginPath();ctx.moveTo(margin.left,margin.top);ctx.lineTo(margin.left,h-margin.bottom);ctx.stroke();
 
   // X軸目盛り
-  ctx.fillStyle=axisCol;
-  ctx.font=tickSz+'px '+fontFam;
-  ctx.textAlign='center';
+  ctx.fillStyle=axisCol; ctx.font=tickSz+'px '+fontFam; ctx.textAlign='center';
   const xStep=calcStep(xMax-xMin);
   for(let v=Math.ceil(xMin/xStep)*xStep;v<=xMax;v+=xStep){
     const px=xPx(v);
@@ -546,57 +663,38 @@ function redraw(){
     ctx.beginPath();ctx.moveTo(px,h-margin.bottom);ctx.lineTo(px,h-margin.bottom+5);ctx.stroke();
   }
 
-  // X軸ラベル（単位を斜体で描画）
   drawAxisLabel(ctx, xLabelText, margin.left+pw/2, h-6, axisLabelSz, fontFam, axisCol, false);
 
-  // Y軸ラベル（単位を斜体で描画、回転）
   ctx.save();
   ctx.translate(14, margin.top+ph/2);
   ctx.rotate(-Math.PI/2);
   drawAxisLabel(ctx, yLabelText, 0, 0, axisLabelSz, fontFam, axisCol, false);
   ctx.restore();
 
-  // タイトル
   if(plotTitle){
-    ctx.font='bold '+titleSz+'px '+fontFam;
-    ctx.fillStyle=axisCol;
-    ctx.textAlign='center';
+    ctx.font='bold '+titleSz+'px '+fontFam; ctx.fillStyle=axisCol; ctx.textAlign='center';
     ctx.fillText(plotTitle, margin.left+pw/2, margin.top-8);
   }
 }
 
 // ===== 軸ラベル描画（単位部分を斜体） =====
-// "2θ / deg" → "2θ / " は通常、"deg" は italic
-// "Intensity / a.u." → "Intensity / " は通常、"a.u." は italic
-// " / " で分割し、後半（単位）を斜体にする。√ や log 接頭語は通常体に保つ
 function drawAxisLabel(ctx, text, cx, cy, fontSize, fontFam, color, isBold){
   ctx.fillStyle=color;
   const prefix=isBold?'bold ':'';
   const slashIdx=text.indexOf(' / ');
   if(slashIdx===-1){
-    // スラッシュ区切りがなければそのまま描画
-    ctx.font=prefix+fontSize+'px '+fontFam;
-    ctx.textAlign='center';
-    ctx.fillText(text, cx, cy);
-    return;
+    ctx.font=prefix+fontSize+'px '+fontFam; ctx.textAlign='center';
+    ctx.fillText(text, cx, cy); return;
   }
-  const quantityPart=text.substring(0, slashIdx+3); // "2θ / " まで
-  const unitPart=text.substring(slashIdx+3);          // "deg" 等
-
-  // 各パーツの幅を測定
+  const quantityPart=text.substring(0, slashIdx+3);
+  const unitPart=text.substring(slashIdx+3);
   ctx.font=prefix+fontSize+'px '+fontFam;
   const qw=ctx.measureText(quantityPart).width;
   ctx.font=prefix+'italic '+fontSize+'px '+fontFam;
   const uw=ctx.measureText(unitPart).width;
-  const totalW=qw+uw;
-  const startX=cx-totalW/2;
-
-  // 量の部分（通常体）
-  ctx.font=prefix+fontSize+'px '+fontFam;
-  ctx.textAlign='left';
+  const startX=cx-(qw+uw)/2;
+  ctx.font=prefix+fontSize+'px '+fontFam; ctx.textAlign='left';
   ctx.fillText(quantityPart, startX, cy);
-
-  // 単位の部分（斜体）
   ctx.font=prefix+'italic '+fontSize+'px '+fontFam;
   ctx.fillText(unitPart, startX+qw, cy);
 }
@@ -611,16 +709,56 @@ function calcStep(range){
   return 10*mag;
 }
 
+// ===== FWHM計算 =====
+function calcFWHM(f, peakIdx){
+  const pk=f.peaks[peakIdx];
+  const x=f.x, y=f.y;
+  // ピーク位置に最も近いデータインデックス
+  let ci=0, minD=Infinity;
+  for(let i=0;i<x.length;i++){ const d=Math.abs(x[i]-pk.x); if(d<minD){minD=d;ci=i;} }
+
+  // 左右のベースラインを推定（ピークの左右の谷）
+  let leftBase=y[ci], rightBase=y[ci];
+  for(let i=ci-1;i>=Math.max(0,ci-100);i--){ if(y[i]<leftBase) leftBase=y[i]; if(y[i]>y[ci]*0.5&&i<ci-3) break; }
+  for(let i=ci+1;i<=Math.min(x.length-1,ci+100);i++){ if(y[i]<rightBase) rightBase=y[i]; if(y[i]>y[ci]*0.5&&i>ci+3) break; }
+  const baseY=Math.max(leftBase, rightBase);
+  pk._baseY=baseY;
+
+  const halfMax=(pk.y+baseY)/2;
+
+  // 左側の半値点を探す
+  let leftTheta=pk.x;
+  for(let i=ci;i>0;i--){
+    if(y[i]<=halfMax&&y[i-1]<=halfMax){ break; }
+    if((y[i]>=halfMax&&y[i-1]<halfMax)||(y[i]>halfMax&&y[i-1]<=halfMax)){
+      const frac=(halfMax-y[i-1])/(y[i]-y[i-1]);
+      leftTheta=x[i-1]+frac*(x[i]-x[i-1]);
+      break;
+    }
+  }
+
+  // 右側の半値点を探す
+  let rightTheta=pk.x;
+  for(let i=ci;i<x.length-1;i++){
+    if(y[i]<=halfMax&&y[i+1]<=halfMax){ break; }
+    if((y[i]>=halfMax&&y[i+1]<halfMax)||(y[i]>halfMax&&y[i+1]<=halfMax)){
+      const frac=(halfMax-y[i])/(y[i+1]-y[i]);
+      rightTheta=x[i]+frac*(x[i+1]-x[i]);
+      break;
+    }
+  }
+
+  const fwhm=Math.abs(rightTheta-leftTheta);
+  return fwhm>0&&fwhm<20?fwhm:null;
+}
+
 // ===== ピーク検出 =====
 function detectPeaks(){
   if(fileList.length===0) return;
-  const tablesEl=document.getElementById('peakTables');
-  tablesEl.innerHTML='';
 
   fileList.forEach((f, fi)=>{
     const x=f.x, y=f.y, nn=y.length;
     const peaks=[];
-
     const win=Math.max(3, Math.floor(nn/200));
     const sy=y.map((_,i)=>{
       let s=0,c=0;
@@ -628,27 +766,29 @@ function detectPeaks(){
       return s/c;
     });
 
-    // 閾値: 最大値の10%以上のピークのみ検出（ノイズ除去）
     const maxSy=Math.max(...sy);
     const threshold=maxSy*0.10;
-    // プロミネンス（突出度）も考慮
     for(let i=5;i<nn-5;i++){
       if(sy[i]>sy[i-1]&&sy[i]>sy[i+1]&&sy[i]>sy[i-2]&&sy[i]>sy[i+2]&&sy[i]>threshold){
-        // 左右の谷を探してプロミネンスを計算
         let leftMin=sy[i], rightMin=sy[i];
         for(let j=i-1;j>=Math.max(0,i-50);j--){if(sy[j]<leftMin)leftMin=sy[j];if(sy[j]>sy[i])break;}
         for(let j=i+1;j<=Math.min(nn-1,i+50);j++){if(sy[j]<rightMin)rightMin=sy[j];if(sy[j]>sy[i])break;}
         const prominence=sy[i]-Math.max(leftMin,rightMin);
-        if(prominence<maxSy*0.03) continue; // プロミネンスが小さすぎるピークは除外
+        if(prominence<maxSy*0.03) continue;
 
         if(peaks.length>0&&Math.abs(x[i]-peaks[peaks.length-1].x)<1.0){
-          if(sy[i]>peaks[peaks.length-1].y) peaks[peaks.length-1]={x:x[i],y:y[i],label:''};
+          if(sy[i]>peaks[peaks.length-1].y) peaks[peaks.length-1]={x:x[i],y:y[i],label:'',fwhm:null,_baseY:0};
         } else {
-          peaks.push({x:x[i],y:y[i],label:''});
+          peaks.push({x:x[i],y:y[i],label:'',fwhm:null,_baseY:0});
         }
       }
     }
     f.peaks=peaks;
+
+    // FWHM計算
+    for(let pi=0;pi<f.peaks.length;pi++){
+      f.peaks[pi].fwhm=calcFWHM(f, pi);
+    }
   });
 
   refreshPeakTables();
@@ -657,28 +797,88 @@ function detectPeaks(){
   redraw();
 }
 
-// ===== ピークテーブル再描画（検出・手動追加共通） =====
-function refreshPeakTables(){
-  const tablesEl=document.getElementById('peakTables');
-  tablesEl.innerHTML='';
-  const lambda=1.5406;
+// ===== 解析（層間距離・相関距離） =====
+function analyzePeaks(){
+  if(fileList.length===0||!fileList.some(f=>f.peaks&&f.peaks.length>0)){
+    alert('先にピーク検出を行い、必要に応じてピークを同定（ラベル付け）してください');
+    return;
+  }
+  const lambda=parseFloat(document.getElementById('xrayLambda').value)||1.5406;
+  const K=0.9; // Scherrer定数
 
-  fileList.forEach((f, fi)=>{
+  // FWHM再計算
+  fileList.forEach(f=>{
+    if(!f.peaks) return;
+    for(let pi=0;pi<f.peaks.length;pi++){
+      if(!f.peaks[pi].fwhm) f.peaks[pi].fwhm=calcFWHM(f, pi);
+    }
+  });
+
+  const tablesEl=document.getElementById('analysisTables');
+  tablesEl.innerHTML='';
+  document.getElementById('analysisLambda').textContent=lambda.toFixed(4);
+
+  fileList.forEach((f,fi)=>{
     if(!f.peaks||f.peaks.length===0) return;
-    let html=`<h4 style="color:${f.color};margin:12px 0 6px">${f.label} (${f.peaks.length}ピーク)</h4>`;
-    html+=`<table><thead><tr><th>#</th><th>2\u03B8 (°)</th><th>強度</th><th>d値 (Å)</th><th>ラベル</th><th></th></tr></thead><tbody>`;
+    let html=`<h4 style="color:${f.color};margin:14px 0 6px">${f.label} (${f.peaks.length} peaks)</h4>`;
+    html+=`<table><thead><tr>
+      <th>#</th><th>2θ (°)</th><th>強度</th><th>d (Å)</th><th>FWHM (°)</th>
+      <th>FWHM (rad)</th><th>相関距離 L (nm)</th><th>ラベル</th>
+    </tr></thead><tbody>`;
+
     f.peaks.forEach((p,pi)=>{
-      const theta=p.x*Math.PI/360;
-      const d=lambda/(2*Math.sin(theta));
-      html+=`<tr><td>${pi+1}</td><td>${p.x.toFixed(3)}</td><td>${p.y.toFixed(1)}</td><td>${d.toFixed(4)}</td>`;
-      html+=`<td><input type="text" value="${p.label}" placeholder="(001)等" style="width:80px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;color:#ddd;padding:2px 4px;font-size:.72rem" onchange="updatePeakLabel(${fi},${pi},this.value)"></td>`;
-      html+=`<td><button class="btn" style="padding:1px 6px;font-size:.65rem;color:#f66;border-color:#f66" onclick="deletePeak(${fi},${pi})" title="ピーク削除">&times;</button></td></tr>`;
+      const thetaRad=p.x*Math.PI/360; // θ in radians
+      const d=lambda/(2*Math.sin(thetaRad));
+      const fwhmDeg=p.fwhm||0;
+      const fwhmRad=fwhmDeg*Math.PI/180;
+      // Scherrer式: L = Kλ / (β cosθ)
+      let corrLen=0;
+      if(fwhmRad>0) corrLen=(K*lambda)/(fwhmRad*Math.cos(thetaRad))/10; // Å→nm
+
+      html+=`<tr>
+        <td>${pi+1}</td>
+        <td class="num">${p.x.toFixed(3)}</td>
+        <td class="num">${p.y.toFixed(1)}</td>
+        <td class="num" style="font-weight:bold;color:#58a6ff">${d.toFixed(4)}</td>
+        <td class="num">${fwhmDeg?fwhmDeg.toFixed(4):'—'}</td>
+        <td class="num">${fwhmRad>0?fwhmRad.toFixed(6):'—'}</td>
+        <td class="num" style="font-weight:bold;color:#ff8c00">${corrLen>0?corrLen.toFixed(2):'—'}</td>
+        <td>${p.label||'—'}</td>
+      </tr>`;
     });
     html+='</tbody></table>';
     tablesEl.innerHTML+=html;
   });
 
-  // 手動追加ドロップダウンも更新
+  document.getElementById('analysisPanel').classList.add('open');
+  // FWHM表示もON
+  document.getElementById('chkFWHM').checked=true;
+  redraw();
+}
+
+// ===== ピークテーブル再描画 =====
+function refreshPeakTables(){
+  const tablesEl=document.getElementById('peakTables');
+  tablesEl.innerHTML='';
+  const lambda=parseFloat(document.getElementById('xrayLambda').value)||1.5406;
+
+  fileList.forEach((f, fi)=>{
+    if(!f.peaks||f.peaks.length===0) return;
+    let html=`<h4 style="color:${f.color};margin:12px 0 6px">${f.label} (${f.peaks.length}ピーク)</h4>`;
+    html+=`<table><thead><tr><th>#</th><th>2θ (°)</th><th>強度</th><th>d (Å)</th><th>FWHM (°)</th><th>ラベル</th><th></th></tr></thead><tbody>`;
+    f.peaks.forEach((p,pi)=>{
+      const theta=p.x*Math.PI/360;
+      const d=lambda/(2*Math.sin(theta));
+      html+=`<tr><td>${pi+1}</td><td>${p.x.toFixed(3)}</td><td>${p.y.toFixed(1)}</td>`;
+      html+=`<td style="color:#58a6ff">${d.toFixed(4)}</td>`;
+      html+=`<td>${p.fwhm?p.fwhm.toFixed(4):'—'}</td>`;
+      html+=`<td><input type="text" value="${p.label}" placeholder="(001)等" style="width:70px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;color:#ddd;padding:2px 4px;font-size:.72rem" onchange="updatePeakLabel(${fi},${pi},this.value)"></td>`;
+      html+=`<td><button class="btn" style="padding:1px 6px;font-size:.65rem;color:#f66;border-color:#f66" onclick="deletePeak(${fi},${pi})" title="削除">&times;</button></td></tr>`;
+    });
+    html+='</tbody></table>';
+    tablesEl.innerHTML+=html;
+  });
+
   const dsSel=document.getElementById('manualPeakDs');
   dsSel.innerHTML=fileList.map((f,i)=>`<option value="${i}">${f.label}</option>`).join('');
 }
@@ -699,7 +899,6 @@ function toggleTable(){
   const el=document.getElementById('dataTable');
   if(el.style.display==='block'){el.style.display='none';return;}
   if(fileList.length===0) return;
-  // データセット選択ドロップダウンを更新
   const dsSel=document.getElementById('dataTableDs');
   dsSel.innerHTML=fileList.map((f,i)=>`<option value="${i}">${f.label}</option>`).join('');
   showDataForDataset();
@@ -722,12 +921,8 @@ function jumpToTheta(){
   const idx=parseInt(document.getElementById('dataTableDs').value)||0;
   if(idx>=fileList.length) return;
   const f=fileList[idx];
-  // 最も近い2θを探す
   let closest=0, minDiff=Infinity;
-  for(let i=0;i<f.x.length;i++){
-    const diff=Math.abs(f.x[i]-target);
-    if(diff<minDiff){minDiff=diff;closest=i;}
-  }
+  for(let i=0;i<f.x.length;i++){ const diff=Math.abs(f.x[i]-target); if(diff<minDiff){minDiff=diff;closest=i;} }
   const row=document.getElementById('drow-'+closest);
   if(row){
     row.scrollIntoView({behavior:'smooth',block:'center'});
@@ -739,18 +934,19 @@ function jumpToTheta(){
 function addPeakFromData(fi,dataIdx){
   const f=fileList[fi];
   if(!f.peaks) f.peaks=[];
-  // 重複チェック
   const x2t=f.x[dataIdx];
   if(f.peaks.some(p=>Math.abs(p.x-x2t)<0.05)){alert('この位置には既にピークがあります');return;}
   const lbl=prompt('ピークラベルを入力（例: (001)）','');
-  f.peaks.push({x:x2t, y:f.y[dataIdx], label:lbl||''});
-  // ピークリスト再表示
+  const pk={x:x2t, y:f.y[dataIdx], label:lbl||'', fwhm:null, _baseY:0};
+  f.peaks.push(pk);
+  // FWHM計算
+  const pi=f.peaks.length-1;
+  f.peaks[pi].fwhm=calcFWHM(f, pi);
   refreshPeakTables();
   document.getElementById('chkPeakLabel').checked=true;
   redraw();
 }
 
-// ===== 手動ピーク追加 =====
 function addManualPeak(){
   const dsIdx=parseInt(document.getElementById('manualPeakDs').value);
   const theta2=parseFloat(document.getElementById('manualPeak2t').value);
@@ -759,16 +955,14 @@ function addManualPeak(){
   if(isNaN(theta2)){alert('2θ値を入力してください');return;}
   const f=fileList[dsIdx];
   if(!f.peaks) f.peaks=[];
-  // 重複チェック
   if(f.peaks.some(p=>Math.abs(p.x-theta2)<0.05)){alert('この位置には既にピークがあります');return;}
-  // 該当2θに最も近いデータ点の強度を取得
   let closestY=0, minDiff=Infinity;
-  for(let i=0;i<f.x.length;i++){
-    const diff=Math.abs(f.x[i]-theta2);
-    if(diff<minDiff){minDiff=diff;closestY=f.y[i];}
-  }
-  f.peaks.push({x:theta2, y:closestY, label:lbl});
+  for(let i=0;i<f.x.length;i++){ const diff=Math.abs(f.x[i]-theta2); if(diff<minDiff){minDiff=diff;closestY=f.y[i];} }
+  f.peaks.push({x:theta2, y:closestY, label:lbl, fwhm:null, _baseY:0});
   f.peaks.sort((a,b)=>a.x-b.x);
+  // FWHM計算
+  const pi=f.peaks.findIndex(p=>Math.abs(p.x-theta2)<0.01);
+  if(pi>=0) f.peaks[pi].fwhm=calcFWHM(f, pi);
   document.getElementById('manualPeak2t').value='';
   document.getElementById('manualPeakLbl').value='';
   refreshPeakTables();
@@ -776,43 +970,41 @@ function addManualPeak(){
   redraw();
 }
 
-// ===== Excel出力（ExcelJS: 正規.xlsx + 画像埋め込み） =====
+// ===== Excel出力 =====
 async function exportXLSX(){
   if(fileList.length===0){alert('データを先に読み込んでください');return;}
   const canvas=document.getElementById('xrdCanvas');
   const firstName=fileList[0].label;
-  const lambda=1.5406;
+  const lambda=parseFloat(document.getElementById('xrayLambda').value)||1.5406;
 
   const wb=new ExcelJS.Workbook();
 
-  // --- シート1: グラフ画像 ---
   const wsChart=wb.addWorksheet('XRD Chart');
   const imgBase64=canvas.toDataURL('image/png').split(',')[1];
   const imgId=wb.addImage({base64:imgBase64, extension:'png'});
-  // キャンバスのアスペクト比を保持
   const cols=Math.min(14, Math.round(canvas.clientWidth/70));
   const rows=Math.min(35, Math.round(canvas.clientHeight/20));
   wsChart.addImage(imgId,{tl:{col:0,row:0},br:{col:cols,row:rows}});
 
-  // --- シート2〜: 各データセット ---
   for(const f of fileList){
     const name=(f.label||'data').substring(0,28).replace(/[\\\/\*\?\[\]:]/g,'');
     const ws=wb.addWorksheet(name);
-    ws.columns=[{header:'2\u03B8 (\u00B0)',key:'x',width:14},{header:'Intensity (cps)',key:'y',width:18}];
+    ws.columns=[{header:'2θ (°)',key:'x',width:14},{header:'Intensity (cps)',key:'y',width:18}];
     const headerRow=ws.getRow(1);
     headerRow.font={bold:true,color:{argb:'FFFFFFFF'}};
     headerRow.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
     for(let i=0;i<f.x.length;i++) ws.addRow({x:f.x[i],y:f.y[i]});
   }
 
-  // --- ピークシート ---
   const hasPeaks=fileList.some(f=>f.peaks&&f.peaks.length>0);
   if(hasPeaks){
-    const wsP=wb.addWorksheet('Peaks');
+    const wsP=wb.addWorksheet('Peak Analysis');
     wsP.columns=[
       {header:'Dataset',key:'ds',width:22},{header:'#',key:'n',width:5},
-      {header:'2\u03B8 (\u00B0)',key:'x',width:12},{header:'Intensity',key:'y',width:14},
-      {header:'d (\u00C5)',key:'d',width:12},{header:'Label',key:'l',width:14}
+      {header:'2θ (°)',key:'x',width:12},{header:'Intensity',key:'y',width:14},
+      {header:'d (Å)',key:'d',width:12},{header:'FWHM (°)',key:'fw',width:12},
+      {header:'FWHM (rad)',key:'fwr',width:12},{header:'L (nm)',key:'l',width:12},
+      {header:'Label',key:'lb',width:14}
     ];
     const hdr=wsP.getRow(1);
     hdr.font={bold:true,color:{argb:'FFFFFFFF'}};
@@ -820,14 +1012,15 @@ async function exportXLSX(){
     for(const f of fileList){
       if(!f.peaks) continue;
       f.peaks.forEach((p,i)=>{
-        const theta=p.x*Math.PI/360;
-        const d=lambda/(2*Math.sin(theta));
-        wsP.addRow({ds:f.label,n:i+1,x:p.x,y:p.y,d:d,l:p.label||''});
+        const thetaRad=p.x*Math.PI/360;
+        const d=lambda/(2*Math.sin(thetaRad));
+        const fwhmRad=(p.fwhm||0)*Math.PI/180;
+        const corrLen=fwhmRad>0?(0.9*lambda)/(fwhmRad*Math.cos(thetaRad))/10:0;
+        wsP.addRow({ds:f.label,n:i+1,x:p.x,y:p.y,d:d,fw:p.fwhm||'',fwr:fwhmRad||'',l:corrLen||'',lb:p.label||''});
       });
     }
   }
 
-  // ダウンロード
   const buf=await wb.xlsx.writeBuffer();
   const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a=document.createElement('a');
@@ -837,7 +1030,6 @@ async function exportXLSX(){
   URL.revokeObjectURL(a.href);
 }
 
-// ===== PNG出力 =====
 function exportPNG(){
   const canvas=document.getElementById('xrdCanvas');
   const a=document.createElement('a');
@@ -851,13 +1043,10 @@ window.addEventListener('resize',()=>{if(fileList.length>0)redraw();});
 // ===== ピークラベル ドラッグ機能 =====
 (function(){
   const canvas=document.getElementById('xrdCanvas');
-  let dragging=null; // {fi, pi, startMouseX, startMouseY, startOffsetX, startOffsetY}
+  let dragging=null;
 
   function getCanvasPos(e){
     const rect=canvas.getBoundingClientRect();
-    const scaleX=canvas.width/(canvas.clientWidth*(window.devicePixelRatio||1));
-    const scaleY=canvas.height/(canvas.clientHeight*(window.devicePixelRatio||1));
-    // CSSピクセル座標を返す（dpr考慮不要、描画もCSS座標で行っているため）
     const clientX=e.touches?e.touches[0].clientX:e.clientX;
     const clientY=e.touches?e.touches[0].clientY:e.clientY;
     return {x:clientX-rect.left, y:clientY-rect.top};
@@ -892,13 +1081,11 @@ window.addEventListener('resize',()=>{if(fileList.length>0)redraw();});
     if(dragging){
       e.preventDefault();
       const pos=getCanvasPos(e);
-      const dx=pos.x-dragging.startMouseX;
-      const dy=pos.y-dragging.startMouseY;
+      const dx=pos.x-dragging.startMouseX, dy=pos.y-dragging.startMouseY;
       fileList[dragging.fi].peaks[dragging.pi].offsetX=dragging.startOffsetX+dx;
       fileList[dragging.fi].peaks[dragging.pi].offsetY=dragging.startOffsetY+dy;
       redraw();
     } else {
-      // ホバー時にカーソル変更
       const pos=getCanvasPos(e);
       const hit=findLabelAt(pos);
       canvas.classList.toggle('hovering-label', !!hit);
@@ -906,17 +1093,13 @@ window.addEventListener('resize',()=>{if(fileList.length>0)redraw();});
   }
 
   function onUp(){
-    if(dragging){
-      dragging=null;
-      canvas.classList.remove('dragging');
-    }
+    if(dragging){ dragging=null; canvas.classList.remove('dragging'); }
   }
 
   canvas.addEventListener('mousedown', onDown);
   canvas.addEventListener('mousemove', onMove);
   canvas.addEventListener('mouseup', onUp);
   canvas.addEventListener('mouseleave', onUp);
-  // タッチ対応
   canvas.addEventListener('touchstart', onDown, {passive:false});
   canvas.addEventListener('touchmove', onMove, {passive:false});
   canvas.addEventListener('touchend', onUp);
