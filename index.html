@@ -464,6 +464,22 @@ function renderThread(t,th,isUpdate){
     const boardBody=el.closest('.board-body');
     if(boardBody) setTimeout(()=>{boardBody.scrollTop=boardBody.scrollHeight;},50);
   }
+
+  // このスレッドで自分が既に書き込んでいたら名前を固定
+  const nameInput=document.getElementById('rp-name-'+t);
+  if(nameInput){
+    const myPost=posts.find(r=>r.uid&&r.uid===uid);
+    if(myPost){
+      nameInput.value=myPost.name||'名無しさん';
+      nameInput.readOnly=true;
+      nameInput.style.opacity='0.6';
+      nameInput.title='このスレッドでは名前を変更できません';
+    } else {
+      nameInput.readOnly=false;
+      nameInput.style.opacity='1';
+      nameInput.title='';
+    }
+  }
 }
 
 function deleteReply(t,key){
