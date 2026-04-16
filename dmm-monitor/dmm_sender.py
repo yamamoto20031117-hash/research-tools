@@ -86,6 +86,38 @@ def update_output_status(on):
     firebase_put("dmm/status", {"output": on, "time": int(time.time()*1000)})
 
 
+def flush_buffer(smu):
+    """RS-232入力バッファをクリア"""
+    if not smu:
+        return
+    try:
+        if smu.bytes_in_buffer > 0:
+            smu.read_bytes(smu.bytes_in_buffer)
+    except:
+        pass
+
+
+def safe_write(smu, cmd, delay=0.5):
+    """エラークリア + バッファクリア付きで安全にSCPIコマンドを送信"""
+    if not smu:
+        return
+    flush_buffer(smu)
+    try:
+        smu.write(cmd)
+    except Exception as e:
+        print(f"  [SCPI write error] {cmd} → {e}")
+        # エラー後にクリアして再試行
+        time.sleep(0.5)
+        flush_buffer(smu)
+        try:
+            smu.write("*CLS")
+            time.sleep(0.3)
+            smu.write(cmd)
+        except Exception as e2:
+            print(f"  [SCPI retry failed] {cmd} → {e2}")
+    time.sleep(delay)
+
+
 # ===== タイマー自動停止 =====
 auto_stop_time = 0  # 0 = 無制限
 
@@ -95,9 +127,8 @@ def check_auto_stop(smu):
     global auto_stop_time
     if auto_stop_time > 0 and time.time() >= auto_stop_time:
         print("\n  *** タイマー満了: OUTPUT OFF (自動停止) ***")
-        if smu:
-            smu.write(":OUTP OFF")
-            time.sleep(0.3)
+        safe_write(smu, "*CLS", 0.3)
+        safe_write(smu, ":OUTP OFF", 0.5)
         auto_stop_time = 0
         update_output_status(False)
         return True
@@ -105,31 +136,43 @@ def check_auto_stop(smu):
 
 
 def configure_source(smu, mode, value, compliance):
-    """ソースモードと値を設定"""
+    """ソースモードと値を設定（RS-232安全版）"""
     if not smu:
         print(f"  [テストモード] SOURCE設定: {mode} = {value}, Compliance = {compliance}")
         return
 
+    # まずOUTPUT OFFにしてから設定変更（安全のため）
+    safe_write(smu, ":OUTP OFF", 0.5)
+    # エラーキュークリア
+    safe_write(smu, "*CLS", 0.5)
+
     # ソースモード設定
     if mode == "CURR":
-        smu.write(":SOUR:FUNC CURR"); time.sleep(0.2)
-        smu.write(f":SOUR:CURR:RANG {abs(value)}"); time.sleep(0.2)
-        smu.write(f":SOUR:CURR {value}"); time.sleep(0.2)
+        safe_write(smu, ":SOUR:FUNC CURR", 0.5)
+        # レンジ：0の場合はMINレンジ
+        if abs(value) > 0:
+            safe_write(smu, f":SOUR:CURR:RANG {abs(value)}", 0.5)
+        else:
+            safe_write(smu, ":SOUR:CURR:RANG MIN", 0.5)
+        safe_write(smu, f":SOUR:CURR {value}", 0.5)
         # コンプライアンス（電圧上限）
-        smu.write(f":SENS:VOLT:PROT {compliance}"); time.sleep(0.2)
+        safe_write(smu, f":SENS:VOLT:PROT {compliance}", 0.5)
         print(f"  設定: 定電流モード {value} A, コンプライアンス {compliance} V")
     elif mode == "VOLT":
-        smu.write(":SOUR:FUNC VOLT"); time.sleep(0.2)
-        smu.write(f":SOUR:VOLT:RANG {abs(value)}"); time.sleep(0.2)
-        smu.write(f":SOUR:VOLT {value}"); time.sleep(0.2)
+        safe_write(smu, ":SOUR:FUNC VOLT", 0.5)
+        if abs(value) > 0:
+            safe_write(smu, f":SOUR:VOLT:RANG {abs(value)}", 0.5)
+        else:
+            safe_write(smu, ":SOUR:VOLT:RANG MIN", 0.5)
+        safe_write(smu, f":SOUR:VOLT {value}", 0.5)
         # コンプライアンス（電流上限）
-        smu.write(f":SENS:CURR:PROT {compliance}"); time.sleep(0.2)
+        safe_write(smu, f":SENS:CURR:PROT {compliance}", 0.5)
         print(f"  設定: 定電圧モード {value} V, コンプライアンス {compliance} A")
 
     # 測定関数は常に電圧・電流同時
-    smu.write(":SENS:FUNC:CONC ON"); time.sleep(0.2)
-    smu.write(":SENS:FUNC 'VOLT:DC','CURR:DC'"); time.sleep(0.2)
-    smu.write(":FORM:ELEM VOLT,CURR"); time.sleep(0.2)
+    safe_write(smu, ":SENS:FUNC:CONC ON", 0.5)
+    safe_write(smu, ":SENS:FUNC 'VOLT:DC','CURR:DC'", 0.5)
+    safe_write(smu, ":FORM:ELEM VOLT,CURR", 0.5)
 
 
 def check_command(smu):
@@ -144,18 +187,16 @@ def check_command(smu):
 
     if action == "OUTPUT_OFF":
         print("\n  *** Web からの指令: OUTPUT OFF ***")
-        if smu:
-            smu.write(":OUTP OFF")
-            time.sleep(0.3)
+        safe_write(smu, "*CLS", 0.3)
+        safe_write(smu, ":OUTP OFF", 0.5)
         auto_stop_time = 0
         update_output_status(False)
         return "OFF"
 
     elif action == "OUTPUT_ON":
         print("\n  *** Web からの指令: OUTPUT ON ***")
-        if smu:
-            smu.write(":OUTP ON")
-            time.sleep(0.3)
+        safe_write(smu, "*CLS", 0.3)
+        safe_write(smu, ":OUTP ON", 0.5)
         update_output_status(True)
         return "ON"
 
@@ -176,13 +217,11 @@ def check_command(smu):
         else:
             print(f"  出力時間: 無制限")
 
-        # ソース設定
+        # ソース設定（内部でOUTPUT OFF → 設定変更）
         configure_source(smu, mode, value, compliance)
 
         # OUTPUT ON
-        if smu:
-            smu.write(":OUTP ON")
-            time.sleep(0.5)
+        safe_write(smu, ":OUTP ON", 1.0)
         update_output_status(True)
 
         # タイマー設定
@@ -281,19 +320,19 @@ def connect_keithley():
 
     # ===== Keithley 2400 初期設定 =====
     print("初期設定中...")
-    smu.write("*RST")
-    time.sleep(2)  # RST後は2秒待つ
+    safe_write(smu, "*RST", 2.0)  # RST後は2秒待つ
+    safe_write(smu, "*CLS", 0.5)  # エラーキュークリア
 
-    smu.write(":SYST:BEEP:STAT OFF"); time.sleep(0.2)
-    smu.write(":SENS:FUNC:CONC ON"); time.sleep(0.2)
-    smu.write(":SENS:FUNC 'VOLT:DC','CURR:DC'"); time.sleep(0.2)
-    smu.write(":FORM:ELEM VOLT,CURR"); time.sleep(0.2)
+    safe_write(smu, ":SYST:BEEP:STAT OFF", 0.5)
+    safe_write(smu, ":SENS:FUNC:CONC ON", 0.5)
+    safe_write(smu, ":SENS:FUNC 'VOLT:DC','CURR:DC'", 0.5)
+    safe_write(smu, ":FORM:ELEM VOLT,CURR", 0.5)
 
     # ソース設定（電流源モード・0A出力 → OUTPUT ONで測定可能にする）
-    smu.write(":SOUR:FUNC CURR"); time.sleep(0.2)
-    smu.write(":SOUR:CURR:RANG MIN"); time.sleep(0.2)
-    smu.write(":SOUR:CURR 0"); time.sleep(0.2)
-    smu.write(":OUTP ON"); time.sleep(1)
+    safe_write(smu, ":SOUR:FUNC CURR", 0.5)
+    safe_write(smu, ":SOUR:CURR:RANG MIN", 0.5)
+    safe_write(smu, ":SOUR:CURR 0", 0.5)
+    safe_write(smu, ":OUTP ON", 1.0)
 
     print("初期設定完了")
     print("  モード: 電圧・電流 同時測定")
@@ -305,11 +344,18 @@ def connect_keithley():
 
 def read_keithley(smu):
     """Keithley 2400 から電圧・電流を読み取る"""
+    flush_buffer(smu)
     # :READ? がタイムアウトする場合は :MEAS? を試す
     try:
         result = smu.query(":READ?")
     except Exception:
         time.sleep(0.5)
+        flush_buffer(smu)
+        try:
+            smu.write("*CLS")
+            time.sleep(0.3)
+        except:
+            pass
         result = smu.query(":MEAS?")
     vals = result.strip().split(',')
     voltage = float(vals[0])
