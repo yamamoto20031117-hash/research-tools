@@ -161,7 +161,7 @@
         <h3>グラフカスタマイズ</h3>
         <div class="settings-grid">
           <div class="sg-section">タイトル・ラベル</div>
-          <div class="sg-item"><label>グラフタイトル</label><input type="text" id="plotTitle" placeholder="（空欄で非表示）" oninput="redraw()"></div>
+          <div class="sg-item"><label>グラフタイトル（空欄で非表示）</label><input type="text" id="plotTitle" placeholder="ファイル名が自動入力" oninput="this.dataset.edited='1';redraw()"></div>
           <div class="sg-item"><label>X軸ラベル</label><input type="text" id="xLabel" value="2θ / deg" oninput="redraw()"></div>
           <div class="sg-item"><label>Y軸ラベル</label><input type="text" id="yLabel" value="Intensity / a.u." oninput="redraw()"></div>
 
@@ -218,8 +218,8 @@
 
   <!-- 解析結果パネル -->
   <div class="analysis-panel" id="analysisPanel">
-    <h3>ピーク解析結果（層間距離・FWHM・相関距離）</h3>
-    <p style="font-size:.72rem;color:#888;margin-bottom:8px">λ = <span id="analysisLambda">1.5406</span> Å (Cu Kα) &nbsp;|&nbsp; Scherrer定数 K = 0.9</p>
+    <h3>ピーク解析結果（層間距離 d・FWHM・Scherrer結晶子サイズ）</h3>
+    <p style="font-size:.72rem;color:#888;margin-bottom:8px">Bragg式: d = λ/2sinθ &nbsp;|&nbsp; λ = <span id="analysisLambda">1.5406</span> Å (Cu Kα) &nbsp;|&nbsp; Scherrer: L = Kλ/(β cosθ), K = 0.9</p>
     <div id="analysisTables"></div>
   </div>
 
@@ -241,6 +241,7 @@
 <script>
 const COLORS=['#2F5496','#CC0000','#228B22','#FF8C00','#8B008B','#008B8B','#B22222','#4169E1'];
 let fileList=[]; // {name, label, color, x[], y[], peaks[], yOffset, yScale}
+let titlePos={x:null, y:null}; // null=デフォルト位置、ドラッグで変更可能
 
 // ===== ファイル読み込み =====
 const dropZone=document.getElementById('dropZone');
@@ -326,6 +327,11 @@ function updateUI(){
     const el1=document.getElementById('xMin'), el2=document.getElementById('xMax');
     if(!el1.value) el1.value=Math.floor(Math.min(...allX));
     if(!el2.value) el2.value=Math.ceil(Math.max(...allX));
+    // タイトルデフォルト: ファイル名（未入力で且つ一度も編集されていない場合）
+    const titleEl=document.getElementById('plotTitle');
+    if(!titleEl.dataset.edited){
+      titleEl.value=fileList.map(f=>f.label).join(', ');
+    }
     redraw();
   }
 }
@@ -484,11 +490,7 @@ function redraw(){
       }
       ctx.stroke();
 
-      // ラベル
-      ctx.fillStyle=f.color;
-      ctx.font='bold '+dataLabelSz+'px '+fontFam;
-      ctx.textAlign='right';
-      ctx.fillText(f.label, margin.left+pw-5, margin.top+dataLabelSz*(i+1)+4);
+      // 凡例はタイトルで代用するため省略
 
       // FWHM表示
       if(showFWHM&&f.peaks){
@@ -580,10 +582,7 @@ function redraw(){
       }
       ctx.stroke();
 
-      ctx.fillStyle=f.color;
-      ctx.font='bold '+dataLabelSz+'px '+fontFam;
-      ctx.textAlign='right';
-      ctx.fillText(f.label, margin.left+pw-5, bandTop+dataLabelSz+4);
+      // 凡例はタイトルで代用するため省略
 
       if(showYTicks){
         ctx.font=tickSz+'px '+fontFam; ctx.fillStyle=axisCol; ctx.textAlign='right';
@@ -673,7 +672,12 @@ function redraw(){
 
   if(plotTitle){
     ctx.font='bold '+titleSz+'px '+fontFam; ctx.fillStyle=axisCol; ctx.textAlign='center';
-    ctx.fillText(plotTitle, margin.left+pw/2, margin.top-8);
+    const tx=titlePos.x!==null?titlePos.x:margin.left+pw/2;
+    const ty=titlePos.y!==null?titlePos.y:margin.top-8;
+    ctx.fillText(plotTitle, tx, ty);
+    // タイトルのヒットボックスを保存（ドラッグ用）
+    const tw=ctx.measureText(plotTitle).width;
+    titlePos._hitBox={x:tx-tw/2-4, y:ty-titleSz, w:tw+8, h:titleSz+6};
   }
 }
 
@@ -797,7 +801,7 @@ function detectPeaks(){
   redraw();
 }
 
-// ===== 解析（層間距離・相関距離） =====
+// ===== 解析（層間距離・結晶子サイズ） =====
 function analyzePeaks(){
   if(fileList.length===0||!fileList.some(f=>f.peaks&&f.peaks.length>0)){
     alert('先にピーク検出を行い、必要に応じてピークを同定（ラベル付け）してください');
@@ -823,7 +827,7 @@ function analyzePeaks(){
     let html=`<h4 style="color:${f.color};margin:14px 0 6px">${f.label} (${f.peaks.length} peaks)</h4>`;
     html+=`<table><thead><tr>
       <th>#</th><th>2θ (°)</th><th>強度</th><th>d (Å)</th><th>FWHM (°)</th>
-      <th>FWHM (rad)</th><th>相関距離 L (nm)</th><th>ラベル</th>
+      <th>FWHM (rad)</th><th>結晶子サイズ L (nm)</th><th>ラベル</th>
     </tr></thead><tbody>`;
 
     f.peaks.forEach((p,pi)=>{
@@ -1043,7 +1047,7 @@ window.addEventListener('resize',()=>{if(fileList.length>0)redraw();});
 // ===== ピークラベル ドラッグ機能 =====
 (function(){
   const canvas=document.getElementById('xrdCanvas');
-  let dragging=null;
+  let dragging=null; // {type:'peak'|'title', ...}
 
   function getCanvasPos(e){
     const rect=canvas.getBoundingClientRect();
@@ -1052,14 +1056,22 @@ window.addEventListener('resize',()=>{if(fileList.length>0)redraw();});
     return {x:clientX-rect.left, y:clientY-rect.top};
   }
 
-  function findLabelAt(pos){
+  function findHitAt(pos){
+    // タイトルのヒットチェック
+    if(titlePos._hitBox){
+      const h=titlePos._hitBox;
+      if(pos.x>=h.x&&pos.x<=h.x+h.w&&pos.y>=h.y&&pos.y<=h.y+h.h){
+        return {type:'title'};
+      }
+    }
+    // ピークラベルのヒットチェック
     for(const f of fileList){
       if(!f.peaks) continue;
       for(const pk of f.peaks){
         if(!pk._hitBox||!pk.label) continue;
         const h=pk._hitBox;
         if(pos.x>=h.x&&pos.x<=h.x+h.w&&pos.y>=h.y&&pos.y<=h.y+h.h){
-          return {fi:h.fi, pi:h.pi, pk};
+          return {type:'peak', fi:h.fi, pi:h.pi, pk};
         }
       }
     }
@@ -1068,12 +1080,17 @@ window.addEventListener('resize',()=>{if(fileList.length>0)redraw();});
 
   function onDown(e){
     const pos=getCanvasPos(e);
-    const hit=findLabelAt(pos);
-    if(hit){
-      e.preventDefault();
-      dragging={fi:hit.fi, pi:hit.pi, startMouseX:pos.x, startMouseY:pos.y,
+    const hit=findHitAt(pos);
+    if(!hit) return;
+    e.preventDefault();
+    canvas.classList.add('dragging');
+    if(hit.type==='title'){
+      const h=titlePos._hitBox;
+      dragging={type:'title', startMouseX:pos.x, startMouseY:pos.y,
+        startX:h.x+h.w/2, startY:h.y+h.h-6};
+    } else {
+      dragging={type:'peak', fi:hit.fi, pi:hit.pi, startMouseX:pos.x, startMouseY:pos.y,
         startOffsetX:hit.pk.offsetX||0, startOffsetY:hit.pk.offsetY||-25};
-      canvas.classList.add('dragging');
     }
   }
 
@@ -1082,12 +1099,17 @@ window.addEventListener('resize',()=>{if(fileList.length>0)redraw();});
       e.preventDefault();
       const pos=getCanvasPos(e);
       const dx=pos.x-dragging.startMouseX, dy=pos.y-dragging.startMouseY;
-      fileList[dragging.fi].peaks[dragging.pi].offsetX=dragging.startOffsetX+dx;
-      fileList[dragging.fi].peaks[dragging.pi].offsetY=dragging.startOffsetY+dy;
+      if(dragging.type==='title'){
+        titlePos.x=dragging.startX+dx;
+        titlePos.y=dragging.startY+dy;
+      } else {
+        fileList[dragging.fi].peaks[dragging.pi].offsetX=dragging.startOffsetX+dx;
+        fileList[dragging.fi].peaks[dragging.pi].offsetY=dragging.startOffsetY+dy;
+      }
       redraw();
     } else {
       const pos=getCanvasPos(e);
-      const hit=findLabelAt(pos);
+      const hit=findHitAt(pos);
       canvas.classList.toggle('hovering-label', !!hit);
     }
   }
