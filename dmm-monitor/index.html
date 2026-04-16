@@ -98,6 +98,33 @@
     color:#ddd;padding:4px 8px;font-size:.78rem}
 
   footer{padding:16px 24px;color:#444;font-size:.7rem;text-align:center;border-top:1px solid rgba(255,255,255,0.04)}
+
+  /* ===== スマホ対応 ===== */
+  @media(max-width:600px){
+    header{padding:12px 14px}
+    header h1{font-size:1rem}
+    .current-values{padding:12px 14px;gap:8px}
+    .val-card{padding:12px;min-width:140px}
+    .val-card .value{font-size:1.6rem}
+    .val-card .unit{font-size:.8rem}
+    .val-card .minmax{flex-direction:column;gap:2px}
+    .control-section{padding:0 14px 12px}
+    .control-panel{padding:14px}
+    .control-row{gap:8px;margin-bottom:10px}
+    .control-field{min-width:0;flex:1 1 45%}
+    .control-field select,.control-field input{min-width:0;width:100%;font-size:.78rem;padding:8px 8px}
+    .control-field label{font-size:.7rem}
+    .btn-start,.btn-stop{padding:10px 16px;font-size:.82rem;width:100%}
+    .output-status{width:100%;justify-content:center;margin-top:4px}
+    .timer-display{font-size:1.2rem}
+    .chart-section{padding:0 14px 14px}
+    .chart-controls{gap:6px}
+    .chart-controls select,.chart-controls button{font-size:.72rem;padding:4px 8px}
+    .log-section{padding:0 14px 14px}
+    th,td{padding:4px 6px;font-size:.68rem}
+    .settings-panel{padding:0 14px 14px}
+    .settings-grid{grid-template-columns:1fr}
+  }
 </style>
 </head>
 <body>
@@ -179,21 +206,22 @@
           <option value="3600">時間</option>
         </select>
       </div>
-      <div class="control-field">
+      <div class="control-field" style="flex:1 1 auto">
         <label>&nbsp;</label>
-        <button class="btn-start" id="btnStart" onclick="startSource()">&#9654; OUTPUT ON</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-start" id="btnStart" onclick="startSource()" style="flex:1;min-width:120px">&#9654; OUTPUT ON</button>
+          <button class="btn-stop" id="btnStop" onclick="emergencyStop()" style="flex:1;min-width:120px">&#9632; OUTPUT OFF</button>
+        </div>
       </div>
-      <div class="control-field">
-        <label>&nbsp;</label>
-        <button class="btn-stop" id="btnStop" onclick="emergencyStop()">&#9632; OUTPUT OFF</button>
-      </div>
-      <div class="output-status">
-        <span class="dot off" id="outputDot"></span>
-        <span id="outputStatusText">OUTPUT: OFF</span>
-      </div>
-      <div style="margin-left:auto;text-align:center">
-        <div class="timer-label">残り時間</div>
-        <div class="timer-display" id="timerDisplay">--:--</div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;width:100%;margin-top:4px">
+        <div class="output-status">
+          <span class="dot off" id="outputDot"></span>
+          <span id="outputStatusText">OUTPUT: OFF</span>
+        </div>
+        <div style="margin-left:auto;text-align:center">
+          <div class="timer-label">残り時間</div>
+          <div class="timer-display" id="timerDisplay">--:--</div>
+        </div>
       </div>
     </div>
   </div>
@@ -211,16 +239,13 @@
       <option value="3600">1時間</option>
       <option value="0">全データ</option>
     </select>
-    <button onclick="clearData()">データクリア</button>
+    <button onclick="clearChart()">グラフクリア</button>
+    <button onclick="clearData()">全データクリア</button>
     <button onclick="exportCSV()">CSV出力</button>
   </div>
-  <div class="chart-wrap" style="margin-bottom:12px">
-    <div style="padding:6px 12px 0;font-size:.75rem;color:#58a6ff;font-weight:600">Voltage</div>
-    <canvas id="chartVoltage" height="220"></canvas>
-  </div>
   <div class="chart-wrap">
-    <div style="padding:6px 12px 0;font-size:.75rem;color:#f97316;font-weight:600">Current</div>
-    <canvas id="chartCurrent" height="220"></canvas>
+    <div style="padding:6px 12px 0;font-size:.75rem;font-weight:600" id="chartLabel">測定値</div>
+    <canvas id="chartMain" height="320"></canvas>
   </div>
 </div>
 
@@ -412,30 +437,48 @@ function updateStats(){
 }
 
 // ===== グラフ描画 =====
-function drawSingleChart(canvasId, data, key, color, unitBase){
-  const canvas=document.getElementById(canvasId);
+function redrawChart(){
+  const canvas=document.getElementById('chartMain');
   const dpr=window.devicePixelRatio||1;
   const w=canvas.parentElement.clientWidth;
-  const h=220;
+  const h=320;
   canvas.width=w*dpr;canvas.height=h*dpr;
   canvas.style.height=h+'px';
   const ctx=canvas.getContext('2d');
   ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,w,h);
 
-  if(data.length<2){
+  // ソースモードに応じて測定対象を決定
+  // CC(定電流)→測定するのは電圧、CV(定電圧)→測定するのは電流
+  const mode=document.getElementById('srcMode').value;
+  const key=mode==='CURR'?'voltage':'current';
+  const unitBase=mode==='CURR'?'V':'A';
+  const color=mode==='CURR'?'#58a6ff':'#f97316';
+  const labelText=mode==='CURR'?'Voltage (定電流モード → 電圧測定)':'Current (定電圧モード → 電流測定)';
+
+  const labelEl=document.getElementById('chartLabel');
+  labelEl.textContent=labelText;
+  labelEl.style.color=color;
+
+  if(dataLog.length<2){
     ctx.fillStyle='#555';ctx.font='13px sans-serif';ctx.textAlign='center';
     ctx.fillText('データ待機中...',w/2,h/2);
     return;
   }
 
-  const margin={top:12,right:16,bottom:32,left:60};
+  const rangeSec=parseInt(document.getElementById('timeRange').value)||600;
+  const now=dataLog[dataLog.length-1].time;
+  const tMin=rangeSec>0?now-rangeSec*1000:dataLog[0].time;
+  const filtered=dataLog.filter(d=>d.time>=tMin);
+  if(filtered.length<2) return;
+
+  const margin={top:14,right:16,bottom:36,left:64};
   const pw=w-margin.left-margin.right;
   const ph=h-margin.top-margin.bottom;
 
   // Y軸範囲
   let yMin=Infinity, yMax=-Infinity;
-  for(const d of data){
+  for(const d of filtered){
     const v=d[key];
     if(v<yMin) yMin=v;
     if(v>yMax) yMax=v;
@@ -443,46 +486,45 @@ function drawSingleChart(canvasId, data, key, color, unitBase){
   const pad=(yMax-yMin)*0.1||(unitBase==='A'?0.001:0.1);
   yMin-=pad; yMax+=pad;
 
-  // 時間範囲
-  const tMin=data[0].time, tMax=data[data.length-1].time;
-  const xPx=t=>margin.left+((t-tMin)/(tMax-tMin||1))*pw;
+  const tMinF=filtered[0].time, tMaxF=filtered[filtered.length-1].time;
+  const xPx=t=>margin.left+((t-tMinF)/(tMaxF-tMinF||1))*pw;
   const yPx=v=>margin.top+ph-((v-yMin)/(yMax-yMin||1))*ph;
 
   // グリッド
   ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.5;
-  for(let j=0;j<=4;j++){
-    const y=margin.top+ph*j/4;
+  for(let j=0;j<=5;j++){
+    const y=margin.top+ph*j/5;
     ctx.beginPath();ctx.moveTo(margin.left,y);ctx.lineTo(w-margin.right,y);ctx.stroke();
   }
 
   // Y軸ラベル
   const au=getAutoUnit(Math.max(Math.abs(yMin),Math.abs(yMax)), unitBase);
-  ctx.fillStyle=color;ctx.font='10px sans-serif';ctx.textAlign='right';
-  for(let j=0;j<=4;j++){
-    const val=yMin+(yMax-yMin)*j/4;
-    ctx.fillText((val*au.scale).toFixed(3),margin.left-6,margin.top+ph-ph*j/4+3);
+  ctx.fillStyle=color;ctx.font='11px sans-serif';ctx.textAlign='right';
+  for(let j=0;j<=5;j++){
+    const val=yMin+(yMax-yMin)*j/5;
+    ctx.fillText((val*au.scale).toFixed(3),margin.left-6,margin.top+ph-ph*j/5+4);
   }
   // Y軸単位
-  ctx.save();ctx.translate(12,margin.top+ph/2);ctx.rotate(-Math.PI/2);
-  ctx.fillStyle=color;ctx.textAlign='center';ctx.font='11px sans-serif';
+  ctx.save();ctx.translate(14,margin.top+ph/2);ctx.rotate(-Math.PI/2);
+  ctx.fillStyle=color;ctx.textAlign='center';ctx.font='12px sans-serif';
   ctx.fillText(au.prefix+unitBase,0,0);ctx.restore();
 
   // X軸ラベル
   ctx.fillStyle='#666';ctx.font='10px sans-serif';ctx.textAlign='center';
   const tickCount=Math.min(6,Math.floor(pw/90));
   for(let j=0;j<=tickCount;j++){
-    const t=tMin+(tMax-tMin)*j/tickCount;
+    const t=tMinF+(tMaxF-tMinF)*j/tickCount;
     const d=new Date(t);
     const label=d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    ctx.fillText(label,xPx(t),h-margin.bottom+14);
+    ctx.fillText(label,xPx(t),h-margin.bottom+16);
     ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.beginPath();
     ctx.moveTo(xPx(t),margin.top);ctx.lineTo(xPx(t),h-margin.bottom);ctx.stroke();
   }
 
   // データ線
-  ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.beginPath();
+  ctx.strokeStyle=color;ctx.lineWidth=1.8;ctx.beginPath();
   let started=false;
-  for(const d of data){
+  for(const d of filtered){
     const x=xPx(d.time), y=yPx(d[key]);
     if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
   }
@@ -491,22 +533,6 @@ function drawSingleChart(canvasId, data, key, color, unitBase){
   // 枠
   ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=1;
   ctx.strokeRect(margin.left,margin.top,pw,ph);
-}
-
-function redrawChart(){
-  const rangeSec=parseInt(document.getElementById('timeRange').value)||600;
-  if(dataLog.length<2) {
-    drawSingleChart('chartVoltage',[],'voltage','#58a6ff','V');
-    drawSingleChart('chartCurrent',[],'current','#f97316','A');
-    return;
-  }
-  const now=dataLog[dataLog.length-1].time;
-  const tMin=rangeSec>0?now-rangeSec*1000:dataLog[0].time;
-  const filtered=dataLog.filter(d=>d.time>=tMin);
-  if(filtered.length<2) return;
-
-  drawSingleChart('chartVoltage', filtered, 'voltage', '#58a6ff', 'V');
-  drawSingleChart('chartCurrent', filtered, 'current', '#f97316', 'A');
 }
 
 // ===== ログテーブル =====
@@ -543,13 +569,26 @@ function toggleSettings(){
   document.getElementById('settingsPanel').classList.toggle('open');
 }
 
+function clearChart(){
+  // グラフだけリセット（データは保持、現在値からやり直し）
+  dataLog=[];
+  vMin=Infinity;vMax=-Infinity;iMin=Infinity;iMax=-Infinity;
+  redrawChart();updateLogTable();
+  document.getElementById('totalCount').textContent='0 件';
+}
+
 function clearData(){
-  if(!confirm('表示データをクリアしますか？')) return;
+  if(!confirm('全データをクリアしますか？（Firebase ログも削除）')) return;
   dataLog=[];
   vMin=Infinity;vMax=-Infinity;iMin=Infinity;iMax=-Infinity;lastUpdate=0;
   document.getElementById('curVoltage').textContent='---';
   document.getElementById('curCurrent').textContent='---';
   redrawChart();updateLogTable();
+  // Firebase ログも削除
+  if(firebaseReady){
+    db.ref('dmm/log').remove();
+    db.ref('dmm/live').remove();
+  }
 }
 
 function reconnect(){ if(listener) listener(); startListening(); }
@@ -584,8 +623,9 @@ function updateModeUnits(){
     srcLabel.textContent='ソース電圧';
     srcUnit.innerHTML='<option value="1">V</option><option value="0.001" selected>mV</option><option value="0.000001">μV</option>';
     compLabel.textContent='コンプライアンス電流';
-    compUnit.innerHTML='<option value="1">A</option><option value="0.001" selected>mA</option><option value="0.000001">μA</option>';
+    compUnit.innerHTML='<option value="1" selected>A</option><option value="0.001">mA</option><option value="0.000001">μA</option>';
   }
+  redrawChart(); // グラフもモードに合わせて切替
 }
 
 // ===== 機器制御 =====
@@ -615,10 +655,14 @@ function startSource(){
 
   const modeLabel=mode==='CURR'?'定電流':'定電圧';
   const valUnit=mode==='CURR'?'A':'V';
+  const compBaseUnit=mode==='CURR'?'V':'A';
   const vu=getAutoUnitStr(value, valUnit);
+  const cu=getAutoUnitStr(compliance, compBaseUnit);
   const dispVal=(value*vu.scale).toFixed(4)+' '+vu.str;
+  const dispComp=(compliance*cu.scale).toFixed(4)+' '+cu.str;
 
   let msg=`${modeLabel}モードで ${dispVal} を出力します。`;
+  msg+=`\nコンプライアンス: ${dispComp}`;
   if(durationSec>0) msg+=`\n出力時間: ${formatDuration(durationSec)}（自動停止）`;
   else msg+='\n出力時間: 無制限（手動停止）';
   msg+='\nよろしいですか？';
