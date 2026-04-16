@@ -411,10 +411,23 @@ function countPosts(th){
   return Object.keys(th.replies).length+1;
 }
 
-// UID（自分のコメント識別用）
+// UID（自分のコメント識別用 — localStorage + cookie 二重保存で確実に保持）
 function getUid(){
-  let uid=localStorage.getItem('rt_uid');
-  if(!uid){uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);localStorage.setItem('rt_uid',uid);}
+  let uid=null;
+  // localStorage から取得
+  try{ uid=localStorage.getItem('rt_uid'); }catch(e){}
+  // cookie からフォールバック
+  if(!uid){
+    const m=document.cookie.match(/(?:^|;\s*)rt_uid=([^;]+)/);
+    if(m) uid=m[1];
+  }
+  // 新規生成
+  if(!uid){
+    uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  }
+  // 両方に保存（cookie は1年間有効）
+  try{ localStorage.setItem('rt_uid',uid); }catch(e){}
+  document.cookie='rt_uid='+uid+';max-age=31536000;path=/;SameSite=Lax';
   return uid;
 }
 
