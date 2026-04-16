@@ -30,7 +30,7 @@ INTERVAL = 1.0                         # 測定間隔（秒）
 
 # GPIB接続の場合: "GPIB0::24::INSTR" (アドレス24が一般的)
 # USB接続の場合: 自動検出を試みる
-DMM_ADDRESS = "GPIB0::24::INSTR"
+DMM_ADDRESS = "ASRL/dev/cu.usbserial-AO006ZV3::INSTR"
 
 
 # ===== Firebase REST API =====
@@ -125,37 +125,57 @@ def connect_keithley():
         print("Keithley 2400 が見つかりません")
         return None
 
-    smu.timeout = 10000
-    smu.write_termination = '\n'
-    smu.read_termination = '\n'
+    smu.timeout = 30000  # RS-232は遅いので30秒に
+    smu.write_termination = '\r'   # Keithley 2400 RS-232はCR終端
+    smu.read_termination = '\r'
+    # RS-232設定（Keithley 2400のデフォルト: 9600baud, 8bit, 1stop, no parity）
+    smu.baud_rate = 9600
+    smu.data_bits = 8
+    smu.stop_bits = pyvisa.constants.StopBits.one
+    smu.parity = pyvisa.constants.Parity.none
+    smu.flow_control = pyvisa.constants.VI_ASRL_FLOW_NONE
+
+    # 入力バッファクリア
+    try:
+        smu.read_bytes(smu.bytes_in_buffer) if smu.bytes_in_buffer > 0 else None
+    except:
+        pass
 
     # 機器ID
     idn = smu.query("*IDN?").strip()
     print(f"接続成功: {idn}")
 
     # ===== Keithley 2400 初期設定 =====
-    smu.write("*RST")                          # リセット
-    time.sleep(0.5)
-    smu.write(":SYST:BEEP:STAT OFF")           # ビープ音オフ
-    smu.write(":SENS:FUNC:CONC ON")            # 電圧・電流の同時測定ON
-    smu.write(":SENS:FUNC 'VOLT:DC','CURR:DC'")# 電圧と電流を測定
-    smu.write(":FORM:ELEM VOLT,CURR")          # 読み取りデータに電圧と電流を含める
+    print("初期設定中...")
+    smu.write("*RST")
+    time.sleep(2)  # RST後は2秒待つ
 
-    # ソース設定（電流源モード・0A出力 = 単純な測定のみ）
-    # ※ 既に外部から電流を流している場合はソースをOFFにする
-    # smu.write(":SOUR:FUNC CURR")
-    # smu.write(":SOUR:CURR 0")
-    # smu.write(":OUTP ON")
+    smu.write(":SYST:BEEP:STAT OFF"); time.sleep(0.2)
+    smu.write(":SENS:FUNC:CONC ON"); time.sleep(0.2)
+    smu.write(":SENS:FUNC 'VOLT:DC','CURR:DC'"); time.sleep(0.2)
+    smu.write(":FORM:ELEM VOLT,CURR"); time.sleep(0.2)
+
+    # ソース設定（電流源モード・0A出力 → OUTPUT ONで測定可能にする）
+    smu.write(":SOUR:FUNC CURR"); time.sleep(0.2)
+    smu.write(":SOUR:CURR:RANG MIN"); time.sleep(0.2)
+    smu.write(":SOUR:CURR 0"); time.sleep(0.2)
+    smu.write(":OUTP ON"); time.sleep(1)
 
     print("初期設定完了")
     print("  モード: 電圧・電流 同時測定")
-    print("  ※ 出力(OUTPUT)は手動で制御してください")
+    print("  ソース: 0A（測定のみ）")
+    print("  OUTPUT: ON")
     return smu
 
 
 def read_keithley(smu):
     """Keithley 2400 から電圧・電流を読み取る"""
-    result = smu.query(":READ?")
+    # :READ? がタイムアウトする場合は :MEAS? を試す
+    try:
+        result = smu.query(":READ?")
+    except Exception:
+        time.sleep(0.5)
+        result = smu.query(":MEAS?")
     vals = result.strip().split(',')
     voltage = float(vals[0])
     current = float(vals[1])
@@ -283,7 +303,7 @@ def main():
     # クリーンアップ
     if smu:
         try:
-            # smu.write(":OUTP OFF")  # 出力OFF（必要に応じて）
+            smu.write(":OUTP OFF")  # 出力OFF
             smu.close()
             print("Keithley 2400 切断完了")
         except:
