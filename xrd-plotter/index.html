@@ -154,7 +154,7 @@
         <option value="right">右</option>
         <option value="left">左</option>
       </select>
-      <span style="font-size:.72rem;color:#666">λ=1.5406Å (Cu Kα₁)</span>
+      <span style="font-size:.72rem;color:#666">λ=1.5418Å (Cu Kα)</span>
       <button class="btn" onclick="toggleSettings()" id="btnSettings">カスタマイズ &#9881;</button>
     </div>
 
@@ -224,7 +224,7 @@
   <!-- 解析結果パネル -->
   <div class="analysis-panel" id="analysisPanel">
     <h3>ピーク解析結果（層間距離 d・FWHM・Scherrer結晶子サイズ）</h3>
-    <p style="font-size:.72rem;color:#888;margin-bottom:8px">Bragg式: d = λ/2sinθ &nbsp;|&nbsp; λ = 1.5406 Å (Cu Kα₁) &nbsp;|&nbsp; Scherrer: L = Kλ/(β cosθ), K = 0.9</p>
+    <p style="font-size:.72rem;color:#888;margin-bottom:8px">Bragg式: d = λ/2sinθ &nbsp;|&nbsp; λ = 1.5418 Å (Cu Kα) &nbsp;|&nbsp; Scherrer: L = Kλ/(β cosθ), K = 0.9</p>
     <div id="analysisTables"></div>
   </div>
 
@@ -842,7 +842,7 @@ function analyzePeaks(){
     alert('先にピーク検出を行い、必要に応じてピークを同定（ラベル付け）してください');
     return;
   }
-  const lambda=1.5406;
+  const lambda=1.5418;
   const K=0.9; // Scherrer定数
 
   // FWHM再計算
@@ -899,7 +899,7 @@ function analyzePeaks(){
 function refreshPeakTables(){
   const tablesEl=document.getElementById('peakTables');
   tablesEl.innerHTML='';
-  const lambda=1.5406;
+  const lambda=1.5418;
 
   fileList.forEach((f, fi)=>{
     if(!f.peaks||f.peaks.length===0) return;
@@ -1014,7 +1014,7 @@ async function exportXLSX(){
   if(fileList.length===0){alert('データを先に読み込んでください');return;}
   const canvas=document.getElementById('xrdCanvas');
   const firstName=fileList[0].label;
-  const lambda=1.5406;
+  const lambda=1.5418;
 
   const wb=new ExcelJS.Workbook();
 
