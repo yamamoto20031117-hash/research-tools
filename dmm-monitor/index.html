@@ -206,6 +206,18 @@
           <option value="3600">時間</option>
         </select>
       </div>
+      <div class="control-field">
+        <label>測定間隔</label>
+        <select id="measureInterval" onchange="setInterval2()">
+          <option value="0.1">0.1秒</option>
+          <option value="0.2">0.2秒</option>
+          <option value="0.5">0.5秒</option>
+          <option value="1" selected>1秒</option>
+          <option value="2">2秒</option>
+          <option value="5">5秒</option>
+          <option value="10">10秒</option>
+        </select>
+      </div>
       <div class="control-field" style="flex:1 1 auto">
         <label>&nbsp;</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -655,6 +667,12 @@ function updateModeUnits(){
     compUnit.innerHTML='<option value="1" selected>A</option><option value="0.001">mA</option><option value="0.000001">μA</option>';
   }
   redrawChart(); // グラフもモードに合わせて切替
+}
+
+// ===== 測定間隔変更 =====
+function setInterval2(){
+  const val=parseFloat(document.getElementById('measureInterval').value)||1;
+  sendCommand('SET_INTERVAL',{interval:val});
 }
 
 // ===== 機器制御 =====

@@ -26,7 +26,8 @@ import urllib.error
 FIREBASE_URL = "https://research-tools-board-default-rtdb.firebaseio.com"
 FIREBASE_PATH_LIVE = "dmm/live"       # リアルタイム値（最新1件を上書き）
 FIREBASE_PATH_LOG = "dmm/log"         # ログ（追記）
-INTERVAL = 1.0                         # 測定間隔（秒）
+INTERVAL = 1.0                         # 測定間隔（秒）デフォルト値
+interval = INTERVAL                    # 実行時の間隔（Webから変更可能）
 
 # GPIB接続の場合: "GPIB0::24::INSTR" (アドレス24が一般的)
 # USB接続の場合: 自動検出を試みる
@@ -216,6 +217,14 @@ def check_command(smu):
                 print(f"  OUTPUT 確認エラー: {e}")
         update_output_status(True)
         return "ON"
+
+    elif action == "SET_INTERVAL":
+        global interval
+        new_interval = float(cmd.get("interval", 1.0))
+        new_interval = max(0.1, min(new_interval, 60.0))  # 0.1秒〜60秒
+        interval = new_interval
+        print(f"\n  *** Web からの指令: 測定間隔変更 → {interval} 秒 ***")
+        return None
 
     elif action == "SOURCE_START":
         mode = cmd.get("mode", "CURR")       # "CURR" or "VOLT"
@@ -495,7 +504,7 @@ def main():
 
             # OUTPUT OFF の間は測定スキップ（:READ? がハングするのを防ぐ）
             if not output_on:
-                time.sleep(INTERVAL)
+                time.sleep(interval)
                 continue
 
             # 測定（OUTPUT ON 時のみ）
@@ -545,7 +554,7 @@ def main():
                     except:
                         pass
 
-        time.sleep(INTERVAL)
+        time.sleep(interval)
 
     # クリーンアップ
     if smu:
