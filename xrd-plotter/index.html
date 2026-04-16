@@ -224,7 +224,7 @@
   <!-- 解析結果パネル -->
   <div class="analysis-panel" id="analysisPanel">
     <h3>ピーク解析結果（層間距離 d・FWHM・Scherrer結晶子サイズ）</h3>
-    <p style="font-size:.72rem;color:#888;margin-bottom:8px">Bragg式: d = λ/2sinθ &nbsp;|&nbsp; λ = 1.5418 Å (Cu Kα) &nbsp;|&nbsp; Scherrer: L = Kλ/(β cosθ), K = 0.9</p>
+    <p style="font-size:.72rem;color:#888;margin-bottom:8px">Bragg式: 2d sinθ = nλ → d = nλ/2sinθ &nbsp;|&nbsp; λ = 1.5418 Å (Cu Kα) &nbsp;|&nbsp; Scherrer: L = Kλ/(β cosθ), K = 0.9</p>
     <div id="analysisTables"></div>
   </div>
 
@@ -640,6 +640,25 @@ function drawAxisLabel(ctx, text, cx, cy, fontSize, fontFam, color, isBold){
   ctx.fillText(unitPart, startX+qw, cy);
 }
 
+// ===== ラベルから回折次数nを抽出 =====
+// (001)→1, (002)→2, (003)→3, (00 10)→10 等
+function extractDiffOrder(label){
+  if(!label) return null;
+  const m=label.match(/\(\s*0+\s*(\d+)\s*\)/);
+  return m?parseInt(m[1],10):null;
+}
+// 層間距離計算: d = nλ/(2sinθ)
+function calcDspacing(twoTheta, label){
+  const lambda=1.5418;
+  const thetaRad=twoTheta*Math.PI/360;
+  const n=extractDiffOrder(label);
+  if(n && n>0){
+    return n*lambda/(2*Math.sin(thetaRad));
+  }
+  // ラベルなし or 非(00l)系: 通常のBragg式
+  return lambda/(2*Math.sin(thetaRad));
+}
+
 // ===== ピーク注釈描画（ラベル+FWHM統合） =====
 function drawPeakAnnotation(ctx, pk, peakPx, peakPy, color, fi, pi, showLabel, showFWHM, fontSize, fontFam, transparent, xPx){
   const hasLabel=showLabel&&pk.label;
@@ -688,18 +707,9 @@ function drawPeakAnnotation(ctx, pk, peakPx, peakPy, color, fi, pi, showLabel, s
   }
   const boxY=anchorY-boxH+4;
 
-  // 引き出し線
-  ctx.strokeStyle=color; ctx.lineWidth=0.8; ctx.setLineDash([3,2]);
-  const lineTargetX=boxX+(textAlign==='left'&&labelPosMode==='right'?0:textAlign==='left'?boxW:boxW/2);
-  const lineTargetY=boxY+boxH;
-  ctx.beginPath(); ctx.moveTo(peakPx,peakPy); ctx.lineTo(lineTargetX,lineTargetY); ctx.stroke();
-  ctx.setLineDash([]);
-
-  // ボックス背景
-  ctx.fillStyle=transparent?'rgba(255,255,255,0.92)':bg+'ee';
-  ctx.strokeStyle='rgba(0,0,0,0.12)'; ctx.lineWidth=0.5;
+  // ボックス背景（枠線なし）
+  ctx.fillStyle=transparent?'rgba(255,255,255,0.85)':bg+'dd';
   ctx.fillRect(boxX,boxY,boxW,boxH);
-  ctx.strokeRect(boxX,boxY,boxW,boxH);
 
   // テキスト描画
   let curY=boxY+4;
@@ -867,18 +877,19 @@ function analyzePeaks(){
 
     f.peaks.forEach((p,pi)=>{
       const thetaRad=p.x*Math.PI/360; // θ in radians
-      const d=lambda/(2*Math.sin(thetaRad));
+      const d=calcDspacing(p.x, p.label);
       const fwhmDeg=p.fwhm||0;
       const fwhmRad=fwhmDeg*Math.PI/180;
       // Scherrer式: L = Kλ / (β cosθ)
       let corrLen=0;
       if(fwhmRad>0) corrLen=(K*lambda)/(fwhmRad*Math.cos(thetaRad))/10; // Å→nm
+      const n=extractDiffOrder(p.label);
 
       html+=`<tr>
         <td>${pi+1}</td>
         <td class="num">${p.x.toFixed(3)}</td>
         <td class="num">${p.y.toFixed(1)}</td>
-        <td class="num" style="font-weight:bold;color:#58a6ff">${d.toFixed(4)}</td>
+        <td class="num" style="font-weight:bold;color:#58a6ff">${d.toFixed(4)}${n?' (n='+n+')':''}</td>
         <td class="num">${fwhmDeg?fwhmDeg.toFixed(4):'—'}</td>
         <td class="num">${fwhmRad>0?fwhmRad.toFixed(6):'—'}</td>
         <td class="num" style="font-weight:bold;color:#ff8c00">${corrLen>0?corrLen.toFixed(2):'—'}</td>
@@ -906,10 +917,10 @@ function refreshPeakTables(){
     let html=`<h4 style="color:${f.color};margin:12px 0 6px">${f.label} (${f.peaks.length}ピーク)</h4>`;
     html+=`<table><thead><tr><th>#</th><th>2θ (°)</th><th>強度</th><th>d (Å)</th><th>FWHM (°)</th><th>ラベル</th><th></th></tr></thead><tbody>`;
     f.peaks.forEach((p,pi)=>{
-      const theta=p.x*Math.PI/360;
-      const d=lambda/(2*Math.sin(theta));
+      const d=calcDspacing(p.x, p.label);
+      const n=extractDiffOrder(p.label);
       html+=`<tr><td>${pi+1}</td><td>${p.x.toFixed(3)}</td><td>${p.y.toFixed(1)}</td>`;
-      html+=`<td style="color:#58a6ff">${d.toFixed(4)}</td>`;
+      html+=`<td style="color:#58a6ff">${d.toFixed(4)}${n?' (n='+n+')':''}</td>`;
       html+=`<td>${p.fwhm?p.fwhm.toFixed(4):'—'}</td>`;
       html+=`<td><input type="text" value="${p.label}" placeholder="(001)等" style="width:70px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;color:#ddd;padding:2px 4px;font-size:.72rem" onchange="updatePeakLabel(${fi},${pi},this.value)"></td>`;
       html+=`<td><button class="btn" style="padding:1px 6px;font-size:.65rem;color:#f66;border-color:#f66" onclick="deletePeak(${fi},${pi})" title="削除">&times;</button></td></tr>`;
@@ -1052,7 +1063,7 @@ async function exportXLSX(){
       if(!f.peaks) continue;
       f.peaks.forEach((p,i)=>{
         const thetaRad=p.x*Math.PI/360;
-        const d=lambda/(2*Math.sin(thetaRad));
+        const d=calcDspacing(p.x, p.label);
         const fwhmRad=(p.fwhm||0)*Math.PI/180;
         const corrLen=fwhmRad>0?(0.9*lambda)/(fwhmRad*Math.cos(thetaRad))/10:0;
         wsP.addRow({ds:f.label,n:i+1,x:p.x,y:p.y,d:d,fw:p.fwhm||'',fwr:fwhmRad||'',l:corrLen||'',lb:p.label||''});
