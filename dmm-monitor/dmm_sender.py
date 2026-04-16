@@ -393,6 +393,11 @@ def read_keithley(smu):
     vals = result.strip().split(',')
     voltage = float(vals[0])
     current = float(vals[1])
+    # Keithley オーバーフロー値 (9.91E+37) をフィルタ
+    if abs(voltage) > 1e6:
+        voltage = 0.0
+    if abs(current) > 1e6:
+        current = 0.0
     return voltage, current
 
 

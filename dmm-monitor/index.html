@@ -145,13 +145,13 @@
 <div class="current-values">
   <div class="val-card voltage">
     <div class="label">電圧 (Voltage)</div>
-    <div><span class="value" id="curVoltage">---</span><span class="unit">V</span></div>
+    <div><span class="value" id="curVoltage">---</span><span class="unit" id="curVoltageUnit">V</span></div>
     <div class="minmax"><span id="vMin">Min: ---</span><span id="vMax">Max: ---</span></div>
     <div class="sub" id="vTime">最終更新: ---</div>
   </div>
   <div class="val-card current">
     <div class="label">電流 (Current)</div>
-    <div><span class="value" id="curCurrent">---</span><span class="unit">A</span></div>
+    <div><span class="value" id="curCurrent">---</span><span class="unit" id="curCurrentUnit">A</span></div>
     <div class="minmax"><span id="iMin">Min: ---</span><span id="iMax">Max: ---</span></div>
     <div class="sub" id="iTime">最終更新: ---</div>
   </div>
@@ -356,10 +356,14 @@ function startListening(){
 
 function onNewData(d){
   const now=d.time||Date.now();
-  const v=parseFloat(d.voltage)||0;
-  const i=parseFloat(d.current)||0;
+  let v=parseFloat(d.voltage)||0;
+  let i=parseFloat(d.current)||0;
   if(now<=lastUpdate) return;
   lastUpdate=now;
+
+  // Keithley オーバーフロー値 (9.91E+37) をフィルタ
+  if(Math.abs(v)>1e6) v=0;
+  if(Math.abs(i)>1e6) i=0;
 
   dataLog.push({time:now, voltage:v, current:i});
   if(dataLog.length>10000) dataLog=dataLog.slice(-8000);
@@ -370,8 +374,12 @@ function onNewData(d){
 }
 
 function updateCurrentValues(v, i, time){
-  document.getElementById('curVoltage').textContent=formatValue(v, 'V');
-  document.getElementById('curCurrent').textContent=formatValue(i, 'A');
+  const vu=getAutoUnit(v,'V');
+  const iu=getAutoUnit(i,'A');
+  document.getElementById('curVoltage').textContent=(v*vu.scale).toFixed(4);
+  document.getElementById('curVoltageUnit').textContent=vu.prefix+'V';
+  document.getElementById('curCurrent').textContent=(i*iu.scale).toFixed(4);
+  document.getElementById('curCurrentUnit').textContent=iu.prefix+'A';
 
   const t=new Date(time);
   const ts=t.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
