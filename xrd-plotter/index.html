@@ -372,13 +372,15 @@ function removeFile(idx){
 function normalizeOverlay(){
   if(fileList.length===0) return;
   document.getElementById('displayMode').value='overlay';
-  // 各データセットの最大Y値を取得
-  const maxVals=fileList.map(f=>Math.max(...f.y));
-  const globalMax=Math.max(...maxVals);
+  // 各データセットの検出ピーク中の最大強度を取得
+  const maxPeakVals=fileList.map(f=>{
+    if(!f.peaks||f.peaks.length===0) return Math.max(...f.y); // ピーク未検出ならデータ全体の最大値
+    return Math.max(...f.peaks.map(p=>p.y));
+  });
+  const globalMax=Math.max(...maxPeakVals);
   if(globalMax<=0) return;
-  // 最大ピークに合わせてスケールを設定
   fileList.forEach((f,i)=>{
-    f.yScale=maxVals[i]>0?globalMax/maxVals[i]:1;
+    f.yScale=maxPeakVals[i]>0?globalMax/maxPeakVals[i]:1;
     f.yOffset=0;
   });
   updateMultiList();
