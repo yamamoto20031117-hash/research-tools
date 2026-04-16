@@ -63,6 +63,56 @@ def firebase_push(path, data):
         return False
 
 
+def firebase_get(path):
+    """Firebase から GET"""
+    url = f"{FIREBASE_URL}/{path}.json"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            return json.loads(resp.read().decode('utf-8'))
+    except:
+        return None
+
+def firebase_delete(path):
+    """Firebase から DELETE"""
+    url = f"{FIREBASE_URL}/{path}.json"
+    req = urllib.request.Request(url, method='DELETE')
+    try:
+        urllib.request.urlopen(req, timeout=5)
+    except:
+        pass
+
+def update_output_status(on):
+    """OUTPUT状態をFirebaseに送信（ダッシュボードで監視）"""
+    firebase_put("dmm/status", {"output": on, "time": int(time.time()*1000)})
+
+def check_command(smu):
+    """Firebaseからコマンドを取得して実行"""
+    cmd = firebase_get("dmm/command")
+    if not cmd or not cmd.get("action"):
+        return None
+
+    action = cmd["action"]
+    firebase_delete("dmm/command")  # コマンド消費
+
+    if action == "OUTPUT_OFF":
+        print("\n  *** Web からの指令: OUTPUT OFF ***")
+        if smu:
+            smu.write(":OUTP OFF")
+            time.sleep(0.3)
+        update_output_status(False)
+        return "OFF"
+
+    elif action == "OUTPUT_ON":
+        print("\n  *** Web からの指令: OUTPUT ON ***")
+        if smu:
+            smu.write(":OUTP ON")
+            time.sleep(0.3)
+        update_output_status(True)
+        return "ON"
+
+    return None
+
+
 # ===== Keithley 2400 接続・初期化 =====
 def list_visa_resources():
     """接続可能なVISAデバイス一覧を表示"""
@@ -165,6 +215,7 @@ def connect_keithley():
     print("  モード: 電圧・電流 同時測定")
     print("  ソース: 0A（測定のみ）")
     print("  OUTPUT: ON")
+    update_output_status(True)
     return smu
 
 
@@ -240,9 +291,17 @@ def main():
 
     count = 0
     errors = 0
+    output_on = True  # OUTPUT状態トラッキング
 
     while running:
         try:
+            # Webダッシュボードからのコマンドをチェック
+            cmd_result = check_command(smu)
+            if cmd_result == "OFF":
+                output_on = False
+            elif cmd_result == "ON":
+                output_on = True
+
             # 測定
             if mode == "live" and smu:
                 voltage, current = read_keithley(smu)

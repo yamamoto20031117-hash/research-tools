@@ -76,6 +76,22 @@
   .setting-row input,.setting-row select{flex:1;background:#0e1220;border:1px solid #2a3040;border-radius:4px;
     color:#ddd;padding:4px 8px;font-size:.78rem}
 
+  /* 緊急停止・制御ボタン */
+  .control-bar{display:flex;gap:12px;padding:0 24px 16px;flex-wrap:wrap;align-items:center}
+  .btn-stop{padding:10px 28px;background:#dc2626;color:#fff;border:2px solid #ef4444;border-radius:8px;
+    font-size:1rem;font-weight:bold;cursor:pointer;transition:.15s;letter-spacing:0.05em}
+  .btn-stop:hover{background:#b91c1c;box-shadow:0 0 16px rgba(239,68,68,0.4)}
+  .btn-stop:active{transform:scale(0.97)}
+  .btn-stop.disabled{background:#555;border-color:#666;color:#999;cursor:not-allowed;box-shadow:none}
+  .btn-output{padding:8px 20px;border-radius:6px;font-size:.85rem;font-weight:bold;cursor:pointer;transition:.15s;border:2px solid}
+  .btn-output.on{background:rgba(34,197,94,0.15);color:#22c55e;border-color:#22c55e}
+  .btn-output.on:hover{background:rgba(34,197,94,0.25)}
+  .btn-output.off{background:rgba(239,68,68,0.15);color:#ef4444;border-color:#ef4444}
+  .output-status{font-size:.8rem;color:#888;display:flex;align-items:center;gap:6px}
+  .output-status .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .output-status .dot.on{background:#22c55e}
+  .output-status .dot.off{background:#ef4444}
+
   footer{padding:16px 24px;color:#444;font-size:.7rem;text-align:center;border-top:1px solid rgba(255,255,255,0.04)}
 </style>
 </head>
@@ -92,6 +108,16 @@
     <button class="chart-controls" style="padding:4px 12px;background:rgba(88,166,255,0.15);color:#58a6ff;border:1px solid rgba(88,166,255,0.3);border-radius:4px;font-size:.75rem;cursor:pointer" onclick="toggleSettings()">&#9881; 設定</button>
   </div>
 </header>
+
+<!-- 制御バー -->
+<div class="control-bar">
+  <button class="btn-stop" id="btnEmergencyStop" onclick="emergencyStop()">&#9888; 緊急停止 (OUTPUT OFF)</button>
+  <button class="btn-output on" id="btnOutputToggle" onclick="toggleOutput()">OUTPUT ON</button>
+  <div class="output-status">
+    <span class="dot on" id="outputDot"></span>
+    <span id="outputStatusText">OUTPUT: 確認中...</span>
+  </div>
+</div>
 
 <!-- 現在値 -->
 <div class="current-values">
@@ -549,6 +575,61 @@ function exportCSV(){
   a.click();URL.revokeObjectURL(url);
 }
 
+// ===== 機器制御（Firebase経由でPythonスクリプトにコマンド送信） =====
+let outputState=true; // 現在のOUTPUT状態
+
+function sendCommand(cmd){
+  if(!firebaseReady) return;
+  db.ref('dmm/command').set({
+    action: cmd,
+    time: Date.now(),
+    from: 'web'
+  });
+}
+
+function emergencyStop(){
+  if(!confirm('OUTPUT を OFF にします。電流が停止します。よろしいですか？')) return;
+  sendCommand('OUTPUT_OFF');
+  setOutputUI(false);
+}
+
+function toggleOutput(){
+  if(outputState){
+    if(!confirm('OUTPUT を OFF にしますか？')) return;
+    sendCommand('OUTPUT_OFF');
+    setOutputUI(false);
+  } else {
+    if(!confirm('OUTPUT を ON にしますか？電流が流れます。')) return;
+    sendCommand('OUTPUT_ON');
+    setOutputUI(true);
+  }
+}
+
+function setOutputUI(on){
+  outputState=on;
+  const btn=document.getElementById('btnOutputToggle');
+  const dot=document.getElementById('outputDot');
+  const txt=document.getElementById('outputStatusText');
+  if(on){
+    btn.className='btn-output on'; btn.textContent='OUTPUT ON';
+    dot.className='dot on'; txt.textContent='OUTPUT: ON';
+  } else {
+    btn.className='btn-output off'; btn.textContent='OUTPUT OFF';
+    dot.className='dot off'; txt.textContent='OUTPUT: OFF';
+  }
+}
+
+// OUTPUT状態の監視
+function watchOutputState(){
+  if(!firebaseReady) return;
+  db.ref('dmm/status').on('value',snap=>{
+    const d=snap.val();
+    if(d && d.output!==undefined){
+      setOutputUI(d.output);
+    }
+  });
+}
+
 // ===== デモモード（Firebaseからデータが来ない場合のテスト用） =====
 let demoInterval=null;
 function startDemo(){
@@ -571,6 +652,7 @@ function stopDemo(){
 // ===== 初期化 =====
 window.addEventListener('load',()=>{
   startListening();
+  watchOutputState();
   redrawChart();
 
   // ステータスチェック: 10秒以上データが来なければstaleに
