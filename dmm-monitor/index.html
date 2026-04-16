@@ -202,9 +202,6 @@
 <!-- グラフ -->
 <div class="chart-section">
   <div class="chart-controls">
-    <label>表示:</label>
-    <button id="btnV" class="active" onclick="toggleCh('V')">電圧</button>
-    <button id="btnI" class="active" onclick="toggleCh('I')">電流</button>
     <label>時間幅:</label>
     <select id="timeRange" onchange="redrawChart()">
       <option value="60">1分</option>
@@ -217,8 +214,13 @@
     <button onclick="clearData()">データクリア</button>
     <button onclick="exportCSV()">CSV出力</button>
   </div>
+  <div class="chart-wrap" style="margin-bottom:12px">
+    <div style="padding:6px 12px 0;font-size:.75rem;color:#58a6ff;font-weight:600">Voltage</div>
+    <canvas id="chartVoltage" height="220"></canvas>
+  </div>
   <div class="chart-wrap">
-    <canvas id="chartCanvas" height="350"></canvas>
+    <div style="padding:6px 12px 0;font-size:.75rem;color:#f97316;font-weight:600">Current</div>
+    <canvas id="chartCurrent" height="220"></canvas>
   </div>
 </div>
 
@@ -278,7 +280,6 @@ try{
 
 // ===== 状態 =====
 let dataLog=[];
-let showV=true, showI=true;
 let vMin=Infinity, vMax=-Infinity, iMin=Infinity, iMax=-Infinity;
 let lastUpdate=0;
 let listener=null;
@@ -411,114 +412,101 @@ function updateStats(){
 }
 
 // ===== グラフ描画 =====
-function redrawChart(){
-  const canvas=document.getElementById('chartCanvas');
+function drawSingleChart(canvasId, data, key, color, unitBase){
+  const canvas=document.getElementById(canvasId);
   const dpr=window.devicePixelRatio||1;
   const w=canvas.parentElement.clientWidth;
-  const h=parseInt(document.getElementById('chartH').value)||350;
+  const h=220;
   canvas.width=w*dpr;canvas.height=h*dpr;
   canvas.style.height=h+'px';
   const ctx=canvas.getContext('2d');
   ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,w,h);
 
-  if(dataLog.length<2){
-    ctx.fillStyle='#555';ctx.font='14px sans-serif';ctx.textAlign='center';
+  if(data.length<2){
+    ctx.fillStyle='#555';ctx.font='13px sans-serif';ctx.textAlign='center';
     ctx.fillText('データ待機中...',w/2,h/2);
     return;
   }
 
-  const margin={top:20,right:70,bottom:40,left:70};
+  const margin={top:12,right:16,bottom:32,left:60};
   const pw=w-margin.left-margin.right;
   const ph=h-margin.top-margin.bottom;
 
-  const rangeSec=parseInt(document.getElementById('timeRange').value)||600;
-  const now=dataLog[dataLog.length-1].time;
-  const tMin=rangeSec>0?now-rangeSec*1000:dataLog[0].time;
-  const tMax=now;
-  const filtered=dataLog.filter(d=>d.time>=tMin);
-  if(filtered.length<2) return;
-
-  const xPx=t=>margin.left+((t-tMin)/(tMax-tMin))*pw;
-
-  let vyMin=Infinity,vyMax=-Infinity,iyMin=Infinity,iyMax=-Infinity;
-  for(const d of filtered){
-    if(showV){if(d.voltage<vyMin)vyMin=d.voltage;if(d.voltage>vyMax)vyMax=d.voltage;}
-    if(showI){if(d.current<iyMin)iyMin=d.current;if(d.current>iyMax)iyMax=d.current;}
+  // Y軸範囲
+  let yMin=Infinity, yMax=-Infinity;
+  for(const d of data){
+    const v=d[key];
+    if(v<yMin) yMin=v;
+    if(v>yMax) yMax=v;
   }
-  const vPad=(vyMax-vyMin)*0.1||0.1;
-  vyMin-=vPad;vyMax+=vPad;
-  const iPad=(iyMax-iyMin)*0.1||0.001;
-  iyMin-=iPad;iyMax+=iPad;
+  const pad=(yMax-yMin)*0.1||(unitBase==='A'?0.001:0.1);
+  yMin-=pad; yMax+=pad;
 
-  const vPx=v=>margin.top+ph-((v-vyMin)/(vyMax-vyMin))*ph;
-  const iPxFn=i=>margin.top+ph-((i-iyMin)/(iyMax-iyMin))*ph;
+  // 時間範囲
+  const tMin=data[0].time, tMax=data[data.length-1].time;
+  const xPx=t=>margin.left+((t-tMin)/(tMax-tMin||1))*pw;
+  const yPx=v=>margin.top+ph-((v-yMin)/(yMax-yMin||1))*ph;
 
+  // グリッド
   ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.5;
-  for(let j=0;j<=5;j++){
-    const y=margin.top+ph*j/5;
+  for(let j=0;j<=4;j++){
+    const y=margin.top+ph*j/4;
     ctx.beginPath();ctx.moveTo(margin.left,y);ctx.lineTo(w-margin.right,y);ctx.stroke();
   }
 
-  ctx.fillStyle='#666';ctx.font='11px sans-serif';ctx.textAlign='center';
-  const timeSpan=tMax-tMin;
-  const tickCount=Math.min(8, Math.floor(pw/80));
+  // Y軸ラベル
+  const au=getAutoUnit(Math.max(Math.abs(yMin),Math.abs(yMax)), unitBase);
+  ctx.fillStyle=color;ctx.font='10px sans-serif';ctx.textAlign='right';
+  for(let j=0;j<=4;j++){
+    const val=yMin+(yMax-yMin)*j/4;
+    ctx.fillText((val*au.scale).toFixed(3),margin.left-6,margin.top+ph-ph*j/4+3);
+  }
+  // Y軸単位
+  ctx.save();ctx.translate(12,margin.top+ph/2);ctx.rotate(-Math.PI/2);
+  ctx.fillStyle=color;ctx.textAlign='center';ctx.font='11px sans-serif';
+  ctx.fillText(au.prefix+unitBase,0,0);ctx.restore();
+
+  // X軸ラベル
+  ctx.fillStyle='#666';ctx.font='10px sans-serif';ctx.textAlign='center';
+  const tickCount=Math.min(6,Math.floor(pw/90));
   for(let j=0;j<=tickCount;j++){
-    const t=tMin+timeSpan*j/tickCount;
+    const t=tMin+(tMax-tMin)*j/tickCount;
     const d=new Date(t);
     const label=d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    const x=xPx(t);
-    ctx.fillText(label,x,h-margin.bottom+16);
+    ctx.fillText(label,xPx(t),h-margin.bottom+14);
     ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.beginPath();
-    ctx.moveTo(x,margin.top);ctx.lineTo(x,h-margin.bottom);ctx.stroke();
+    ctx.moveTo(xPx(t),margin.top);ctx.lineTo(xPx(t),h-margin.bottom);ctx.stroke();
   }
 
-  if(showV){
-    const vu=getAutoUnit(vyMax,'V');
-    ctx.fillStyle='#58a6ff';ctx.font='11px sans-serif';ctx.textAlign='right';
-    for(let j=0;j<=5;j++){
-      const val=vyMin+(vyMax-vyMin)*j/5;
-      ctx.fillText((val*vu.scale).toFixed(2),margin.left-6,margin.top+ph-ph*j/5+4);
-    }
-    ctx.save();ctx.translate(14,margin.top+ph/2);ctx.rotate(-Math.PI/2);
-    ctx.fillStyle='#58a6ff';ctx.textAlign='center';ctx.font='12px sans-serif';
-    ctx.fillText('Voltage / '+vu.prefix+'V',0,0);ctx.restore();
+  // データ線
+  ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.beginPath();
+  let started=false;
+  for(const d of data){
+    const x=xPx(d.time), y=yPx(d[key]);
+    if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
   }
+  ctx.stroke();
 
-  if(showI){
-    const iu=getAutoUnit(iyMax,'A');
-    ctx.fillStyle='#f97316';ctx.font='11px sans-serif';ctx.textAlign='left';
-    for(let j=0;j<=5;j++){
-      const val=iyMin+(iyMax-iyMin)*j/5;
-      ctx.fillText((val*iu.scale).toFixed(3),w-margin.right+6,margin.top+ph-ph*j/5+4);
-    }
-    ctx.save();ctx.translate(w-10,margin.top+ph/2);ctx.rotate(Math.PI/2);
-    ctx.fillStyle='#f97316';ctx.textAlign='center';ctx.font='12px sans-serif';
-    ctx.fillText('Current / '+iu.prefix+'A',0,0);ctx.restore();
-  }
-
-  if(showV){
-    ctx.strokeStyle='#58a6ff';ctx.lineWidth=1.5;ctx.beginPath();
-    let started=false;
-    for(const d of filtered){
-      const x=xPx(d.time),y=vPx(d.voltage);
-      if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-  }
-
-  if(showI){
-    ctx.strokeStyle='#f97316';ctx.lineWidth=1.5;ctx.beginPath();
-    let started=false;
-    for(const d of filtered){
-      const x=xPx(d.time),y=iPxFn(d.current);
-      if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-  }
-
+  // 枠
   ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=1;
   ctx.strokeRect(margin.left,margin.top,pw,ph);
+}
+
+function redrawChart(){
+  const rangeSec=parseInt(document.getElementById('timeRange').value)||600;
+  if(dataLog.length<2) {
+    drawSingleChart('chartVoltage',[],'voltage','#58a6ff','V');
+    drawSingleChart('chartCurrent',[],'current','#f97316','A');
+    return;
+  }
+  const now=dataLog[dataLog.length-1].time;
+  const tMin=rangeSec>0?now-rangeSec*1000:dataLog[0].time;
+  const filtered=dataLog.filter(d=>d.time>=tMin);
+  if(filtered.length<2) return;
+
+  drawSingleChart('chartVoltage', filtered, 'voltage', '#58a6ff', 'V');
+  drawSingleChart('chartCurrent', filtered, 'current', '#f97316', 'A');
 }
 
 // ===== ログテーブル =====
@@ -551,14 +539,6 @@ function showAlert(msg){
 }
 
 // ===== UI操作 =====
-function toggleCh(ch){
-  if(ch==='V') showV=!showV;
-  if(ch==='I') showI=!showI;
-  document.getElementById('btnV').classList.toggle('active',showV);
-  document.getElementById('btnI').classList.toggle('active',showI);
-  redrawChart();
-}
-
 function toggleSettings(){
   document.getElementById('settingsPanel').classList.toggle('open');
 }
