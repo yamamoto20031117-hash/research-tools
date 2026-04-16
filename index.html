@@ -248,6 +248,62 @@
   </div>
 </div>
 
+<!-- ===== DMM リアルタイムモニター ===== -->
+<div class="tool-section" data-tool="dmm-monitor">
+  <div class="card">
+    <div class="card-top">
+      <div class="icon">&#9889;</div>
+      <div>
+        <h2>DMM リアルタイムモニター</h2>
+        <p>デジタルマルチメーターの電流・電圧をリアルタイムで監視。ラボPCからPython経由でデータ送信し、ブラウザで誰でも閲覧可能。自動データログ、CSV出力、アラート機能付き。</p>
+        <div class="tags">
+          <span class="tag">Firebase</span><span class="tag">リアルタイム</span><span class="tag">Python連携</span><span class="tag">DMM</span>
+        </div>
+        <a class="launch" href="/dmm-monitor/">モニターを開く &#8594;</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- スレッド板 -->
+  <div class="board" id="board-dmm-monitor">
+    <div class="board-header" onclick="toggleBoard('dmm-monitor')">
+      <h3>&#128172; スレッド板</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="count" id="count-dmm-monitor">0 スレッド</span>
+        <span class="toggle-arrow closed" id="arrow-dmm-monitor">&#9660;</span>
+      </div>
+    </div>
+    <div class="board-body collapsed" id="body-dmm-monitor">
+      <div class="thread-list" id="threads-dmm-monitor"></div>
+      <button class="new-thread-btn" id="ntbtn-dmm-monitor" onclick="showNewThread('dmm-monitor')">+ 新しいスレッドを立てる</button>
+      <div class="new-thread-form" id="newform-dmm-monitor">
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="nt-name-dmm-monitor" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <div class="pf-row"><input type="text" id="nt-title-dmm-monitor" placeholder="スレッドタイトル" maxlength="80"></div>
+          <textarea id="nt-body-dmm-monitor" placeholder="本文を入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button class="cancel-btn" onclick="hideNewThread('dmm-monitor')">キャンセル</button>
+            <button onclick="createThread('dmm-monitor')">スレッドを立てる</button>
+          </div>
+        </div>
+      </div>
+      <div class="thread-view" id="view-dmm-monitor">
+        <span class="tv-back" onclick="backToList('dmm-monitor')">&#8592; スレッド一覧に戻る</span>
+        <div class="tv-title" id="vtitle-dmm-monitor"></div>
+        <div id="replies-dmm-monitor"></div>
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="rp-name-dmm-monitor" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <textarea id="rp-body-dmm-monitor" placeholder="レスを入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button onclick="postReply('dmm-monitor')">書き込む</button>
+          </div>
+        </div>
+      </div>
+      <div class="auto-refresh" id="autorefresh-dmm-monitor"><div class="spinner"></div> リアルタイム更新中</div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== SQUID 磁化データプロッター ===== -->
 <div class="tool-section" data-tool="squid-plotter">
   <div class="card">
@@ -626,6 +682,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadThreads('tmd-viewer');
   loadThreads('xrd-plotter');
   loadThreads('squid-plotter');
+  loadThreads('dmm-monitor');
 });
 </script>
 </body>
