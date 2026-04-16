@@ -31,7 +31,7 @@ interval = INTERVAL                    # 実行時の間隔（Webから変更可
 
 # GPIB接続の場合: "GPIB0::24::INSTR" (アドレス24が一般的)
 # USB接続の場合: 自動検出を試みる
-DMM_ADDRESS = "ASRL/dev/cu.usbserial-AO006ZV3::INSTR"
+DMM_ADDRESS = ""  # 空欄なら自動検出（例: "ASRL3::INSTR", "ASRL/dev/cu.usbserial-XXX::INSTR"）
 
 
 # ===== Firebase REST API =====
@@ -309,32 +309,49 @@ def list_visa_resources():
 
 
 def connect_keithley():
-    """Keithley 2400 に接続"""
+    """Keithley 2400 に接続（自動検出対応）"""
     import pyvisa
     rm = pyvisa.ResourceManager()
     resources = rm.list_resources()
     print(f"検出されたVISAリソース: {resources}")
 
-    # 指定アドレスで接続を試みる
     smu = None
-    try:
-        smu = rm.open_resource(DMM_ADDRESS)
-        print(f"  {DMM_ADDRESS} に接続")
-    except Exception:
-        # 自動検出: Keithley を含むリソースを探す
-        print(f"  {DMM_ADDRESS} に接続できません。自動検出中...")
-        for r in resources:
+
+    # DMM_ADDRESS が指定されていればそれを使う
+    if DMM_ADDRESS:
+        try:
+            smu = rm.open_resource(DMM_ADDRESS)
+            print(f"  {DMM_ADDRESS} に接続")
+        except Exception:
+            print(f"  {DMM_ADDRESS} に接続できません。自動検出に切り替え...")
+
+    # 自動検出: シリアルポート (ASRL) を優先して Keithley を探す
+    if not smu:
+        print("  シリアルポートを自動検出中...")
+        serial_resources = [r for r in resources if r.startswith("ASRL")]
+        for r in serial_resources:
             try:
                 inst = rm.open_resource(r)
-                inst.timeout = 3000
+                inst.timeout = 5000
+                inst.write_termination = '\r'
+                inst.read_termination = '\r'
+                inst.baud_rate = 9600
+                # バッファクリア
+                try:
+                    inst.read_bytes(inst.bytes_in_buffer) if inst.bytes_in_buffer > 0 else None
+                except:
+                    pass
                 idn = inst.query("*IDN?").strip()
                 if "KEITHLEY" in idn.upper() or "2400" in idn:
                     smu = inst
-                    print(f"  Keithley 検出: {r} → {idn}")
+                    print(f"  Keithley 自動検出: {r} → {idn}")
                     break
                 inst.close()
             except:
-                pass
+                try:
+                    inst.close()
+                except:
+                    pass
 
     if not smu:
         print("Keithley 2400 が見つかりません")
