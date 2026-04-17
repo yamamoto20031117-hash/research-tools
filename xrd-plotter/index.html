@@ -117,13 +117,20 @@
   <button class="btn" onclick="exportXLSX()">Excel出力</button>
   <button class="btn btn-primary" onclick="exportPNG()">PNG保存</button>
   <a href="/xrd-plotter/manual.html" class="btn" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px">&#128214; 説明書</a>
+  <button class="btn" id="btnLive" onclick="toggleLiveMode()" style="margin-left:auto">&#128225; ライブ受信: OFF</button>
 </div>
 
 <div class="container">
+  <!-- ライブ受信ステータス -->
+  <div id="liveStatus" style="display:none;padding:10px 16px;margin-bottom:12px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:8px;font-size:.82rem;color:#22c55e;display:none">
+    <span id="liveDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:8px;animation:pulse 2s infinite"></span>
+    <span id="liveText">ライブ受信待機中...</span>
+  </div>
+
   <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-    <h2>XRDデータファイル（TXT）をドロップ</h2>
-    <p>Rigaku SmartLab TXT形式対応（複数ファイル → スタック / 重ね合わせ表示）</p>
-    <input type="file" id="fileInput" multiple accept=".txt,.TXT" style="display:none">
+    <h2>XRDデータファイルをドロップ</h2>
+    <p>Rigaku SmartLab対応（.ras / .asc / .raw / .txt）— 複数ファイル → スタック / 重ね合わせ表示</p>
+    <input type="file" id="fileInput" multiple accept=".txt,.TXT,.ras,.RAS,.asc,.ASC,.raw,.RAW,.xy,.csv" style="display:none">
   </div>
 
   <div class="multi-list" id="multiList"></div>
@@ -253,47 +260,62 @@ dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remov
 fileInput.addEventListener('change',e=>{handleFiles(e.target.files);fileInput.value='';});
 
 function handleFiles(files){
+  const supported=['.txt','.ras','.asc','.raw','.xy','.csv'];
   for(const f of files){
-    if(!f.name.toLowerCase().endsWith('.txt')){alert(f.name+' はTXTファイルではありません');continue;}
+    const ext='.'+f.name.split('.').pop().toLowerCase();
+    if(!supported.includes(ext)){alert(f.name+' は対応していないファイル形式です');continue;}
     readFile(f);
   }
 }
 
 function readFile(file){
+  const ext='.'+file.name.split('.').pop().toLowerCase();
   const encodings=['shift_jis','utf-8','euc-jp','iso-8859-1'];
   let tryIdx=0;
+
+  function addData(data){
+    if(data&&data.x.length>5){
+      const idx=fileList.length;
+      const label=file.name.replace(/\.[^.]+$/,'');
+      fileList.push({name:file.name, label, color:COLORS[idx%COLORS.length], x:data.x, y:data.y, peaks:[], yOffset:0, yScale:1});
+      updateUI();
+      return true;
+    }
+    return false;
+  }
+
   function tryRead(){
     const reader=new FileReader();
     reader.onload=e=>{
-      const data=parseSmartLab(e.target.result);
-      if(data&&data.x.length>10){
-        const idx=fileList.length;
-        const label=file.name.replace(/\.txt$/i,'');
-        fileList.push({name:file.name, label, color:COLORS[idx%COLORS.length], x:data.x, y:data.y, peaks:[], yOffset:0, yScale:1});
-        updateUI();
+      const text=e.target.result;
+      // RASフォーマットを検出
+      let data=null;
+      if(ext==='.ras'||text.includes('*RAS_DATA_START')){
+        data=parseRAS(text);
       } else {
-        tryIdx++;
-        if(tryIdx<encodings.length){ tryRead(); }
-        else {
-          const binReader=new FileReader();
-          binReader.onload=ev=>{
-            const arr=new Uint8Array(ev.target.result);
-            let text='';
-            for(let i=0;i<arr.length;i++){
-              const b=arr[i];
-              if(b===0x09) text+='\t'; else if(b===0x0A) text+='\n'; else if(b===0x0D) continue;
-              else if(b>=0x20&&b<=0x7E) text+=String.fromCharCode(b); else text+=' ';
-            }
-            const data=parseSmartLab(text);
-            if(data&&data.x.length>0){
-              const idx2=fileList.length;
-              const label2=file.name.replace(/\.txt$/i,'');
-              fileList.push({name:file.name, label:label2, color:COLORS[idx2%COLORS.length], x:data.x, y:data.y, peaks:[], yOffset:0, yScale:1});
-              updateUI();
-            } else { alert('データを読み取れませんでした: '+file.name); }
-          };
-          binReader.readAsArrayBuffer(file);
-        }
+        data=parseGenericXRD(text);
+      }
+      if(addData(data)) return;
+
+      tryIdx++;
+      if(tryIdx<encodings.length){ tryRead(); }
+      else {
+        // バイナリとして読み直し
+        const binReader=new FileReader();
+        binReader.onload=ev=>{
+          const arr=new Uint8Array(ev.target.result);
+          let binText='';
+          for(let i=0;i<arr.length;i++){
+            const b=arr[i];
+            if(b===0x09) binText+='\t'; else if(b===0x0A) binText+='\n'; else if(b===0x0D) continue;
+            else if(b>=0x20&&b<=0x7E) binText+=String.fromCharCode(b); else binText+=' ';
+          }
+          let d2=null;
+          if(binText.includes('*RAS_DATA_START')) d2=parseRAS(binText);
+          else d2=parseGenericXRD(binText);
+          if(!addData(d2)) alert('データを読み取れませんでした: '+file.name);
+        };
+        binReader.readAsArrayBuffer(file);
       }
     };
     reader.onerror=()=>{ tryIdx++; if(tryIdx<encodings.length) tryRead(); else alert('読み込み失敗: '+file.name); };
@@ -302,13 +324,61 @@ function readFile(file){
   tryRead();
 }
 
-function parseSmartLab(text){
+// ===== Rigaku .ras ファイルパーサー =====
+function parseRAS(text){
+  const x=[], y=[];
+  const lines=text.split(/\r?\n/);
+  let inData=false;
+  let startAngle=0, stepAngle=0, dataCount=0;
+  let headerMode=''; // 'step' or 'list'
+
+  for(const line of lines){
+    const trimmed=line.trim();
+
+    // ヘッダーからスキャン情報を取得
+    if(trimmed.startsWith('*MEAS_SCAN_START ')){
+      startAngle=parseFloat(trimmed.split(/\s+/)[1])||0;
+    }
+    if(trimmed.startsWith('*MEAS_SCAN_STEP ')){
+      stepAngle=parseFloat(trimmed.split(/\s+/)[1])||0;
+    }
+    if(trimmed.startsWith('*MEAS_DATA_COUNT ')){
+      dataCount=parseInt(trimmed.split(/\s+/)[1])||0;
+    }
+
+    // データセクション
+    if(trimmed==='*RAS_INT_START'){ inData=true; continue; }
+    if(trimmed==='*RAS_INT_END'){ inData=false; continue; }
+
+    if(inData){
+      const parts=trimmed.split(/[\s,]+/).filter(s=>s);
+      if(parts.length>=2){
+        // 2カラム形式: angle intensity
+        const a=parseFloat(parts[0]), b=parseFloat(parts[1]);
+        if(!isNaN(a)&&!isNaN(b)&&a>=0&&a<=180){ x.push(a); y.push(b); }
+      } else if(parts.length===1&&stepAngle>0){
+        // 1カラム形式: intensityのみ（角度はstep計算）
+        const b=parseFloat(parts[0]);
+        if(!isNaN(b)){
+          const angle=startAngle+x.length*stepAngle;
+          x.push(angle); y.push(b);
+        }
+      }
+    }
+  }
+  return {x,y};
+}
+
+// ===== 汎用XRDパーサー（TXT/ASC/RAW/XY/CSV） =====
+function parseGenericXRD(text){
   const lines=text.split(/\r?\n/);
   const x=[], y=[];
   for(const line of lines){
     const trimmed=line.trim();
     if(!trimmed) continue;
-    const parts=trimmed.split(/[\t,]+|\s{2,}/).map(s=>s.trim()).filter(s=>s);
+    // コメント行やヘッダー行をスキップ
+    if(trimmed.startsWith('#')||trimmed.startsWith('*')||trimmed.startsWith(';')) continue;
+    const parts=trimmed.split(/[\t,]+|\s{2,}|\s+/).map(s=>s.trim()).filter(s=>s);
     if(parts.length>=2){
       const a=parseFloat(parts[0]), b=parseFloat(parts[1]);
       if(!isNaN(a)&&!isNaN(b)&&a>=0&&a<=180){x.push(a);y.push(b);}
@@ -1191,6 +1261,89 @@ window.addEventListener('resize',()=>{if(fileList.length>0)redraw();});
   canvas.addEventListener('touchmove', onMove, {passive:false});
   canvas.addEventListener('touchend', onUp);
 })();
+
+// ===== Firebase ライブ受信モード =====
+let fbApp=null, fbDb=null, fbReady=false, liveMode=false, liveListener=null;
+
+function initFirebase(){
+  if(fbReady) return;
+  const script1=document.createElement('script');
+  script1.src='https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js';
+  script1.onload=()=>{
+    const script2=document.createElement('script');
+    script2.src='https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js';
+    script2.onload=()=>{
+      try{
+        firebase.initializeApp({
+          apiKey:"AIzaSyClK3vIE_SQ7SGdXWbmWzZ51MdeBappDKY",
+          authDomain:"research-tools-board.firebaseapp.com",
+          databaseURL:"https://research-tools-board-default-rtdb.firebaseio.com",
+          projectId:"research-tools-board",
+          storageBucket:"research-tools-board.firebasestorage.app",
+          messagingSenderId:"359837086498",
+          appId:"1:359837086498:web:your_app_id"
+        });
+        fbDb=firebase.database();
+        fbReady=true;
+        startLiveListening();
+      }catch(e){console.warn('Firebase init error',e);}
+    };
+    document.head.appendChild(script2);
+  };
+  document.head.appendChild(script1);
+}
+
+function toggleLiveMode(){
+  liveMode=!liveMode;
+  const btn=document.getElementById('btnLive');
+  const status=document.getElementById('liveStatus');
+  if(liveMode){
+    btn.textContent='\u{1F4E1} ライブ受信: ON';
+    btn.style.background='rgba(34,197,94,0.2)';btn.style.color='#22c55e';btn.style.borderColor='#22c55e';
+    status.style.display='block';
+    if(!fbReady) initFirebase();
+    else startLiveListening();
+  } else {
+    btn.textContent='\u{1F4E1} ライブ受信: OFF';
+    btn.style.background='';btn.style.color='';btn.style.borderColor='';
+    status.style.display='none';
+    stopLiveListening();
+  }
+}
+
+function startLiveListening(){
+  if(!fbReady||!liveMode) return;
+  stopLiveListening();
+  document.getElementById('liveText').textContent='ライブ受信待機中...';
+
+  // 新しいXRDデータを監視
+  const ref=fbDb.ref('xrd/data');
+  liveListener=ref.on('child_added',snap=>{
+    const d=snap.val();
+    if(!d||!d.x||!d.y) return;
+    const label=d.name||('Live_'+new Date(d.time||Date.now()).toLocaleTimeString('ja-JP'));
+    // 既に同名のデータがあれば上書き
+    const existing=fileList.findIndex(f=>f.name===d.name);
+    if(existing>=0){
+      fileList[existing].x=d.x;
+      fileList[existing].y=d.y;
+    } else {
+      const idx=fileList.length;
+      fileList.push({name:d.name||'live', label, color:COLORS[idx%COLORS.length], x:d.x, y:d.y, peaks:[], yOffset:0, yScale:1});
+    }
+    updateUI();
+    document.getElementById('liveText').textContent='受信: '+label+' ('+d.x.length+'点) — '+new Date().toLocaleTimeString('ja-JP');
+    // 受信後にFirebaseからデータを削除（一度きり）
+    snap.ref.remove();
+  });
+}
+
+function stopLiveListening(){
+  if(liveListener&&fbDb){
+    fbDb.ref('xrd/data').off('child_added',liveListener);
+    liveListener=null;
+  }
+}
 </script>
 </body>
 </html>
