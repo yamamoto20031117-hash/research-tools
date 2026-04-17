@@ -501,32 +501,64 @@ function redrawChart(){
   const ph=h-margin.top-margin.bottom;
 
   // Y軸範囲
-  let yMin=Infinity, yMax=-Infinity;
+  let yDataMin=Infinity, yDataMax=-Infinity;
   for(const d of filtered){
     const v=d[key];
-    if(v<yMin) yMin=v;
-    if(v>yMax) yMax=v;
+    if(v<yDataMin) yDataMin=v;
+    if(v>yDataMax) yDataMax=v;
   }
-  const pad=(yMax-yMin)*0.1||(unitBase==='A'?0.001:0.1);
-  yMin-=pad; yMax+=pad;
+
+  // キリのいい目盛りを計算（nice tick algorithm）
+  function niceNum(range, round){
+    const exp=Math.floor(Math.log10(range));
+    const frac=range/Math.pow(10,exp);
+    let nice;
+    if(round){
+      if(frac<1.5) nice=1;
+      else if(frac<3) nice=2;
+      else if(frac<7) nice=5;
+      else nice=10;
+    } else {
+      if(frac<=1) nice=1;
+      else if(frac<=2) nice=2;
+      else if(frac<=5) nice=5;
+      else nice=10;
+    }
+    return nice*Math.pow(10,exp);
+  }
+
+  const yRange=yDataMax-yDataMin||((unitBase==='A')?0.001:0.1);
+  const nTicks=5;
+  const tickSpacing=niceNum(yRange/(nTicks-1), true);
+  let yMin=Math.floor(yDataMin/tickSpacing)*tickSpacing;
+  let yMax=Math.ceil(yDataMax/tickSpacing)*tickSpacing;
+  if(yMin===yMax){ yMin-=tickSpacing; yMax+=tickSpacing; }
 
   const tMinF=filtered[0].time, tMaxF=filtered[filtered.length-1].time;
   const xPx=t=>margin.left+((t-tMinF)/(tMaxF-tMinF||1))*pw;
   const yPx=v=>margin.top+ph-((v-yMin)/(yMax-yMin||1))*ph;
 
+  // Y軸の目盛り値を生成
+  const yTicks=[];
+  for(let v=yMin;v<=yMax+tickSpacing*0.001;v+=tickSpacing) yTicks.push(v);
+
   // グリッド
   ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.5;
-  for(let j=0;j<=5;j++){
-    const y=margin.top+ph*j/5;
+  for(const tv of yTicks){
+    const y=yPx(tv);
     ctx.beginPath();ctx.moveTo(margin.left,y);ctx.lineTo(w-margin.right,y);ctx.stroke();
   }
 
   // Y軸ラベル
   const au=getAutoUnit(Math.max(Math.abs(yMin),Math.abs(yMax)), unitBase);
+  const scaledSpacing=tickSpacing*au.scale;
+  const decimals=scaledSpacing>=1?1:scaledSpacing>=0.1?2:scaledSpacing>=0.01?3:4;
   ctx.fillStyle=color;ctx.font='11px sans-serif';ctx.textAlign='right';
-  for(let j=0;j<=5;j++){
-    const val=yMin+(yMax-yMin)*j/5;
-    ctx.fillText((val*au.scale).toFixed(3),margin.left-6,margin.top+ph-ph*j/5+4);
+  for(const tv of yTicks){
+    const y=yPx(tv);
+    if(y>=margin.top-2 && y<=margin.top+ph+2){
+      ctx.fillText((tv*au.scale).toFixed(decimals),margin.left-6,y+4);
+    }
   }
   // Y軸単位
   ctx.save();ctx.translate(14,margin.top+ph/2);ctx.rotate(-Math.PI/2);
