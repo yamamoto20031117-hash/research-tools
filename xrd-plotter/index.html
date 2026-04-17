@@ -633,26 +633,27 @@ function redraw(){
   }
 }
 
-// ===== 軸ラベル描画（単位部分を斜体） =====
+// ===== 軸ラベル描画（変数部分を斜体、単位は通常体） =====
 function drawAxisLabel(ctx, text, cx, cy, fontSize, fontFam, color, isBold){
   ctx.fillStyle=color;
   const prefix=isBold?'bold ':'';
   const slashIdx=text.indexOf(' / ');
   if(slashIdx===-1){
-    ctx.font=prefix+fontSize+'px '+fontFam; ctx.textAlign='center';
+    // スラッシュなし → 全体を斜体（変数のみと見なす）
+    ctx.font=prefix+'italic '+fontSize+'px '+fontFam; ctx.textAlign='center';
     ctx.fillText(text, cx, cy); return;
   }
-  const quantityPart=text.substring(0, slashIdx+3);
-  const unitPart=text.substring(slashIdx+3);
+  const varPart=text.substring(0, slashIdx);       // 変数部分（斜体）
+  const sepAndUnit=' / '+text.substring(slashIdx+3); // " / " + 単位部分（通常体）
+  ctx.font=prefix+'italic '+fontSize+'px '+fontFam;
+  const vw=ctx.measureText(varPart).width;
   ctx.font=prefix+fontSize+'px '+fontFam;
-  const qw=ctx.measureText(quantityPart).width;
-  ctx.font=prefix+'italic '+fontSize+'px '+fontFam;
-  const uw=ctx.measureText(unitPart).width;
-  const startX=cx-(qw+uw)/2;
-  ctx.font=prefix+fontSize+'px '+fontFam; ctx.textAlign='left';
-  ctx.fillText(quantityPart, startX, cy);
-  ctx.font=prefix+'italic '+fontSize+'px '+fontFam;
-  ctx.fillText(unitPart, startX+qw, cy);
+  const uw=ctx.measureText(sepAndUnit).width;
+  const startX=cx-(vw+uw)/2;
+  ctx.font=prefix+'italic '+fontSize+'px '+fontFam; ctx.textAlign='left';
+  ctx.fillText(varPart, startX, cy);
+  ctx.font=prefix+fontSize+'px '+fontFam;
+  ctx.fillText(sepAndUnit, startX+vw, cy);
 }
 
 // ===== ラベルから回折次数nを抽出 =====
