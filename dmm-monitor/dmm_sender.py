@@ -465,19 +465,24 @@ def main():
 
     smu = None
     if mode == "live":
-        try:
-            smu = connect_keithley()
-            if not smu:
-                print("\n接続失敗。テストモードで続行しますか？ (y/n)")
-                if input().strip().lower() != 'y':
-                    return
-                mode = "test"
-        except ImportError:
-            print("pyvisa がインストールされていません")
-            print("  pip install pyvisa pyvisa-py pyserial")
-            return
-        except Exception as e:
-            print(f"接続エラー: {e}")
+        # Keithleyが見つかるまでリトライ（自動起動対応）
+        retry_wait = 10  # 秒
+        while running:
+            try:
+                smu = connect_keithley()
+                if smu:
+                    break
+                print(f"\n  Keithley が見つかりません。{retry_wait}秒後に再試行...")
+                print(f"  （装置の電源を入れてケーブルを接続してください）")
+                time.sleep(retry_wait)
+            except ImportError:
+                print("pyvisa がインストールされていません")
+                print("  pip install pyvisa pyvisa-py pyserial")
+                return
+            except Exception as e:
+                print(f"  接続エラー: {e} — {retry_wait}秒後に再試行...")
+                time.sleep(retry_wait)
+        if not smu and not running:
             return
     else:
         print("\nテストモードで動作中（ダミーデータを送信）")
