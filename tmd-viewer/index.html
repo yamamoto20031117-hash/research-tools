@@ -645,8 +645,8 @@ function buildStructure() {
 
   // Update gap slider display to show effective value
   document.getElementById('v-gap').value = effExpansion>expansion?effExpansion.toFixed(1):expansion.toFixed(1);
-  // 実際の層間距離（Å）を表示
-  document.getElementById('v-gap-abs').value = expandedGap.toFixed(2);
+  // 実際の層間金属間距離（Å）を表示（左下パネルのM–M距離と一致）
+  document.getElementById('v-gap-abs').value = layerStep.toFixed(3);
 
 
   // カスタム色が設定されていればMCOL/XCOLを上書き
@@ -1359,23 +1359,23 @@ function stepSlider(slId, dir){
 ['v-gap','v-layers','v-na','v-nb'].forEach(vId=>{
   document.getElementById(vId).addEventListener('change',function(){ syncNumToSlider(vId); });
 });
-// 層間距離（Å）からの逆算入力
+// 層間距離（Å: M–M金属間距離）からの逆算入力
 document.getElementById('v-gap-abs').addEventListener('change',function(){
   pushUndo();
-  const absVal=parseFloat(this.value);
-  if(isNaN(absVal)||absVal<=0) return;
-  // 現在の材料のnormalGapを計算
+  const targetDist=parseFloat(this.value);
+  if(isNaN(targetDist)||targetDist<=0) return;
+  // 現在の材料のパラメータ
   const info=DB[curMat], phase=curPhase;
   const c_layer=phase==='2H'?info.c2H/2:info.c1T;
   const r_inp=info.a/S3;
   const d_xm=Math.sqrt(Math.max(info.bond*info.bond-r_inp*r_inp,0.1));
-  const normalGap=c_layer-2*d_xm;
+  const sandwich=2*d_xm;
+  const normalGap=c_layer-sandwich;
   if(normalGap<=0) return;
-  // 倍率 = 入力Å / normalGap
-  let ratio=absVal/normalGap;
-  const maxRatio=parseFloat(document.getElementById('sl-gap').max);
+  // layerStep = sandwich + normalGap * ratio → ratio = (targetDist - sandwich) / normalGap
+  let ratio=(targetDist-sandwich)/normalGap;
   ratio=Math.max(1.0, Math.round(ratio*10)/10);
-  // スライダー範囲を超える場合はスライダーのmaxを拡張
+  const maxRatio=parseFloat(document.getElementById('sl-gap').max);
   if(ratio>maxRatio){
     document.getElementById('sl-gap').max=ratio;
     document.getElementById('v-gap').max=ratio;
