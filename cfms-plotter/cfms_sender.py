@@ -234,12 +234,14 @@ def scan_active_folders(watch_dir, known_files):
     """対象フォルダのみスキャンして新規・更新ファイルを検出"""
     new_files = []
     folders = get_active_folders(watch_dir)
+    # watch_dir をクロージャで参照
 
     for folder_name, dat_paths in folders.items():
         for fpath in dat_paths:
             fhash = get_file_hash(fpath)
             if fhash and known_files.get(fpath) != fhash:
-                new_files.append((fpath, folder_name))
+                rel_dir = os.path.relpath(os.path.dirname(fpath), watch_dir)
+                new_files.append((fpath, rel_dir))
                 known_files[fpath] = fhash
 
     return new_files
@@ -390,8 +392,10 @@ def main():
                 if not running:
                     break
                 basename = os.path.basename(fpath)
-                file_key = sanitize_key(f"{folder_name}__{basename.replace('.dat', '')}")
-                send_file(fpath, file_key, folder_name)
+                # サブフォルダの相対パスを取得 (例: Okuda/TiSe2 MBA)
+                rel_dir = os.path.relpath(os.path.dirname(fpath), watch_dir)
+                file_key = sanitize_key(f"{rel_dir}__{basename.replace('.dat', '')}")
+                send_file(fpath, file_key, rel_dir)
                 known_files[fpath] = get_file_hash(fpath)
                 sent_count += 1
 

@@ -41,7 +41,7 @@
   .online-files-header h2{font-size:.85rem;color:#fff}
   .online-files-header button{padding:3px 10px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);
     border-radius:4px;font-size:.7rem;cursor:pointer}
-  .of-list{display:flex;flex-direction:column;gap:12px}
+  .of-list{display:flex;flex-direction:column;gap:10px}
   .folder-group{background:rgba(15,18,28,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:0;overflow:hidden}
   .folder-group-header{font-size:.8rem;color:#a78bfa;font-weight:600;padding:10px 14px;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;transition:.15s}
   .folder-group-header:hover{background:rgba(167,139,250,0.06)}
@@ -49,8 +49,17 @@
   .folder-group-header .fg-arrow.open{transform:rotate(90deg)}
   .folder-group-header .fg-icon{font-size:.9rem}
   .folder-group-header .fg-count{font-size:.68rem;color:#666;font-weight:400}
-  .folder-group-files{display:none;gap:6px;flex-wrap:wrap;padding:0 14px 10px}
-  .folder-group-files.open{display:flex}
+  .folder-group-body{display:none;padding:0 14px 10px}
+  .folder-group-body.open{display:block}
+  .folder-group-files{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .sub-folder{margin-top:8px;margin-left:8px;background:rgba(20,25,40,0.5);border:1px solid rgba(255,255,255,0.04);border-radius:8px;padding:0;overflow:hidden}
+  .sub-folder-header{font-size:.75rem;color:#8b9dc3;font-weight:600;padding:8px 12px;display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;transition:.15s}
+  .sub-folder-header:hover{background:rgba(139,157,195,0.06)}
+  .sub-folder-header .fg-arrow{font-size:.6rem;transition:transform .2s;color:#555}
+  .sub-folder-header .fg-arrow.open{transform:rotate(90deg)}
+  .sub-folder-body{display:none;padding:0 12px 8px}
+  .sub-folder-body.open{display:block}
+  .sub-folder-body .folder-group-files{margin-top:4px}
 
   /* ドロップエリア */
   .drop-zone{margin:0 24px 16px;padding:32px 24px;background:rgba(20,25,40,0.85);
@@ -391,41 +400,82 @@ function renderOnlineFileList(files){
   document.getElementById('onlineSection').classList.remove('hidden');
   const entries = Object.entries(files);
 
-  // フォルダごとにグループ化
-  const groups = {};
+  // フォルダツリーを構築
+  // folder パスは "Okuda" や "Okuda/TiSe2 MBA" や "Okuda\\TiSe2 MBA" の形式
+  const tree = {};  // {topFolder: {_files:[], subFolder: {_files:[]}}}
+
   for(const [key, f] of entries){
-    const folder = f.folder || '(その他)';
-    if(!groups[folder]) groups[folder] = [];
-    groups[folder].push({key, ...f});
+    const folder = (f.folder || '(その他)').replace(/\\/g, '/');
+    const parts = folder.split('/');
+    const top = parts[0];
+    const sub = parts.length > 1 ? parts.slice(1).join('/') : null;
+
+    if(!tree[top]) tree[top] = {_files:[], _subs:{}};
+
+    if(sub){
+      if(!tree[top]._subs[sub]) tree[top]._subs[sub] = [];
+      tree[top]._subs[sub].push({key, ...f});
+    } else {
+      tree[top]._files.push({key, ...f});
+    }
   }
 
-  // 各フォルダ内をファイル作成日の新しい順にソート
-  for(const folder in groups){
-    groups[folder].sort((a,b) => (b.file_created||b.uploaded_at||0) - (a.file_created||a.uploaded_at||0));
-  }
+  // ソート関数
+  const sortFiles = arr => arr.sort((a,b) => (b.file_created||b.uploaded_at||0) - (a.file_created||a.uploaded_at||0));
 
-  const folderOrder = Object.keys(groups).sort((a,b) => a.localeCompare(b, 'ja'));
+  const topFolders = Object.keys(tree).sort((a,b) => a.localeCompare(b, 'ja'));
 
-  el.innerHTML = folderOrder.map(folder => {
-    const items = groups[folder];
-    const chips = items.map(f => {
-      const loaded = allFiles.some(af => af.key === f.key);
-      const dateStr = fmtDate(f.file_created || f.uploaded_at);
-      return `<div class="file-chip online${loaded ? ' active' : ''}" onclick="loadOnlineFile('${f.key}')">
-        <span class="fc-name">${esc(f.filename)}</span>
-        <span class="fc-info">${dateStr} &#183; ${(f.rows||0).toLocaleString()} 点 &#183; ${f.temp_range||''}</span>
+  el.innerHTML = topFolders.map(top => {
+    const node = tree[top];
+    // トップフォルダ直下のファイル数 + サブフォルダ内のファイル数
+    let totalFiles = node._files.length;
+    for(const sub in node._subs) totalFiles += node._subs[sub].length;
+
+    const fid = 'fg_' + top.replace(/[^a-zA-Z0-9]/g,'_');
+
+    // トップ直下のファイルチップ
+    sortFiles(node._files);
+    const topChips = node._files.length > 0 ? `<div class="folder-group-files">${renderChips(node._files)}</div>` : '';
+
+    // サブフォルダ
+    const subFolders = Object.keys(node._subs).sort((a,b) => a.localeCompare(b, 'ja'));
+    const subHtml = subFolders.map(sub => {
+      const items = sortFiles(node._subs[sub]);
+      const sid = fid + '_sub_' + sub.replace(/[^a-zA-Z0-9]/g,'_');
+      return `<div class="sub-folder">
+        <div class="sub-folder-header" onclick="toggleFolder('${sid}')">
+          <span class="fg-arrow" id="${sid}_arrow">&#9654;</span>
+          &#128194; ${esc(sub)}
+          <span class="fg-count">(${items.length} ファイル)</span>
+        </div>
+        <div class="sub-folder-body" id="${sid}_files">
+          <div class="folder-group-files">${renderChips(items)}</div>
+        </div>
       </div>`;
     }).join('');
 
-    const fid = 'fg_' + folder.replace(/[^a-zA-Z0-9]/g,'_');
     return `<div class="folder-group">
       <div class="folder-group-header" onclick="toggleFolder('${fid}')">
         <span class="fg-arrow" id="${fid}_arrow">&#9654;</span>
         <span class="fg-icon">&#128194;</span>
-        ${esc(folder)}
-        <span class="fg-count">(${items.length} ファイル)</span>
+        ${esc(top)}
+        <span class="fg-count">(${totalFiles} ファイル)</span>
       </div>
-      <div class="folder-group-files" id="${fid}_files">${chips}</div>
+      <div class="folder-group-body" id="${fid}_files">
+        ${topChips}
+        ${subHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderChips(items){
+  return items.map(f => {
+    const loaded = allFiles.some(af => af.key === f.key);
+    const dateStr = fmtDate(f.file_created || f.uploaded_at);
+    return `<div class="file-chip online${loaded ? ' active' : ''}" onclick="loadOnlineFile('${f.key}')">
+      <span class="fc-name">${esc(f.filename)}</span>
+      <span class="fc-info">${dateStr} &#183; ${(f.rows||0).toLocaleString()} 点 &#183; ${f.temp_range||''}</span>
     </div>`;
   }).join('');
 }
