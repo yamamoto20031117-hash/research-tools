@@ -569,6 +569,15 @@ function redrawChart(){
   }
   ctx.stroke();
 
+  // データポイント（小さい丸）
+  ctx.fillStyle=color;
+  for(const d of filtered){
+    const x=xPx(d.time), y=yPx(d[key]);
+    ctx.beginPath();
+    ctx.arc(x, y, 2.5, 0, Math.PI*2);
+    ctx.fill();
+  }
+
   ctx.restore(); // クリッピング解除
 
   // 枠
