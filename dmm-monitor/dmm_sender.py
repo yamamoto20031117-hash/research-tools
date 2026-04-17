@@ -18,6 +18,8 @@ import time
 import json
 import signal
 import sys
+import threading
+import queue
 from datetime import datetime
 import urllib.request
 import urllib.error
@@ -27,15 +29,24 @@ FIREBASE_URL = "https://research-tools-board-default-rtdb.firebaseio.com"
 FIREBASE_PATH_LIVE = "dmm/live"       # リアルタイム値（最新1件を上書き）
 FIREBASE_PATH_LOG = "dmm/log"         # ログ（追記）
 INTERVAL = 1.0                         # 測定間隔（秒）デフォルト値
-interval = INTERVAL                    # 実行時の間隔（Webから変更可能）
 
 # GPIB接続の場合: "GPIB0::24::INSTR" (アドレス24が一般的)
 # USB接続の場合: 自動検出を試みる
-DMM_ADDRESS = ""  # 空欄なら自動検出（例: "ASRL3::INSTR", "ASRL/dev/cu.usbserial-XXX::INSTR"）
+DMM_ADDRESS = ""  # 空欄なら自動検出
 
 
-# ===== Firebase REST API =====
-def firebase_put(path, data):
+# ===== スレッド間共有変数 =====
+interval = INTERVAL        # 実行時の間隔（Webから変更可能）
+auto_stop_time = 0         # 0 = 無制限
+running = True
+output_on = False          # OUTPUT状態
+command_queue = queue.Queue()   # コマンド受信キュー（command_thread → main）
+data_queue = queue.Queue(maxsize=100)  # データ送信キュー（main → sender_thread）
+lock = threading.Lock()
+
+
+# ===== Firebase REST API（タイムアウト短縮） =====
+def firebase_put(path, data, timeout=3):
     """Firebase に PUT（上書き）"""
     url = f"{FIREBASE_URL}/{path}.json"
     req = urllib.request.Request(
@@ -43,13 +54,12 @@ def firebase_put(path, data):
         method='PUT', headers={'Content-Type': 'application/json'}
     )
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status == 200
-    except Exception as e:
-        print(f"  [Firebase PUT error] {e}")
+    except Exception:
         return False
 
-def firebase_push(path, data):
+def firebase_push(path, data, timeout=3):
     """Firebase に POST（追記）"""
     url = f"{FIREBASE_URL}/{path}.json"
     req = urllib.request.Request(
@@ -57,36 +67,35 @@ def firebase_push(path, data):
         method='POST', headers={'Content-Type': 'application/json'}
     )
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status == 200
-    except Exception as e:
-        print(f"  [Firebase POST error] {e}")
+    except Exception:
         return False
 
-
-def firebase_get(path):
+def firebase_get(path, timeout=3):
     """Firebase から GET"""
     url = f"{FIREBASE_URL}/{path}.json"
     try:
-        with urllib.request.urlopen(url, timeout=5) as resp:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
             return json.loads(resp.read().decode('utf-8'))
     except:
         return None
 
-def firebase_delete(path):
+def firebase_delete(path, timeout=3):
     """Firebase から DELETE"""
     url = f"{FIREBASE_URL}/{path}.json"
     req = urllib.request.Request(url, method='DELETE')
     try:
-        urllib.request.urlopen(req, timeout=5)
+        urllib.request.urlopen(req, timeout=timeout)
     except:
         pass
 
 def update_output_status(on):
-    """OUTPUT状態をFirebaseに送信（ダッシュボードで監視）"""
+    """OUTPUT状態をFirebaseに送信"""
     firebase_put("dmm/status", {"output": on, "time": int(time.time()*1000)})
 
 
+# ===== RS-232 ユーティリティ =====
 def flush_buffer(smu):
     """RS-232入力バッファをクリア"""
     if not smu:
@@ -97,7 +106,6 @@ def flush_buffer(smu):
     except:
         pass
 
-
 def safe_write(smu, cmd, delay=0.5):
     """エラークリア + バッファクリア付きで安全にSCPIコマンドを送信"""
     if not smu:
@@ -106,8 +114,7 @@ def safe_write(smu, cmd, delay=0.5):
     try:
         smu.write(cmd)
     except Exception as e:
-        print(f"  [SCPI write error] {cmd} → {e}")
-        # エラー後にクリアして再試行
+        print(f"  [SCPI write error] {cmd} -> {e}")
         time.sleep(0.5)
         flush_buffer(smu)
         try:
@@ -115,170 +122,161 @@ def safe_write(smu, cmd, delay=0.5):
             time.sleep(0.3)
             smu.write(cmd)
         except Exception as e2:
-            print(f"  [SCPI retry failed] {cmd} → {e2}")
+            print(f"  [SCPI retry failed] {cmd} -> {e2}")
     time.sleep(delay)
 
 
-# ===== タイマー自動停止 =====
-auto_stop_time = 0  # 0 = 無制限
+# ===== Firebase データ送信スレッド =====
+def firebase_sender_thread():
+    """データキューからFirebaseへ非同期送信"""
+    while running:
+        try:
+            data = data_queue.get(timeout=1)
+            if data is None:
+                break
+            # PUT と PUSH を順次実行（別スレッドなのでメイン測定をブロックしない）
+            firebase_put(FIREBASE_PATH_LIVE, data)
+            firebase_push(FIREBASE_PATH_LOG, data)
+            data_queue.task_done()
+        except queue.Empty:
+            continue
+        except Exception as e:
+            print(f"  [Sender error] {e}")
 
 
-def check_auto_stop(smu):
-    """タイマー自動停止をチェック"""
-    global auto_stop_time
-    if auto_stop_time > 0 and time.time() >= auto_stop_time:
-        print("\n  *** タイマー満了: OUTPUT OFF (自動停止) ***")
-        safe_write(smu, "*CLS", 0.3)
-        safe_write(smu, ":OUTP OFF", 0.5)
-        safe_write(smu, ":SYST:LOC", 0.3)  # フロントパネル操作を復帰
-        auto_stop_time = 0
-        update_output_status(False)
-        return True
-    return False
+# ===== Firebase コマンド監視スレッド =====
+def firebase_command_thread(smu):
+    """Firebaseのコマンドを定期的にチェック"""
+    global auto_stop_time, interval, output_on
+
+    while running:
+        try:
+            # コマンドチェック
+            cmd = firebase_get("dmm/command")
+            if cmd and cmd.get("action"):
+                action = cmd["action"]
+                firebase_delete("dmm/command")
+
+                if action == "OUTPUT_OFF":
+                    print("\n  *** Web: OUTPUT OFF ***")
+                    safe_write(smu, "*CLS", 0.3)
+                    safe_write(smu, ":OUTP OFF", 0.5)
+                    safe_write(smu, ":SYST:LOC", 0.3)
+                    auto_stop_time = 0
+                    output_on = False
+                    update_output_status(False)
+                    command_queue.put(("OFF", None))
+
+                elif action == "OUTPUT_ON":
+                    print("\n  *** Web: OUTPUT ON ***")
+                    safe_write(smu, "*CLS", 0.3)
+                    safe_write(smu, ":OUTP ON", 1.0)
+                    if smu:
+                        try:
+                            flush_buffer(smu)
+                            state = smu.query(":OUTP?").strip()
+                            if state not in ("1", "ON"):
+                                safe_write(smu, "*CLS", 0.5)
+                                safe_write(smu, ":OUTP ON", 1.0)
+                        except:
+                            pass
+                    output_on = True
+                    update_output_status(True)
+                    command_queue.put(("ON", None))
+
+                elif action == "SET_INTERVAL":
+                    new_interval = float(cmd.get("interval", 1.0))
+                    interval = max(0.1, min(new_interval, 60.0))
+                    print(f"\n  *** Web: 測定間隔 -> {interval} 秒 ***")
+
+                elif action == "SOURCE_START":
+                    mode = cmd.get("mode", "CURR")
+                    value = float(cmd.get("value", 0))
+                    compliance = float(cmd.get("compliance", 21))
+                    duration = float(cmd.get("duration", 0))
+
+                    mode_label = "定電流" if mode == "CURR" else "定電圧"
+                    unit = "A" if mode == "CURR" else "V"
+                    print(f"\n  *** Web: SOURCE START ***")
+                    print(f"  {mode_label} {value} {unit}, Comp={compliance}")
+
+                    configure_source(smu, mode, value, compliance)
+                    safe_write(smu, ":OUTP ON", 1.0)
+
+                    if smu:
+                        try:
+                            flush_buffer(smu)
+                            state = smu.query(":OUTP?").strip()
+                            if state not in ("1", "ON"):
+                                safe_write(smu, "*CLS", 0.5)
+                                safe_write(smu, ":OUTP ON", 1.0)
+                        except:
+                            pass
+
+                    output_on = True
+                    update_output_status(True)
+
+                    if duration > 0:
+                        auto_stop_time = time.time() + duration
+                        print(f"  自動停止: {datetime.fromtimestamp(auto_stop_time).strftime('%H:%M:%S')}")
+                    else:
+                        auto_stop_time = 0
+
+                    command_queue.put(("ON", None))
+
+            # タイマー自動停止チェック
+            if auto_stop_time > 0 and time.time() >= auto_stop_time:
+                print("\n  *** タイマー満了: OUTPUT OFF ***")
+                safe_write(smu, "*CLS", 0.3)
+                safe_write(smu, ":OUTP OFF", 0.5)
+                safe_write(smu, ":SYST:LOC", 0.3)
+                auto_stop_time = 0
+                output_on = False
+                update_output_status(False)
+                command_queue.put(("OFF", None))
+
+        except Exception as e:
+            print(f"  [Command thread error] {e}")
+
+        # コマンドチェック間隔（OUTPUT OFF時は1秒、ON時は2秒）
+        sleep_time = 1.0 if not output_on else 2.0
+        time.sleep(sleep_time)
 
 
 def configure_source(smu, mode, value, compliance):
-    """ソースモードと値を設定（RS-232安全版）"""
+    """ソースモードと値を設定"""
     if not smu:
-        print(f"  [テストモード] SOURCE設定: {mode} = {value}, Compliance = {compliance}")
         return
 
-    # まずOUTPUT OFFにしてから設定変更（安全のため）
     safe_write(smu, ":OUTP OFF", 0.5)
-    # エラーキュークリア
     safe_write(smu, "*CLS", 0.5)
 
-    # ソースモード設定（レンジは AUTO に任せる — 手動レンジはエラー101の原因）
     if mode == "CURR":
         safe_write(smu, ":SOUR:FUNC CURR", 0.5)
         safe_write(smu, ":SOUR:CURR:RANG:AUTO ON", 0.5)
         safe_write(smu, f":SOUR:CURR {value}", 0.5)
-        # コンプライアンス（電圧上限）
         safe_write(smu, f":SENS:VOLT:PROT {compliance}", 0.5)
-        print(f"  設定: 定電流モード {value} A, コンプライアンス {compliance} V")
     elif mode == "VOLT":
         safe_write(smu, ":SOUR:FUNC VOLT", 0.5)
         safe_write(smu, ":SOUR:VOLT:RANG:AUTO ON", 0.5)
         safe_write(smu, f":SOUR:VOLT {value}", 0.5)
-        # コンプライアンス（電流上限）
         safe_write(smu, f":SENS:CURR:PROT {compliance}", 0.5)
-        print(f"  設定: 定電圧モード {value} V, コンプライアンス {compliance} A")
 
-    # 測定関数は常に電圧・電流同時
     safe_write(smu, ":SENS:FUNC:CONC ON", 0.5)
     safe_write(smu, ":SENS:FUNC 'VOLT:DC','CURR:DC'", 0.5)
     safe_write(smu, ":FORM:ELEM VOLT,CURR", 0.5)
 
-    # エラーチェック
     if smu:
         try:
             flush_buffer(smu)
             err = smu.query(":SYST:ERR?").strip()
             if not err.startswith("0") and not err.startswith("+0"):
-                print(f"  ⚠ Keithley エラー: {err}")
+                print(f"  Keithley error: {err}")
         except:
             pass
 
 
-def check_command(smu):
-    """Firebaseからコマンドを取得して実行"""
-    global auto_stop_time
-    cmd = firebase_get("dmm/command")
-    if not cmd or not cmd.get("action"):
-        return None
-
-    action = cmd["action"]
-    firebase_delete("dmm/command")  # コマンド消費
-
-    if action == "OUTPUT_OFF":
-        print("\n  *** Web からの指令: OUTPUT OFF ***")
-        safe_write(smu, "*CLS", 0.3)
-        safe_write(smu, ":OUTP OFF", 0.5)
-        safe_write(smu, ":SYST:LOC", 0.3)  # フロントパネル操作を復帰
-        auto_stop_time = 0
-        update_output_status(False)
-        return "OFF"
-
-    elif action == "OUTPUT_ON":
-        print("\n  *** Web からの指令: OUTPUT ON ***")
-        safe_write(smu, "*CLS", 0.3)
-        safe_write(smu, ":OUTP ON", 1.0)
-        # 確認
-        if smu:
-            try:
-                flush_buffer(smu)
-                state = smu.query(":OUTP?").strip()
-                print(f"  OUTPUT 状態確認: {state}")
-                if state not in ("1", "ON"):
-                    print("  OUTPUT ON に失敗。リトライ...")
-                    safe_write(smu, "*CLS", 0.5)
-                    safe_write(smu, ":OUTP ON", 1.0)
-            except Exception as e:
-                print(f"  OUTPUT 確認エラー: {e}")
-        update_output_status(True)
-        return "ON"
-
-    elif action == "SET_INTERVAL":
-        global interval
-        new_interval = float(cmd.get("interval", 1.0))
-        new_interval = max(0.1, min(new_interval, 60.0))  # 0.1秒〜60秒
-        interval = new_interval
-        print(f"\n  *** Web からの指令: 測定間隔変更 → {interval} 秒 ***")
-        return None
-
-    elif action == "SOURCE_START":
-        mode = cmd.get("mode", "CURR")       # "CURR" or "VOLT"
-        value = float(cmd.get("value", 0))    # 実値（A or V）
-        compliance = float(cmd.get("compliance", 21))
-        duration = float(cmd.get("duration", 0))  # 秒（0=無制限）
-
-        mode_label = "定電流" if mode == "CURR" else "定電圧"
-        unit = "A" if mode == "CURR" else "V"
-        print(f"\n  *** Web からの指令: SOURCE START ***")
-        print(f"  モード: {mode_label} ({mode})")
-        print(f"  ソース値: {value} {unit}")
-        print(f"  コンプライアンス: {compliance}")
-        if duration > 0:
-            print(f"  出力時間: {duration} 秒（自動停止あり）")
-        else:
-            print(f"  出力時間: 無制限")
-
-        # ソース設定（内部でOUTPUT OFF → 設定変更）
-        configure_source(smu, mode, value, compliance)
-
-        # OUTPUT ON（確認付き）
-        safe_write(smu, ":OUTP ON", 1.0)
-
-        # OUTPUT状態を確認
-        if smu:
-            try:
-                flush_buffer(smu)
-                state = smu.query(":OUTP?").strip()
-                print(f"  OUTPUT 状態確認: {state}")
-                if state not in ("1", "ON"):
-                    print("  OUTPUT ON に失敗。リトライ...")
-                    safe_write(smu, "*CLS", 0.5)
-                    safe_write(smu, ":OUTP ON", 1.0)
-                    state = smu.query(":OUTP?").strip()
-                    print(f"  OUTPUT 状態確認（リトライ後）: {state}")
-            except Exception as e:
-                print(f"  OUTPUT 確認エラー: {e}")
-
-        update_output_status(True)
-
-        # タイマー設定
-        if duration > 0:
-            auto_stop_time = time.time() + duration
-            print(f"  自動停止予定: {datetime.fromtimestamp(auto_stop_time).strftime('%H:%M:%S')}")
-        else:
-            auto_stop_time = 0
-
-        return "ON"
-
-    return None
-
-
-# ===== Keithley 2400 接続・初期化 =====
+# ===== Keithley 2400 接続 =====
 def list_visa_resources():
     """接続可能なVISAデバイス一覧を表示"""
     try:
@@ -293,16 +291,12 @@ def list_visa_resources():
                     inst = rm.open_resource(r)
                     inst.timeout = 3000
                     idn = inst.query("*IDN?").strip()
-                    print(f"    → {idn}")
+                    print(f"    -> {idn}")
                     inst.close()
                 except:
-                    print(f"    → (IDN取得不可)")
+                    print(f"    -> (IDN取得不可)")
         else:
             print("VISAデバイスが見つかりません")
-            print("確認事項:")
-            print("  - ケーブルが接続されているか")
-            print("  - NI-VISA ドライバがインストールされているか")
-            print("  - GPIB-USB アダプタのドライバが入っているか")
     except ImportError:
         print("pyvisa がインストールされていません")
         print("  pip install pyvisa pyvisa-py pyserial")
@@ -317,7 +311,6 @@ def connect_keithley():
 
     smu = None
 
-    # DMM_ADDRESS が指定されていればそれを使う
     if DMM_ADDRESS:
         try:
             smu = rm.open_resource(DMM_ADDRESS)
@@ -325,7 +318,6 @@ def connect_keithley():
         except Exception:
             print(f"  {DMM_ADDRESS} に接続できません。自動検出に切り替え...")
 
-    # 自動検出: シリアルポート (ASRL) を優先して Keithley を探す
     if not smu:
         print("  シリアルポートを自動検出中...")
         serial_resources = [r for r in resources if r.startswith("ASRL")]
@@ -336,7 +328,6 @@ def connect_keithley():
                 inst.write_termination = '\r'
                 inst.read_termination = '\r'
                 inst.baud_rate = 9600
-                # バッファクリア
                 try:
                     inst.read_bytes(inst.bytes_in_buffer) if inst.bytes_in_buffer > 0 else None
                 except:
@@ -344,7 +335,7 @@ def connect_keithley():
                 idn = inst.query("*IDN?").strip()
                 if "KEITHLEY" in idn.upper() or "2400" in idn:
                     smu = inst
-                    print(f"  Keithley 自動検出: {r} → {idn}")
+                    print(f"  Keithley 自動検出: {r} -> {idn}")
                     break
                 inst.close()
             except:
@@ -357,41 +348,33 @@ def connect_keithley():
         print("Keithley 2400 が見つかりません")
         return None
 
-    smu.timeout = 30000  # RS-232は遅いので30秒に
-    smu.write_termination = '\r'   # Keithley 2400 RS-232はCR終端
+    smu.timeout = 30000
+    smu.write_termination = '\r'
     smu.read_termination = '\r'
-    # RS-232設定（Keithley 2400のデフォルト: 9600baud, 8bit, 1stop, no parity）
     smu.baud_rate = 9600
     smu.data_bits = 8
     smu.stop_bits = pyvisa.constants.StopBits.one
     smu.parity = pyvisa.constants.Parity.none
     smu.flow_control = pyvisa.constants.VI_ASRL_FLOW_NONE
 
-    # 入力バッファクリア
     try:
         smu.read_bytes(smu.bytes_in_buffer) if smu.bytes_in_buffer > 0 else None
     except:
         pass
 
-    # 機器ID
     idn = smu.query("*IDN?").strip()
     print(f"接続成功: {idn}")
 
-    # ===== Keithley 2400 初期設定 =====
     print("初期設定中...")
-    safe_write(smu, "*RST", 2.0)  # RST後は2秒待つ
-    safe_write(smu, "*CLS", 0.5)  # エラーキュークリア
-
+    safe_write(smu, "*RST", 2.0)
+    safe_write(smu, "*CLS", 0.5)
     safe_write(smu, ":SYST:BEEP:STAT OFF", 0.5)
     safe_write(smu, ":SENS:FUNC:CONC ON", 0.5)
     safe_write(smu, ":SENS:FUNC 'VOLT:DC','CURR:DC'", 0.5)
     safe_write(smu, ":FORM:ELEM VOLT,CURR", 0.5)
-
-    # ソース設定（電流源モード・0A — OUTPUT はOFFのまま待機）
     safe_write(smu, ":SOUR:FUNC CURR", 0.5)
     safe_write(smu, ":SOUR:CURR:RANG MIN", 0.5)
     safe_write(smu, ":SOUR:CURR 0", 0.5)
-    # OUTPUT OFF のまま（Webダッシュボードからの指令で ON にする）
 
     print("初期設定完了")
     print("  モード: 電圧・電流 同時測定")
@@ -404,7 +387,6 @@ def connect_keithley():
 def read_keithley(smu):
     """Keithley 2400 から電圧・電流を読み取る"""
     flush_buffer(smu)
-    # :READ? がタイムアウトする場合は :MEAS? を試す
     try:
         result = smu.query(":READ?")
     except Exception:
@@ -419,7 +401,6 @@ def read_keithley(smu):
     vals = result.strip().split(',')
     voltage = float(vals[0])
     current = float(vals[1])
-    # Keithley オーバーフロー値 (9.91E+37) をフィルタ
     if abs(voltage) > 1e6:
         voltage = 0.0
     if abs(current) > 1e6:
@@ -435,9 +416,7 @@ def read_dummy():
     return voltage, current
 
 
-# ===== メインループ =====
-running = True
-
+# ===== シグナルハンドラ =====
 def signal_handler(sig, frame):
     global running
     print("\n停止中...")
@@ -446,8 +425,10 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 
+# ===== メインループ =====
 def main():
-    global auto_stop_time
+    global running, output_on, auto_stop_time
+
     mode = "test"
     if "--live" in sys.argv:
         mode = "live"
@@ -456,7 +437,7 @@ def main():
         return
 
     print("=" * 56)
-    print("  Keithley 2400 リアルタイムモニター")
+    print("  Keithley 2400 リアルタイムモニター (v2 threaded)")
     print("=" * 56)
     print(f"  モード:     {'実機接続' if mode=='live' else 'テスト（ダミーデータ）'}")
     print(f"  Firebase:   {FIREBASE_URL}")
@@ -466,22 +447,20 @@ def main():
 
     smu = None
     if mode == "live":
-        # Keithleyが見つかるまでリトライ（自動起動対応）
-        retry_wait = 10  # 秒
+        retry_wait = 10
         while running:
             try:
                 smu = connect_keithley()
                 if smu:
                     break
                 print(f"\n  Keithley が見つかりません。{retry_wait}秒後に再試行...")
-                print(f"  （装置の電源を入れてケーブルを接続してください）")
                 time.sleep(retry_wait)
             except ImportError:
                 print("pyvisa がインストールされていません")
                 print("  pip install pyvisa pyvisa-py pyserial")
                 return
             except Exception as e:
-                print(f"  接続エラー: {e} — {retry_wait}秒後に再試行...")
+                print(f"  接続エラー: {e} -- {retry_wait}秒後に再試行...")
                 time.sleep(retry_wait)
         if not smu and not running:
             return
@@ -489,116 +468,121 @@ def main():
         print("\nテストモードで動作中（ダミーデータを送信）")
         print("実機に接続するには: python dmm_sender.py --live\n")
 
+    # ----- スレッド起動 -----
+    sender = threading.Thread(target=firebase_sender_thread, daemon=True)
+    sender.start()
+
+    cmd_thread = threading.Thread(target=firebase_command_thread, args=(smu,), daemon=True)
+    cmd_thread.start()
+
+    print("  [スレッド] Firebase送信スレッド 起動")
+    print("  [スレッド] コマンド監視スレッド 起動")
+
+    # ----- メインループ: 測定のみに集中 -----
     count = 0
     errors = 0
-    cmd_check_counter = 0
-    output_on = False  # OUTPUT状態トラッキング（起動時はOFF）
 
-    # 自動単位フォーマット関数
     def fmt_i(i):
         a = abs(i)
         if a < 1e-6: return f"{i*1e9:>8.3f} nA"
-        if a < 1e-3: return f"{i*1e6:>8.3f} μA"
+        if a < 1e-3: return f"{i*1e6:>8.3f} uA"
         if a < 1:    return f"{i*1e3:>8.4f} mA"
         return f"{i:>8.5f} A"
 
     def fmt_v(v):
         a = abs(v)
-        if a < 1e-3: return f"{v*1e6:>8.2f} μV"
+        if a < 1e-3: return f"{v*1e6:>8.2f} uV"
         if a < 1:    return f"{v*1e3:>8.4f} mV"
         return f"{v:>8.5f} V"
 
-    print("\n  OUTPUT OFF — Webダッシュボードからの指令を待機中...")
+    print("\n  OUTPUT OFF -- Webからの指令を待機中...")
 
     while running:
         loop_start = time.time()
         try:
-            # Webダッシュボードからのコマンドをチェック（OUTPUT OFF時は毎回、ON時は3回に1回）
-            cmd_result = None
-            cmd_check_counter += 1
-            if not output_on or cmd_check_counter >= 3:
-                cmd_check_counter = 0
-                cmd_result = check_command(smu)
-                if cmd_result == "OFF":
-                    output_on = False
-                    print("\n  OUTPUT OFF — 測定停止。コマンド待機中...")
-                elif cmd_result == "ON":
-                    output_on = True
-                    print("\n  OUTPUT ON — 測定開始")
+            # コマンドスレッドからの通知を確認（ノンブロッキング）
+            try:
+                while True:
+                    cmd_msg, _ = command_queue.get_nowait()
+                    if cmd_msg == "OFF":
+                        output_on = False
+                        print("\n  OUTPUT OFF -- 測定停止")
+                    elif cmd_msg == "ON":
+                        output_on = True
+                        print("\n  OUTPUT ON -- 測定開始")
+            except queue.Empty:
+                pass
 
-            # タイマー自動停止チェック
-            if check_auto_stop(smu):
-                output_on = False
-                print("\n  OUTPUT OFF（タイマー満了）— コマンド待機中...")
-
-            # OUTPUT OFF の間は測定スキップ（:READ? がハングするのを防ぐ）
+            # OUTPUT OFF 時はスキップ
             if not output_on:
-                elapsed = time.time() - loop_start
-                wait = max(0.05, interval - elapsed)
-                time.sleep(wait)
+                time.sleep(max(0.05, interval - (time.time() - loop_start)))
                 continue
 
-            # 測定（OUTPUT ON 時のみ）
+            # === 測定（これだけがメインスレッドの仕事） ===
             if mode == "live" and smu:
                 voltage, current = read_keithley(smu)
             else:
                 voltage, current = read_dummy()
 
-            now = int(time.time() * 1000)  # ミリ秒タイムスタンプ
-
+            now = int(time.time() * 1000)
             data = {
                 "time": now,
                 "voltage": round(voltage, 8),
                 "current": round(current, 8),
             }
 
-            # Firebase送信
-            ok1 = firebase_put(FIREBASE_PATH_LIVE, data)
-            ok2 = firebase_push(FIREBASE_PATH_LOG, data)
+            # データキューに投入（Firebaseスレッドが非同期で送信）
+            try:
+                data_queue.put_nowait(data)
+            except queue.Full:
+                # キューが満杯なら古いデータを捨てる
+                try:
+                    data_queue.get_nowait()
+                except:
+                    pass
+                data_queue.put_nowait(data)
 
             count += 1
             ts = datetime.now().strftime("%H:%M:%S")
-            status = "OK" if (ok1 and ok2) else "WARN"
 
-            # タイマー残り表示
             timer_str = ""
             if auto_stop_time > 0:
                 remain = max(0, int(auto_stop_time - time.time()))
                 m, s = divmod(remain, 60)
-                timer_str = f"  ⏱{m:02d}:{s:02d}"
+                timer_str = f"  T-{m:02d}:{s:02d}"
 
-            print(f"[{ts}] #{count:>5}  {fmt_v(voltage)}  {fmt_i(current)}{timer_str}  [{status}]")
+            print(f"[{ts}] #{count:>5}  {fmt_v(voltage)}  {fmt_i(current)}{timer_str}")
 
-            errors = 0  # 成功したらエラーカウントリセット
+            errors = 0
 
         except Exception as e:
             errors += 1
             print(f"  [エラー #{errors}] {e}")
             if errors > 10:
-                print("  連続エラーが多すぎます。接続を確認してください。")
+                print("  連続エラー。再接続...")
                 if mode == "live" and smu:
                     try:
                         smu.close()
-                        print("  再接続中...")
                         smu = connect_keithley()
                         errors = 0
                     except:
                         pass
 
-        # ループ内の処理時間を差し引いて残りだけ待つ
+        # ループ時間を差し引いて残りだけ待つ
         elapsed = time.time() - loop_start
         wait = max(0.01, interval - elapsed)
         time.sleep(wait)
 
-    # クリーンアップ
+    # ----- クリーンアップ -----
+    data_queue.put(None)  # 送信スレッドに終了通知
     if smu:
         try:
-            smu.write(":OUTP OFF")   # 出力OFF
+            smu.write(":OUTP OFF")
             time.sleep(0.3)
-            smu.write(":SYST:LOC")   # フロントパネル操作を復帰
+            smu.write(":SYST:LOC")
             time.sleep(0.3)
             smu.close()
-            print("Keithley 2400 切断完了（フロントパネル復帰済み）")
+            print("Keithley 2400 切断完了")
         except:
             pass
     print("終了しました。")
