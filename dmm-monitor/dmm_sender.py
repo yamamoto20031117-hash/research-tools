@@ -471,6 +471,10 @@ def main():
         print("\nテストモードで動作中（ダミーデータを送信）")
         print("実機に接続するには: python dmm_sender.py --live\n")
 
+    # ----- 起動時に古いコマンドをクリア -----
+    firebase_delete("dmm/command")
+    print("  [初期化] 古いコマンドをクリア")
+
     # ----- スレッド起動 -----
     sender = threading.Thread(target=firebase_sender_thread, daemon=True)
     sender.start()
