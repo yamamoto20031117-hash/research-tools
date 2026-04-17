@@ -447,6 +447,7 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 def main():
+    global auto_stop_time
     mode = "test"
     if "--live" in sys.argv:
         mode = "live"
