@@ -172,7 +172,10 @@
   <div class="g">
     <label>層間</label>
     <input type="range" id="sl-gap" min="1.0" max="5.0" step="0.1" value="1.0">
-    <input type="number" class="num-in" id="v-gap" min="1.0" max="5.0" step="0.1" value="1.0">
+    <input type="number" class="num-in" id="v-gap" min="1.0" max="5.0" step="0.1" value="1.0" title="倍率">
+    <span style="color:#666;font-size:.7em">×</span>
+    <input type="number" class="num-in" id="v-gap-abs" min="0" step="0.01" value="0" style="width:52px" title="層間距離 (Å)">
+    <span style="color:#666;font-size:.7em">Å</span>
     <span class="pm"><button onclick="stepSlider('sl-gap',-1)">−</button><button onclick="stepSlider('sl-gap',1)">+</button></span>
   </div>
   <div class="g">
@@ -642,6 +645,8 @@ function buildStructure() {
 
   // Update gap slider display to show effective value
   document.getElementById('v-gap').value = effExpansion>expansion?effExpansion.toFixed(1):expansion.toFixed(1);
+  // 実際の層間距離（Å）を表示
+  document.getElementById('v-gap-abs').value = expandedGap.toFixed(2);
 
 
   // カスタム色が設定されていればMCOL/XCOLを上書き
@@ -1353,6 +1358,31 @@ function stepSlider(slId, dir){
 // 数値入力欄のイベント
 ['v-gap','v-layers','v-na','v-nb'].forEach(vId=>{
   document.getElementById(vId).addEventListener('change',function(){ syncNumToSlider(vId); });
+});
+// 層間距離（Å）からの逆算入力
+document.getElementById('v-gap-abs').addEventListener('change',function(){
+  pushUndo();
+  const absVal=parseFloat(this.value);
+  if(isNaN(absVal)||absVal<=0) return;
+  // 現在の材料のnormalGapを計算
+  const info=DB[curMat], phase=curPhase;
+  const c_layer=phase==='2H'?info.c2H/2:info.c1T;
+  const r_inp=info.a/S3;
+  const d_xm=Math.sqrt(Math.max(info.bond*info.bond-r_inp*r_inp,0.1));
+  const normalGap=c_layer-2*d_xm;
+  if(normalGap<=0) return;
+  // 倍率 = 入力Å / normalGap
+  let ratio=absVal/normalGap;
+  const maxRatio=parseFloat(document.getElementById('sl-gap').max);
+  ratio=Math.max(1.0, Math.round(ratio*10)/10);
+  // スライダー範囲を超える場合はスライダーのmaxを拡張
+  if(ratio>maxRatio){
+    document.getElementById('sl-gap').max=ratio;
+    document.getElementById('v-gap').max=ratio;
+  }
+  document.getElementById('sl-gap').value=ratio;
+  document.getElementById('v-gap').value=ratio.toFixed(1);
+  buildStructure();
 });
 
 document.querySelectorAll('.rot-sl').forEach(sl=>{
