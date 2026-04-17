@@ -41,7 +41,12 @@
   .online-files-header h2{font-size:.85rem;color:#fff}
   .online-files-header button{padding:3px 10px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);
     border-radius:4px;font-size:.7rem;cursor:pointer}
-  .of-list{display:flex;gap:8px;flex-wrap:wrap}
+  .of-list{display:flex;flex-direction:column;gap:12px}
+  .folder-group{background:rgba(15,18,28,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 14px}
+  .folder-group-header{font-size:.8rem;color:#a78bfa;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .folder-group-header .fg-icon{font-size:.9rem}
+  .folder-group-header .fg-count{font-size:.68rem;color:#666;font-weight:400}
+  .folder-group-files{display:flex;gap:6px;flex-wrap:wrap}
 
   /* ドロップエリア */
   .drop-zone{margin:0 24px 16px;padding:32px 24px;background:rgba(20,25,40,0.85);
@@ -253,6 +258,7 @@ let activeFileIdx = -1;
 let autoReceive = false;
 let fileListListener = null;
 let senderStatusListener = null;
+let lastOnlineFiles = null;  // 最後に取得したファイル一覧を保持
 
 
 // ===== 自動受信 ON/OFF =====
@@ -261,13 +267,60 @@ function toggleAutoReceive(){
 
   if(autoReceive){
     startAutoReceive();
-    // Firebase に ON を通知
+    // Firebase に ON を通知 → sender が再開し未送信データを送る
     if(firebaseReady) db.ref('cfms/control').set({enabled: true, time: Date.now()});
+    // 既存の受信済みデータを全てロード
+    loadAllOnlineFiles();
   } else {
     stopAutoReceive();
     if(firebaseReady) db.ref('cfms/control').set({enabled: false, time: Date.now()});
   }
   updateSenderStatusUI();
+}
+
+function loadAllOnlineFiles(){
+  if(!firebaseReady) return;
+  db.ref('cfms/file_list').once('value').then(snap => {
+    const files = snap.val();
+    if(!files) return;
+    // まだロードされていないファイルを検出
+    const unloaded = Object.keys(files).filter(key => !allFiles.some(af => af.key === key));
+    if(unloaded.length === 0) return;
+
+    const statusEl = document.getElementById('senderStatus');
+    statusEl.innerHTML = `<span class="dot sending"></span><span>未読み込みデータ ${unloaded.length} 件を取得中...</span>`;
+
+    let loaded = 0;
+    for(const fileKey of unloaded){
+      db.ref(`cfms/files/${fileKey}/meta`).once('value').then(metaSnap => {
+        const meta = metaSnap.val();
+        if(!meta){ loaded++; return; }
+
+        const chunks = meta.chunks || 1;
+        const promises = [];
+        for(let i = 0; i < chunks; i++){
+          promises.push(db.ref(`cfms/files/${fileKey}/data/${i}`).once('value'));
+        }
+        return Promise.all(promises).then(snaps => {
+          let data = [];
+          for(const s of snaps){
+            const chunk = s.val();
+            if(chunk && Array.isArray(chunk)) data = data.concat(chunk);
+            else if(chunk) data = data.concat(Object.values(chunk));
+          }
+          if(data.length > 0){
+            allFiles.push({name: meta.filename, data, source: 'online', key: fileKey, folder: meta.folder || ''});
+            activeFileIdx = allFiles.length - 1;
+          }
+          loaded++;
+          if(loaded >= unloaded.length){
+            updateUI();
+            statusEl.innerHTML = `<span class="dot on"></span><span>全データ読み込み完了 (${unloaded.length} 件)</span>`;
+          }
+        });
+      });
+    }
+  });
 }
 
 function startAutoReceive(){
@@ -297,7 +350,10 @@ function startAutoReceive(){
 function stopAutoReceive(){
   if(fileListListener){ fileListListener(); fileListListener = null; }
   if(senderStatusListener){ senderStatusListener(); senderStatusListener = null; }
-  document.getElementById('onlineSection').classList.add('hidden');
+  // OFF にしても受信済みファイル一覧は表示し続ける（データがあれば）
+  if(!lastOnlineFiles){
+    document.getElementById('onlineSection').classList.add('hidden');
+  }
 }
 
 function updateSenderStatusUI(){
@@ -327,14 +383,38 @@ function updateSenderStatusFromFirebase(s){
 }
 
 function renderOnlineFileList(files){
+  lastOnlineFiles = files;
   const el = document.getElementById('onlineFileList');
+  document.getElementById('onlineSection').classList.remove('hidden');
   const entries = Object.entries(files).sort((a,b) => (b[1].uploaded_at||0) - (a[1].uploaded_at||0));
 
-  el.innerHTML = entries.map(([key, f]) => {
-    const loaded = allFiles.some(af => af.key === key);
-    return `<div class="file-chip online${loaded ? ' active' : ''}" onclick="loadOnlineFile('${key}')">
-      <span class="fc-name">${esc(f.filename)}</span>
-      <span class="fc-info">${(f.rows||0).toLocaleString()} 点 &#183; ${f.temp_range||''}</span>
+  // フォルダごとにグループ化
+  const groups = {};
+  for(const [key, f] of entries){
+    const folder = f.folder || '(その他)';
+    if(!groups[folder]) groups[folder] = [];
+    groups[folder].push({key, ...f});
+  }
+
+  const folderOrder = Object.keys(groups).sort((a,b) => a.localeCompare(b, 'ja'));
+
+  el.innerHTML = folderOrder.map(folder => {
+    const items = groups[folder];
+    const chips = items.map(f => {
+      const loaded = allFiles.some(af => af.key === f.key);
+      return `<div class="file-chip online${loaded ? ' active' : ''}" onclick="loadOnlineFile('${f.key}')">
+        <span class="fc-name">${esc(f.filename)}</span>
+        <span class="fc-info">${(f.rows||0).toLocaleString()} 点 &#183; ${f.temp_range||''}</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="folder-group">
+      <div class="folder-group-header">
+        <span class="fg-icon">&#128194;</span>
+        ${esc(folder)}
+        <span class="fg-count">(${items.length} ファイル)</span>
+      </div>
+      <div class="folder-group-files">${chips}</div>
     </div>`;
   }).join('');
 }
@@ -372,7 +452,7 @@ function loadOnlineFile(fileKey){
         else if(chunk) data = data.concat(Object.values(chunk));
       }
 
-      allFiles.push({name: meta.filename, data, source: 'online', key: fileKey});
+      allFiles.push({name: meta.filename, data, source: 'online', key: fileKey, folder: meta.folder || ''});
       activeFileIdx = allFiles.length - 1;
       updateUI();
       updateSenderStatusUI();
