@@ -42,7 +42,7 @@ running = True
 output_on = False          # OUTPUT状態
 command_queue = queue.Queue()   # コマンド受信キュー（command_thread → main）
 data_queue = queue.Queue(maxsize=100)  # データ送信キュー（main → sender_thread）
-lock = threading.Lock()
+smu_lock = threading.Lock()    # Keithleyシリアル通信の排他制御
 
 
 # ===== Firebase REST API（タイムアウト短縮） =====
@@ -159,9 +159,10 @@ def firebase_command_thread(smu):
 
                 if action == "OUTPUT_OFF":
                     print("\n  *** Web: OUTPUT OFF ***")
-                    safe_write(smu, "*CLS", 0.3)
-                    safe_write(smu, ":OUTP OFF", 0.5)
-                    safe_write(smu, ":SYST:LOC", 0.3)
+                    with smu_lock:
+                        safe_write(smu, "*CLS", 0.3)
+                        safe_write(smu, ":OUTP OFF", 0.5)
+                        safe_write(smu, ":SYST:LOC", 0.3)
                     auto_stop_time = 0
                     output_on = False
                     update_output_status(False)
@@ -169,17 +170,18 @@ def firebase_command_thread(smu):
 
                 elif action == "OUTPUT_ON":
                     print("\n  *** Web: OUTPUT ON ***")
-                    safe_write(smu, "*CLS", 0.3)
-                    safe_write(smu, ":OUTP ON", 1.0)
-                    if smu:
-                        try:
-                            flush_buffer(smu)
-                            state = smu.query(":OUTP?").strip()
-                            if state not in ("1", "ON"):
-                                safe_write(smu, "*CLS", 0.5)
-                                safe_write(smu, ":OUTP ON", 1.0)
-                        except:
-                            pass
+                    with smu_lock:
+                        safe_write(smu, "*CLS", 0.3)
+                        safe_write(smu, ":OUTP ON", 1.0)
+                        if smu:
+                            try:
+                                flush_buffer(smu)
+                                state = smu.query(":OUTP?").strip()
+                                if state not in ("1", "ON"):
+                                    safe_write(smu, "*CLS", 0.5)
+                                    safe_write(smu, ":OUTP ON", 1.0)
+                            except:
+                                pass
                     output_on = True
                     update_output_status(True)
                     command_queue.put(("ON", None))
@@ -190,28 +192,28 @@ def firebase_command_thread(smu):
                     print(f"\n  *** Web: 測定間隔 -> {interval} 秒 ***")
 
                 elif action == "SOURCE_START":
-                    mode = cmd.get("mode", "CURR")
+                    src_mode = cmd.get("mode", "CURR")
                     value = float(cmd.get("value", 0))
                     compliance = float(cmd.get("compliance", 21))
                     duration = float(cmd.get("duration", 0))
 
-                    mode_label = "定電流" if mode == "CURR" else "定電圧"
-                    unit = "A" if mode == "CURR" else "V"
+                    mode_label = "定電流" if src_mode == "CURR" else "定電圧"
+                    unit = "A" if src_mode == "CURR" else "V"
                     print(f"\n  *** Web: SOURCE START ***")
                     print(f"  {mode_label} {value} {unit}, Comp={compliance}")
 
-                    configure_source(smu, mode, value, compliance)
-                    safe_write(smu, ":OUTP ON", 1.0)
-
-                    if smu:
-                        try:
-                            flush_buffer(smu)
-                            state = smu.query(":OUTP?").strip()
-                            if state not in ("1", "ON"):
-                                safe_write(smu, "*CLS", 0.5)
-                                safe_write(smu, ":OUTP ON", 1.0)
-                        except:
-                            pass
+                    with smu_lock:
+                        configure_source(smu, src_mode, value, compliance)
+                        safe_write(smu, ":OUTP ON", 1.0)
+                        if smu:
+                            try:
+                                flush_buffer(smu)
+                                state = smu.query(":OUTP?").strip()
+                                if state not in ("1", "ON"):
+                                    safe_write(smu, "*CLS", 0.5)
+                                    safe_write(smu, ":OUTP ON", 1.0)
+                            except:
+                                pass
 
                     output_on = True
                     update_output_status(True)
@@ -227,9 +229,10 @@ def firebase_command_thread(smu):
             # タイマー自動停止チェック
             if auto_stop_time > 0 and time.time() >= auto_stop_time:
                 print("\n  *** タイマー満了: OUTPUT OFF ***")
-                safe_write(smu, "*CLS", 0.3)
-                safe_write(smu, ":OUTP OFF", 0.5)
-                safe_write(smu, ":SYST:LOC", 0.3)
+                with smu_lock:
+                    safe_write(smu, "*CLS", 0.3)
+                    safe_write(smu, ":OUTP OFF", 0.5)
+                    safe_write(smu, ":SYST:LOC", 0.3)
                 auto_stop_time = 0
                 output_on = False
                 update_output_status(False)
@@ -520,7 +523,8 @@ def main():
 
             # === 測定（これだけがメインスレッドの仕事） ===
             if mode == "live" and smu:
-                voltage, current = read_keithley(smu)
+                with smu_lock:
+                    voltage, current = read_keithley(smu)
             else:
                 voltage, current = read_dummy()
 
