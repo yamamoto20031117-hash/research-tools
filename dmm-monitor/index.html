@@ -736,6 +736,8 @@ function startSource(){
 
 function emergencyStop(){
   sendCommand('OUTPUT_OFF',{});
+  // ステータスも直接更新（Pythonの応答を待たない）
+  if(firebaseReady) db.ref('dmm/status').set({output:false, time:Date.now()});
   setOutputUI(false);
   stopTimer();
   document.getElementById('timerDisplay').textContent='--:--';

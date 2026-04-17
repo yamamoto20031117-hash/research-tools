@@ -520,6 +520,17 @@ def main():
                 output_on = True
                 print("\n  OUTPUT ON — 測定開始")
 
+            # Firebaseステータスも確認（Webから直接OFF書き込みへの対応）
+            if output_on and cmd_result is None:
+                status = firebase_get("dmm/status")
+                if status and status.get("output") == False:
+                    print("\n  *** Firebase ステータス検出: OUTPUT OFF ***")
+                    safe_write(smu, "*CLS", 0.3)
+                    safe_write(smu, ":OUTP OFF", 0.5)
+                    safe_write(smu, ":SYST:LOC", 0.3)
+                    auto_stop_time = 0
+                    output_on = False
+
             # タイマー自動停止チェック
             if check_auto_stop(smu):
                 output_on = False
