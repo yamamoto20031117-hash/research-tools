@@ -1,21 +1,15 @@
 #!/usr/bin/env python3
 """
-CFMS-5T データ自動送信スクリプト — フォルダ監視 & Firebase 送信
-
-CFMS PCの DATA フォルダを監視し、新しい .dat ファイルを検出したら
-自動でパースして Firebase に送信する。
+CFMS-5T データ自動送信スクリプト v3.0
 
 使い方:
-  python cfms_sender.py                         # デフォルト (C:\\Users\\User\\Desktop\\DATA)
-  python cfms_sender.py "D:\\MyData"             # フォルダ指定
-  python cfms_sender.py --test                   # テストモード（ダミーファイル生成）
+  python cfms_sender.py              # 自動送信 → 監視モード
+  python cfms_sender.py --test       # テストモード
 
-CFMS PCセットアップ:
-  1. Python 3 をインストール（python.org → Add to PATH にチェック）
-  2. このファイルをデスクトップに置く
-  3. コマンドプロンプトで: python cfms_sender.py
-  4. 初回は既存ファイルをスキャンして送信（時間がかかる場合あり）
-  5. 以降は新しいファイルが追加されたら自動送信
+起動すると:
+  1. 指定フォルダの既存 .dat ファイルを全て送信
+  2. 送信後、自動で新規ファイル監視モードに移行
+  3. 対象フォルダ: inaba, Mizuguchi, Okuda, Yamamoto, Yamashita, Yokoi
 """
 
 import time
@@ -23,7 +17,6 @@ import json
 import signal
 import sys
 import os
-import hashlib
 from datetime import datetime
 import urllib.request
 import urllib.error
@@ -31,10 +24,19 @@ import urllib.error
 # ===== 設定 =====
 FIREBASE_URL = "https://research-tools-board-default-rtdb.firebaseio.com"
 DEFAULT_WATCH_DIR = r"C:\Users\User\Desktop\DATA"
-SCAN_INTERVAL = 10       # フォルダスキャン間隔（秒）
-MAX_ROWS_PER_FILE = 20000  # 1ファイルあたり最大行数
+SCAN_INTERVAL = 10
+MAX_ROWS_PER_FILE = 20000
 
-# 送信するカラム（データ量を抑える）
+# 対象フォルダ（アクティブユーザーのみ）
+ACTIVE_FOLDERS = [
+    "inaba",
+    "Mizuguchi",
+    "Okuda",
+    "Yamamoto",
+    "Yamashita",
+    "Yokoi",
+]
+
 KEY_COLUMNS = [
     "Time", "R_nv", "R_s", "sensor_B_(K)", "T_VTI_(K)",
     "B_digital_(T)", "I_s", "V_s", "V_nv"
@@ -77,7 +79,6 @@ def firebase_delete(path, timeout=10):
 
 # ===== .dat ファイルパーサー =====
 def parse_dat_file(filepath):
-    """タブ区切り .dat ファイルをパースしてヘッダーとデータを返す"""
     try:
         with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
             lines = f.readlines()
@@ -112,7 +113,6 @@ def parse_dat_file(filepath):
 
 
 def get_file_hash(filepath):
-    """ファイルのサイズと更新日時からハッシュを生成（高速）"""
     try:
         stat = os.stat(filepath)
         return f"{stat.st_size}_{int(stat.st_mtime)}"
@@ -121,18 +121,14 @@ def get_file_hash(filepath):
 
 
 def sanitize_key(name):
-    """Firebase キーに使えない文字を置換"""
-    # Firebase は . $ # [ ] / を禁止
     for ch in '.#$[]/ ':
         name = name.replace(ch, '_')
     return name
 
 
 # ===== ファイル送信 =====
-def send_file(filepath, file_key):
-    """1つの .dat ファイルをパースして Firebase に送信"""
+def send_file(filepath, file_key, folder_name=""):
     basename = os.path.basename(filepath)
-    relpath = filepath  # フルパスを記録
 
     print(f"\n  --- {basename} ---")
     print(f"  パース中...")
@@ -144,16 +140,13 @@ def send_file(filepath, file_key):
 
     print(f"  {len(data):,} 行パース完了")
 
-    # データが大きい場合は分割送信
-    # Firebase は 1リクエスト最大 ~16MB
-    # 1行あたり約 100 bytes → 10000行で ~1MB → 問題なし
     chunk_size = 5000
     total_chunks = (len(data) + chunk_size - 1) // chunk_size
 
-    # メタデータ送信
     meta = {
         "filename": basename,
-        "path": relpath,
+        "folder": folder_name,
+        "path": filepath,
         "columns": headers,
         "key_columns": KEY_COLUMNS,
         "total_rows": len(data),
@@ -162,7 +155,6 @@ def send_file(filepath, file_key):
         "file_hash": get_file_hash(filepath),
     }
 
-    # データのサマリー
     if data:
         temps = [d.get("sensor_B_(K)", 0) for d in data if "sensor_B_(K)" in d]
         if temps:
@@ -176,7 +168,6 @@ def send_file(filepath, file_key):
     print(f"  メタデータ送信中...")
     firebase_put(f"cfms/files/{file_key}/meta", meta)
 
-    # データ送信（チャンクごと）
     for i in range(total_chunks):
         chunk = data[i * chunk_size : (i + 1) * chunk_size]
         print(f"  チャンク {i+1}/{total_chunks} 送信中 ({len(chunk)} 行)...")
@@ -185,9 +176,9 @@ def send_file(filepath, file_key):
             print(f"  [エラー] チャンク {i+1} 送信失敗")
             return False
 
-    # ファイル一覧に追加
     firebase_put(f"cfms/file_list/{file_key}", {
         "filename": basename,
+        "folder": folder_name,
         "rows": len(data),
         "temp_range": f"{meta.get('temp_min','?')} - {meta.get('temp_max','?')} K",
         "uploaded_at": meta["uploaded_at"],
@@ -197,38 +188,63 @@ def send_file(filepath, file_key):
     return True
 
 
-# ===== フォルダスキャン =====
-def scan_folder(watch_dir, known_files):
-    """フォルダを再帰スキャンして新しい/更新された .dat ファイルを検出"""
-    new_files = []
+# ===== フォルダスキャン（対象フォルダのみ） =====
+def get_active_folders(watch_dir):
+    """対象フォルダの .dat ファイル一覧を取得（大文字小文字を柔軟にマッチ）"""
+    result = {}  # {実際のフォルダ名: [.dat ファイルリスト]}
 
-    for root, dirs, files in os.walk(watch_dir):
-        for fname in files:
-            if not fname.lower().endswith('.dat'):
-                continue
-            fpath = os.path.join(root, fname)
+    # 実際のフォルダ名を取得して ACTIVE_FOLDERS とマッチ
+    try:
+        entries = os.listdir(watch_dir)
+    except Exception as e:
+        print(f"  [エラー] フォルダ読み取り失敗: {e}")
+        return result
+
+    active_lower = [f.lower() for f in ACTIVE_FOLDERS]
+
+    for entry in entries:
+        entry_path = os.path.join(watch_dir, entry)
+        if not os.path.isdir(entry_path):
+            continue
+        if entry.lower() in active_lower:
+            # このフォルダ以下の .dat ファイルを再帰的に探す
+            dat_files = []
+            for root, dirs, files in os.walk(entry_path):
+                for fname in files:
+                    if fname.lower().endswith('.dat'):
+                        dat_files.append(os.path.join(root, fname))
+            result[entry] = dat_files
+
+    return result
+
+
+def scan_active_folders(watch_dir, known_files):
+    """対象フォルダのみスキャンして新規・更新ファイルを検出"""
+    new_files = []
+    folders = get_active_folders(watch_dir)
+
+    for folder_name, dat_paths in folders.items():
+        for fpath in dat_paths:
             fhash = get_file_hash(fpath)
             if fhash and known_files.get(fpath) != fhash:
-                new_files.append(fpath)
+                new_files.append((fpath, folder_name))
                 known_files[fpath] = fhash
 
     return new_files
 
 
-# ===== コントロール（On/Off） =====
+# ===== コントロール =====
 def check_enabled():
-    """Firebase の制御フラグを確認"""
     try:
         ctrl = firebase_get("cfms/control")
         if ctrl and ctrl.get("enabled") == False:
             return False
     except:
         pass
-    return True  # デフォルトは ON
+    return True
 
 
 def update_status(status_text, file_count=0):
-    """ステータスを Firebase に送信"""
     firebase_put("cfms/sender_status", {
         "status": status_text,
         "files_sent": file_count,
@@ -247,12 +263,10 @@ signal.signal(signal.SIGINT, signal_handler)
 
 # ===== テストモード =====
 def test_mode():
-    """テスト用: ダミーの .dat ファイルを生成して送信テスト"""
     import random
 
     print("\n  テストモード: ダミーデータを Firebase に送信\n")
 
-    # テストデータ生成
     headers = KEY_COLUMNS[:]
     data = []
     temp = 300.0
@@ -273,7 +287,6 @@ def test_mode():
         })
 
     file_key = "TEST_300K_to_2K"
-
     meta = {
         "filename": "TEST_300K_to_2K.dat",
         "path": "test",
@@ -307,12 +320,12 @@ def main():
     global running
 
     print("=" * 60)
-    print("  CFMS-5T データ自動送信 (v1.0)")
+    print("  CFMS-5T データ送信ツール (v3.0)")
+    print("  対象フォルダ自動送信 + 監視モード")
     print("=" * 60)
 
     args = sys.argv[1:]
 
-    # テストモード
     if "--test" in args:
         test_mode()
         return
@@ -326,102 +339,87 @@ def main():
 
     if not os.path.exists(watch_dir):
         print(f"\n  [エラー] フォルダが見つかりません: {watch_dir}")
-        print(f"  使い方: python cfms_sender.py \"D:\\path\\to\\DATA\"")
+        print(f'  使い方: python cfms_sender.py "D:\\path\\to\\DATA"')
         return
 
     print(f"  監視フォルダ: {watch_dir}")
-    print(f"  スキャン間隔: {SCAN_INTERVAL} 秒")
     print(f"  Firebase:     {FIREBASE_URL}")
     print(f"  停止:         Ctrl+C")
-    print(f"  Web制御:      cfms-plotter のON/OFFボタン")
-    print("=" * 60)
+    print(f"\n  対象フォルダ:")
+    for f in ACTIVE_FOLDERS:
+        print(f"    - {f}")
 
-    # 既に送信済みのファイルを Firebase から取得
+    # 対象フォルダの既存ファイルを取得
+    folders = get_active_folders(watch_dir)
     known_files = {}
-    print("\n  既存ファイル情報を取得中...")
-    existing = firebase_get("cfms/file_list")
-    if existing:
-        print(f"  Firebase に {len(existing)} ファイル登録済み")
-        # ハッシュマッチングは初回スキャンで行う
+    sent_count = 0
+
+    if not folders:
+        print(f"\n  [警告] 対象フォルダに .dat ファイルが見つかりません")
     else:
-        print(f"  Firebase にファイルなし（初回スキャン）")
+        # 存在するフォルダを表示
+        total_files = sum(len(files) for files in folders.values())
+        print(f"\n{'='*60}")
+        print(f"  既存ファイル送信開始")
+        print(f"  フォルダ数: {len(folders)} / ファイル数: {total_files}")
+        print(f"{'='*60}")
 
-    # 初期ステータス
-    update_status("scanning", 0)
-
-    # 初回フルスキャン
-    print(f"\n  初回スキャン中: {watch_dir}")
-    all_dats = []
-    for root, dirs, files in os.walk(watch_dir):
-        for fname in files:
-            if fname.lower().endswith('.dat'):
-                all_dats.append(os.path.join(root, fname))
-
-    print(f"  .dat ファイル: {len(all_dats)} 個検出")
-
-    # 既に送信済みかチェック（ハッシュ比較）
-    files_to_send = []
-    for fpath in all_dats:
-        fhash = get_file_hash(fpath)
-        file_key = sanitize_key(os.path.basename(fpath).replace('.dat', ''))
-
-        # Firebase に同じハッシュがあればスキップ
-        if existing and file_key in existing:
-            known_files[fpath] = fhash
-            continue
-
-        files_to_send.append(fpath)
-        known_files[fpath] = fhash
-
-    if files_to_send:
-        print(f"  新規ファイル: {len(files_to_send)} 個")
-        for i, fpath in enumerate(files_to_send):
+        for folder_name in sorted(folders.keys()):
             if not running:
                 break
-            if not check_enabled():
-                print("  [一時停止] Web から OFF にされました")
-                while not check_enabled() and running:
-                    time.sleep(5)
+
+            dat_paths = folders[folder_name]
+            print(f"\n  ========================================")
+            print(f"  フォルダ: {folder_name}")
+            print(f"  ファイル数: {len(dat_paths)}")
+            print(f"  ========================================")
+
+            for fpath in dat_paths:
                 if not running:
                     break
-                print("  [再開] ON に戻りました")
+                basename = os.path.basename(fpath)
+                file_key = sanitize_key(f"{folder_name}__{basename.replace('.dat', '')}")
+                send_file(fpath, file_key, folder_name)
+                known_files[fpath] = get_file_hash(fpath)
+                sent_count += 1
 
-            file_key = sanitize_key(os.path.basename(fpath).replace('.dat', ''))
-            print(f"\n  [{i+1}/{len(files_to_send)}] 送信中...")
-            send_file(fpath, file_key)
-            update_status("sending", i + 1)
-    else:
-        print(f"  全ファイル送信済み")
+        print(f"\n  既存ファイル送信完了! {sent_count} ファイル送信しました。")
 
-    update_status("watching", len(known_files))
-    print(f"\n  監視モードに移行... (Ctrl+C で停止)\n")
+    # 監視モードへ移行
+    update_status("watching", sent_count)
+    print(f"\n{'='*60}")
+    print(f"  監視モードに移行")
+    print(f"  対象フォルダに新しい .dat ファイルが追加されたら自動送信")
+    print(f"  停止: Ctrl+C")
+    print(f"{'='*60}\n")
 
-    # 監視ループ
     while running:
         if not check_enabled():
             print("  [一時停止] Web から OFF")
-            update_status("paused", len(known_files))
+            update_status("paused", sent_count)
             while not check_enabled() and running:
                 time.sleep(5)
             if not running:
                 break
             print("  [再開]")
-            update_status("watching", len(known_files))
+            update_status("watching", sent_count)
 
-        new_files = scan_folder(watch_dir, known_files)
+        new_files = scan_active_folders(watch_dir, known_files)
         if new_files:
             print(f"\n  新しいファイル検出: {len(new_files)} 個")
-            for fpath in new_files:
+            for fpath, folder_name in new_files:
                 if not running:
                     break
-                file_key = sanitize_key(os.path.basename(fpath).replace('.dat', ''))
-                send_file(fpath, file_key)
+                basename = os.path.basename(fpath)
+                file_key = sanitize_key(f"{folder_name}__{basename.replace('.dat', '')}")
+                send_file(fpath, file_key, folder_name)
+                sent_count += 1
 
-            update_status("watching", len(known_files))
+            update_status("watching", sent_count)
 
         time.sleep(SCAN_INTERVAL)
 
-    update_status("stopped", len(known_files))
+    update_status("stopped", sent_count)
     print("終了しました。")
 
 
