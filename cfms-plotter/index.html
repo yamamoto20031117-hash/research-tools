@@ -389,7 +389,7 @@ function renderOnlineFileList(files){
   lastOnlineFiles = files;
   const el = document.getElementById('onlineFileList');
   document.getElementById('onlineSection').classList.remove('hidden');
-  const entries = Object.entries(files).sort((a,b) => (b[1].uploaded_at||0) - (a[1].uploaded_at||0));
+  const entries = Object.entries(files);
 
   // フォルダごとにグループ化
   const groups = {};
@@ -399,15 +399,21 @@ function renderOnlineFileList(files){
     groups[folder].push({key, ...f});
   }
 
+  // 各フォルダ内をファイル作成日の新しい順にソート
+  for(const folder in groups){
+    groups[folder].sort((a,b) => (b.file_created||b.uploaded_at||0) - (a.file_created||a.uploaded_at||0));
+  }
+
   const folderOrder = Object.keys(groups).sort((a,b) => a.localeCompare(b, 'ja'));
 
   el.innerHTML = folderOrder.map(folder => {
     const items = groups[folder];
     const chips = items.map(f => {
       const loaded = allFiles.some(af => af.key === f.key);
+      const dateStr = fmtDate(f.file_created || f.uploaded_at);
       return `<div class="file-chip online${loaded ? ' active' : ''}" onclick="loadOnlineFile('${f.key}')">
         <span class="fc-name">${esc(f.filename)}</span>
-        <span class="fc-info">${(f.rows||0).toLocaleString()} 点 &#183; ${f.temp_range||''}</span>
+        <span class="fc-info">${dateStr} &#183; ${(f.rows||0).toLocaleString()} 点 &#183; ${f.temp_range||''}</span>
       </div>`;
     }).join('');
 
@@ -747,6 +753,13 @@ function updateTable(){
 
 function fmt(v,d){return v!==undefined?parseFloat(v).toFixed(d):'---';}
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmtDate(ts){
+  if(!ts) return '';
+  const d = new Date(ts);
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  const h = String(d.getHours()).padStart(2,'0'), min = String(d.getMinutes()).padStart(2,'0');
+  return `${y}/${m}/${day} ${h}:${min}`;
+}
 
 
 // ===== エクスポート =====

@@ -143,6 +143,14 @@ def send_file(filepath, file_key, folder_name=""):
     chunk_size = 5000
     total_chunks = (len(data) + chunk_size - 1) // chunk_size
 
+    # ファイル作成日時を取得
+    try:
+        file_ctime = int(os.path.getctime(filepath) * 1000)
+        file_mtime = int(os.path.getmtime(filepath) * 1000)
+    except:
+        file_ctime = int(time.time() * 1000)
+        file_mtime = file_ctime
+
     meta = {
         "filename": basename,
         "folder": folder_name,
@@ -152,6 +160,8 @@ def send_file(filepath, file_key, folder_name=""):
         "total_rows": len(data),
         "chunks": total_chunks,
         "uploaded_at": int(time.time() * 1000),
+        "file_created": file_ctime,
+        "file_modified": file_mtime,
         "file_hash": get_file_hash(filepath),
     }
 
@@ -182,6 +192,8 @@ def send_file(filepath, file_key, folder_name=""):
         "rows": len(data),
         "temp_range": f"{meta.get('temp_min','?')} - {meta.get('temp_max','?')} K",
         "uploaded_at": meta["uploaded_at"],
+        "file_created": file_ctime,
+        "file_modified": file_mtime,
     })
 
     print(f"  完了! {len(data):,} 行送信")
