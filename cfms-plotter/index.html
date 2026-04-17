@@ -42,11 +42,15 @@
   .online-files-header button{padding:3px 10px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);
     border-radius:4px;font-size:.7rem;cursor:pointer}
   .of-list{display:flex;flex-direction:column;gap:12px}
-  .folder-group{background:rgba(15,18,28,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 14px}
-  .folder-group-header{font-size:.8rem;color:#a78bfa;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .folder-group{background:rgba(15,18,28,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:0;overflow:hidden}
+  .folder-group-header{font-size:.8rem;color:#a78bfa;font-weight:600;padding:10px 14px;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;transition:.15s}
+  .folder-group-header:hover{background:rgba(167,139,250,0.06)}
+  .folder-group-header .fg-arrow{font-size:.65rem;transition:transform .2s;color:#666}
+  .folder-group-header .fg-arrow.open{transform:rotate(90deg)}
   .folder-group-header .fg-icon{font-size:.9rem}
   .folder-group-header .fg-count{font-size:.68rem;color:#666;font-weight:400}
-  .folder-group-files{display:flex;gap:6px;flex-wrap:wrap}
+  .folder-group-files{display:none;gap:6px;flex-wrap:wrap;padding:0 14px 10px}
+  .folder-group-files.open{display:flex}
 
   /* ドロップエリア */
   .drop-zone{margin:0 24px 16px;padding:32px 24px;background:rgba(20,25,40,0.85);
@@ -157,7 +161,6 @@
 <div class="online-files hidden" id="onlineSection">
   <div class="online-files-header">
     <h2>受信済みファイル</h2>
-    <button onclick="clearOnlineData()">全データ削除</button>
   </div>
   <div class="of-list" id="onlineFileList"></div>
 </div>
@@ -408,15 +411,24 @@ function renderOnlineFileList(files){
       </div>`;
     }).join('');
 
+    const fid = 'fg_' + folder.replace(/[^a-zA-Z0-9]/g,'_');
     return `<div class="folder-group">
-      <div class="folder-group-header">
+      <div class="folder-group-header" onclick="toggleFolder('${fid}')">
+        <span class="fg-arrow" id="${fid}_arrow">&#9654;</span>
         <span class="fg-icon">&#128194;</span>
         ${esc(folder)}
         <span class="fg-count">(${items.length} ファイル)</span>
       </div>
-      <div class="folder-group-files">${chips}</div>
+      <div class="folder-group-files" id="${fid}_files">${chips}</div>
     </div>`;
   }).join('');
+}
+
+function toggleFolder(fid){
+  const files = document.getElementById(fid + '_files');
+  const arrow = document.getElementById(fid + '_arrow');
+  const isOpen = files.classList.toggle('open');
+  arrow.classList.toggle('open', isOpen);
 }
 
 function loadOnlineFile(fileKey){
