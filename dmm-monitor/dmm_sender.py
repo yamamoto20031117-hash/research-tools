@@ -43,6 +43,7 @@ output_on = False          # OUTPUT状態
 command_queue = queue.Queue()   # コマンド受信キュー（command_thread → main）
 data_queue = queue.Queue(maxsize=100)  # データ送信キュー（main → sender_thread）
 smu_lock = threading.Lock()    # Keithleyシリアル通信の排他制御
+last_source_config = {}        # 前回のソース設定（再設定スキップ用）
 
 
 # ===== Firebase REST API（タイムアウト短縮） =====
@@ -106,7 +107,7 @@ def flush_buffer(smu):
     except:
         pass
 
-def safe_write(smu, cmd, delay=0.5):
+def safe_write(smu, cmd, delay=0.1):
     """エラークリア + バッファクリア付きで安全にSCPIコマンドを送信"""
     if not smu:
         return
@@ -160,9 +161,7 @@ def firebase_command_thread(smu):
                 if action == "OUTPUT_OFF":
                     print("\n  *** Web: OUTPUT OFF ***")
                     with smu_lock:
-                        safe_write(smu, "*CLS", 0.3)
-                        safe_write(smu, ":OUTP OFF", 0.5)
-                        safe_write(smu, ":SYST:LOC", 0.3)
+                        safe_write(smu, ":OUTP OFF", 0.2)
                     auto_stop_time = 0
                     output_on = False
                     update_output_status(False)
@@ -171,17 +170,7 @@ def firebase_command_thread(smu):
                 elif action == "OUTPUT_ON":
                     print("\n  *** Web: OUTPUT ON ***")
                     with smu_lock:
-                        safe_write(smu, "*CLS", 0.3)
-                        safe_write(smu, ":OUTP ON", 1.0)
-                        if smu:
-                            try:
-                                flush_buffer(smu)
-                                state = smu.query(":OUTP?").strip()
-                                if state not in ("1", "ON"):
-                                    safe_write(smu, "*CLS", 0.5)
-                                    safe_write(smu, ":OUTP ON", 1.0)
-                            except:
-                                pass
+                        safe_write(smu, ":OUTP ON", 0.3)
                     output_on = True
                     update_output_status(True)
                     command_queue.put(("ON", None))
@@ -192,28 +181,23 @@ def firebase_command_thread(smu):
                     print(f"\n  *** Web: 測定間隔 -> {interval} 秒 ***")
 
                 elif action == "SOURCE_START":
+                    global last_source_config
                     src_mode = cmd.get("mode", "CURR")
                     value = float(cmd.get("value", 0))
                     compliance = float(cmd.get("compliance", 21))
                     duration = float(cmd.get("duration", 0))
 
-                    mode_label = "定電流" if src_mode == "CURR" else "定電圧"
-                    unit = "A" if src_mode == "CURR" else "V"
-                    print(f"\n  *** Web: SOURCE START ***")
-                    print(f"  {mode_label} {value} {unit}, Comp={compliance}")
+                    new_config = {"mode": src_mode, "value": value, "compliance": compliance}
+                    need_reconfig = (new_config != last_source_config)
 
                     with smu_lock:
-                        configure_source(smu, src_mode, value, compliance)
-                        safe_write(smu, ":OUTP ON", 1.0)
-                        if smu:
-                            try:
-                                flush_buffer(smu)
-                                state = smu.query(":OUTP?").strip()
-                                if state not in ("1", "ON"):
-                                    safe_write(smu, "*CLS", 0.5)
-                                    safe_write(smu, ":OUTP ON", 1.0)
-                            except:
-                                pass
+                        if need_reconfig:
+                            print(f"\n  *** Web: SOURCE START (設定変更) ***")
+                            configure_source(smu, src_mode, value, compliance)
+                            last_source_config = new_config
+                        else:
+                            print(f"\n  *** Web: SOURCE START (再開) ***")
+                        safe_write(smu, ":OUTP ON", 0.3)
 
                     output_on = True
                     update_output_status(True)
@@ -230,9 +214,7 @@ def firebase_command_thread(smu):
             if auto_stop_time > 0 and time.time() >= auto_stop_time:
                 print("\n  *** タイマー満了: OUTPUT OFF ***")
                 with smu_lock:
-                    safe_write(smu, "*CLS", 0.3)
-                    safe_write(smu, ":OUTP OFF", 0.5)
-                    safe_write(smu, ":SYST:LOC", 0.3)
+                    safe_write(smu, ":OUTP OFF", 0.2)
                 auto_stop_time = 0
                 output_on = False
                 update_output_status(False)
@@ -251,32 +233,23 @@ def configure_source(smu, mode, value, compliance):
     if not smu:
         return
 
-    safe_write(smu, ":OUTP OFF", 0.5)
-    safe_write(smu, "*CLS", 0.5)
+    safe_write(smu, ":OUTP OFF", 0.15)
+    safe_write(smu, "*CLS", 0.1)
 
     if mode == "CURR":
-        safe_write(smu, ":SOUR:FUNC CURR", 0.5)
-        safe_write(smu, ":SOUR:CURR:RANG:AUTO ON", 0.5)
-        safe_write(smu, f":SOUR:CURR {value}", 0.5)
-        safe_write(smu, f":SENS:VOLT:PROT {compliance}", 0.5)
+        safe_write(smu, ":SOUR:FUNC CURR", 0.1)
+        safe_write(smu, ":SOUR:CURR:RANG:AUTO ON", 0.1)
+        safe_write(smu, f":SOUR:CURR {value}", 0.1)
+        safe_write(smu, f":SENS:VOLT:PROT {compliance}", 0.1)
     elif mode == "VOLT":
-        safe_write(smu, ":SOUR:FUNC VOLT", 0.5)
-        safe_write(smu, ":SOUR:VOLT:RANG:AUTO ON", 0.5)
-        safe_write(smu, f":SOUR:VOLT {value}", 0.5)
-        safe_write(smu, f":SENS:CURR:PROT {compliance}", 0.5)
+        safe_write(smu, ":SOUR:FUNC VOLT", 0.1)
+        safe_write(smu, ":SOUR:VOLT:RANG:AUTO ON", 0.1)
+        safe_write(smu, f":SOUR:VOLT {value}", 0.1)
+        safe_write(smu, f":SENS:CURR:PROT {compliance}", 0.1)
 
-    safe_write(smu, ":SENS:FUNC:CONC ON", 0.5)
-    safe_write(smu, ":SENS:FUNC 'VOLT:DC','CURR:DC'", 0.5)
-    safe_write(smu, ":FORM:ELEM VOLT,CURR", 0.5)
-
-    if smu:
-        try:
-            flush_buffer(smu)
-            err = smu.query(":SYST:ERR?").strip()
-            if not err.startswith("0") and not err.startswith("+0"):
-                print(f"  Keithley error: {err}")
-        except:
-            pass
+    safe_write(smu, ":SENS:FUNC:CONC ON", 0.1)
+    safe_write(smu, ":SENS:FUNC 'VOLT:DC','CURR:DC'", 0.1)
+    safe_write(smu, ":FORM:ELEM VOLT,CURR", 0.1)
 
 
 # ===== Keithley 2400 接続 =====
