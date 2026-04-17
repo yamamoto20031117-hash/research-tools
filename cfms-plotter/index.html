@@ -16,28 +16,61 @@
   .back-link{color:#58a6ff;text-decoration:none;font-size:.8rem}
   .back-link:hover{text-decoration:underline}
 
+  /* 自動受信パネル */
+  .auto-panel{margin:16px 24px;background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.06);
+    border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .auto-panel .ap-label{font-size:.85rem;color:#fff;font-weight:600}
+  .auto-panel .ap-sub{font-size:.72rem;color:#666}
+  .toggle-switch{position:relative;width:48px;height:26px;cursor:pointer;flex-shrink:0}
+  .toggle-switch input{display:none}
+  .toggle-switch .slider{position:absolute;inset:0;background:#333;border-radius:26px;transition:.2s}
+  .toggle-switch .slider:before{content:'';position:absolute;width:20px;height:20px;left:3px;top:3px;
+    background:#888;border-radius:50%;transition:.2s}
+  .toggle-switch input:checked+.slider{background:rgba(34,197,94,0.3)}
+  .toggle-switch input:checked+.slider:before{transform:translateX(22px);background:#22c55e}
+  .sender-status{font-size:.72rem;color:#666;display:flex;align-items:center;gap:6px}
+  .sender-status .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+  .sender-status .dot.on{background:#22c55e;box-shadow:0 0 4px #22c55e}
+  .sender-status .dot.off{background:#555}
+  .sender-status .dot.sending{background:#eab308;animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* オンラインファイル一覧 */
+  .online-files{margin:0 24px 16px}
+  .online-files-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .online-files-header h2{font-size:.85rem;color:#fff}
+  .online-files-header button{padding:3px 10px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);
+    border-radius:4px;font-size:.7rem;cursor:pointer}
+  .of-list{display:flex;gap:8px;flex-wrap:wrap}
+
   /* ドロップエリア */
-  .drop-zone{margin:20px 24px;padding:48px 24px;background:rgba(20,25,40,0.85);
-    border:2px dashed rgba(88,166,255,0.3);border-radius:16px;text-align:center;
-    cursor:pointer;transition:.2s;position:relative}
+  .drop-zone{margin:0 24px 16px;padding:32px 24px;background:rgba(20,25,40,0.85);
+    border:2px dashed rgba(88,166,255,0.3);border-radius:12px;text-align:center;
+    cursor:pointer;transition:.2s}
   .drop-zone:hover{border-color:#58a6ff;background:rgba(20,25,40,1)}
-  .drop-zone.dragover{border-color:#22c55e;background:rgba(34,197,94,0.05);transform:scale(1.01)}
-  .drop-zone .dz-icon{font-size:3rem;margin-bottom:12px;opacity:.7}
-  .drop-zone .dz-text{font-size:1rem;color:#aaa}
-  .drop-zone .dz-sub{font-size:.78rem;color:#555;margin-top:8px}
+  .drop-zone.dragover{border-color:#22c55e;background:rgba(34,197,94,0.05)}
+  .drop-zone.compact{padding:14px 24px}
+  .drop-zone.compact .dz-icon{display:none}
+  .drop-zone.compact .dz-sub{display:none}
+  .drop-zone .dz-icon{font-size:2.5rem;margin-bottom:8px;opacity:.7}
+  .drop-zone .dz-text{font-size:.9rem;color:#aaa}
+  .drop-zone .dz-sub{font-size:.72rem;color:#555;margin-top:6px}
   .drop-zone input{display:none}
 
-  /* ファイルリスト */
+  /* ファイルチップ */
   .file-list{margin:0 24px 16px;display:flex;gap:8px;flex-wrap:wrap}
   .file-chip{background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.25);border-radius:8px;
-    padding:6px 14px;font-size:.78rem;color:#58a6ff;display:flex;align-items:center;gap:8px;cursor:default}
+    padding:6px 14px;font-size:.78rem;color:#58a6ff;display:flex;align-items:center;gap:8px;cursor:pointer}
+  .file-chip:hover{background:rgba(88,166,255,0.15)}
   .file-chip .fc-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .file-chip .fc-info{color:#666;font-size:.68rem}
-  .file-chip .fc-close{cursor:pointer;color:#888;font-size:1rem;line-height:1}
+  .file-chip .fc-close{color:#888;font-size:1rem;line-height:1}
   .file-chip .fc-close:hover{color:#ef4444}
   .file-chip.active{background:rgba(88,166,255,0.2);border-color:#58a6ff}
+  .file-chip.online{border-color:rgba(34,197,94,0.3);color:#22c55e}
+  .file-chip.online.active{background:rgba(34,197,94,0.15);border-color:#22c55e}
 
-  /* 現在値カード */
+  /* サマリーカード */
   .summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding:0 24px 16px}
   .s-card{background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.06);
     border-radius:10px;padding:12px;text-align:center}
@@ -62,7 +95,7 @@
   .chart-wrap{background:rgba(15,18,28,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:8px;overflow:hidden}
   canvas{display:block;width:100%}
 
-  /* データテーブル */
+  /* テーブル */
   .table-section{padding:0 24px 24px}
   .table-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
   .table-header h2{font-size:.9rem;color:#fff}
@@ -75,17 +108,16 @@
   tr:hover td{background:rgba(88,166,255,0.03)}
 
   footer{padding:16px 24px;color:#444;font-size:.7rem;text-align:center;border-top:1px solid rgba(255,255,255,0.04)}
-
   .hidden{display:none}
 
   @media(max-width:600px){
     header{padding:12px 14px}
     header h1{font-size:1rem}
-    .drop-zone{margin:12px 14px;padding:32px 14px}
-    .file-list{margin:0 14px 12px}
+    .auto-panel{margin:12px 14px;padding:12px 14px}
+    .drop-zone{margin:0 14px 12px;padding:24px 14px}
+    .file-list,.online-files{margin-left:14px;margin-right:14px}
     .summary{padding:0 14px 12px;grid-template-columns:repeat(2,1fr)}
     .chart-section{padding:0 14px 14px}
-    .chart-controls{gap:6px}
     .table-section{padding:0 14px 14px}
     th,td{padding:4px 6px;font-size:.68rem}
   }
@@ -100,6 +132,31 @@
   </div>
 </header>
 
+<!-- 自動受信パネル -->
+<div class="auto-panel">
+  <div style="flex:1;min-width:200px">
+    <div class="ap-label">自動受信 (CFMS PC → Web)</div>
+    <div class="ap-sub">CFMS PCの cfms_sender.py が送信したデータを自動受信</div>
+  </div>
+  <label class="toggle-switch">
+    <input type="checkbox" id="autoToggle" onchange="toggleAutoReceive()">
+    <span class="slider"></span>
+  </label>
+  <div class="sender-status" id="senderStatus">
+    <span class="dot off"></span>
+    <span>OFF</span>
+  </div>
+</div>
+
+<!-- オンラインファイル一覧 -->
+<div class="online-files hidden" id="onlineSection">
+  <div class="online-files-header">
+    <h2>受信済みファイル</h2>
+    <button onclick="clearOnlineData()">全データ削除</button>
+  </div>
+  <div class="of-list" id="onlineFileList"></div>
+</div>
+
 <!-- ドロップゾーン -->
 <div class="drop-zone" id="dropZone"
      onclick="document.getElementById('fileInput').click()"
@@ -107,15 +164,15 @@
      ondragleave="this.classList.remove('dragover')"
      ondrop="handleDrop(event)">
   <div class="dz-icon">&#128194;</div>
-  <div class="dz-text">.dat ファイルをドラッグ＆ドロップ、またはクリックして選択</div>
-  <div class="dz-sub">Cryogenic CFMS-5T の .dat ファイル（タブ区切り）に対応 &#183; 複数ファイル可</div>
+  <div class="dz-text">.dat ファイルをドロップ、またはクリックして選択</div>
+  <div class="dz-sub">手動アップロード &#183; 複数ファイル可</div>
   <input type="file" id="fileInput" accept=".dat,.txt,.csv" multiple onchange="handleFileSelect(event)">
 </div>
 
-<!-- ファイルリスト -->
+<!-- ファイルチップ（ローカル + オンライン） -->
 <div class="file-list hidden" id="fileList"></div>
 
-<!-- サマリーカード -->
+<!-- サマリー -->
 <div class="summary hidden" id="summary">
   <div class="s-card info"><div class="label">データ点数</div><div class="value" id="sCount">---</div></div>
   <div class="s-card temp"><div class="label">温度範囲</div><div class="value" id="sTempRange">---</div><span class="unit">K</span></div>
@@ -124,7 +181,7 @@
   <div class="s-card temp"><div class="label">電流 I_s</div><div class="value" id="sCurrent">---</div><span class="unit">A</span></div>
 </div>
 
-<!-- メインチャート -->
+<!-- チャート -->
 <div class="chart-section hidden" id="chartSection">
   <div class="chart-controls">
     <label>Y軸:</label>
@@ -148,7 +205,7 @@
   </div>
 </div>
 
-<!-- データテーブル -->
+<!-- テーブル -->
 <div class="table-section hidden" id="tableSection">
   <div class="table-header">
     <h2>データテーブル</h2>
@@ -168,12 +225,176 @@
 
 <footer>CFMS Plotter v1.0 — Cryogenic CFMS-5T — Research Tools</footer>
 
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
-// ===== データ =====
-let allFiles = [];  // [{name, data:[{...}]}]
-let activeFileIdx = 0;
+const firebaseConfig = {
+  apiKey: "AIzaSyClK3vIE_SQ7SGdXWbmWzZ51MdeBappDKY",
+  authDomain: "research-tools-board.firebaseapp.com",
+  databaseURL: "https://research-tools-board-default-rtdb.firebaseio.com",
+  projectId: "research-tools-board",
+  storageBucket: "research-tools-board.firebasestorage.app",
+  messagingSenderId: "359837086498",
+  appId: "1:359837086498:web:your_app_id"
+};
 
-// ===== ファイル読み込み =====
+let db = null, firebaseReady = false;
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+  firebaseReady = true;
+} catch(e){ console.warn('Firebase init error', e); }
+
+
+// ===== 全ファイルデータ管理 =====
+let allFiles = [];       // [{name, data, source:'local'|'online', key}]
+let activeFileIdx = -1;
+let autoReceive = false;
+let fileListListener = null;
+let senderStatusListener = null;
+
+
+// ===== 自動受信 ON/OFF =====
+function toggleAutoReceive(){
+  autoReceive = document.getElementById('autoToggle').checked;
+
+  if(autoReceive){
+    startAutoReceive();
+    // Firebase に ON を通知
+    if(firebaseReady) db.ref('cfms/control').set({enabled: true, time: Date.now()});
+  } else {
+    stopAutoReceive();
+    if(firebaseReady) db.ref('cfms/control').set({enabled: false, time: Date.now()});
+  }
+  updateSenderStatusUI();
+}
+
+function startAutoReceive(){
+  if(!firebaseReady) return;
+  document.getElementById('onlineSection').classList.remove('hidden');
+
+  // ファイル一覧を監視
+  if(fileListListener) fileListListener();
+  const ref = db.ref('cfms/file_list');
+  ref.on('value', snap => {
+    const files = snap.val();
+    if(!files) return;
+    renderOnlineFileList(files);
+  });
+  fileListListener = () => ref.off('value');
+
+  // Sender ステータス監視
+  if(senderStatusListener) senderStatusListener();
+  const sRef = db.ref('cfms/sender_status');
+  sRef.on('value', snap => {
+    const s = snap.val();
+    if(s) updateSenderStatusFromFirebase(s);
+  });
+  senderStatusListener = () => sRef.off('value');
+}
+
+function stopAutoReceive(){
+  if(fileListListener){ fileListListener(); fileListListener = null; }
+  if(senderStatusListener){ senderStatusListener(); senderStatusListener = null; }
+  document.getElementById('onlineSection').classList.add('hidden');
+}
+
+function updateSenderStatusUI(){
+  const el = document.getElementById('senderStatus');
+  if(!autoReceive){
+    el.innerHTML = '<span class="dot off"></span><span>OFF</span>';
+  }
+}
+
+function updateSenderStatusFromFirebase(s){
+  if(!autoReceive) return;
+  const el = document.getElementById('senderStatus');
+  const status = s.status || 'unknown';
+  const t = s.last_update ? new Date(s.last_update).toLocaleTimeString('ja-JP') : '';
+
+  if(status === 'watching'){
+    el.innerHTML = `<span class="dot on"></span><span>監視中 (${s.files_sent || 0} files) ${t}</span>`;
+  } else if(status === 'sending'){
+    el.innerHTML = `<span class="dot sending"></span><span>送信中... (${s.files_sent || 0} files)</span>`;
+  } else if(status === 'paused'){
+    el.innerHTML = '<span class="dot off"></span><span>一時停止中</span>';
+  } else if(status === 'stopped'){
+    el.innerHTML = '<span class="dot off"></span><span>停止</span>';
+  } else {
+    el.innerHTML = `<span class="dot on"></span><span>${status} ${t}</span>`;
+  }
+}
+
+function renderOnlineFileList(files){
+  const el = document.getElementById('onlineFileList');
+  const entries = Object.entries(files).sort((a,b) => (b[1].uploaded_at||0) - (a[1].uploaded_at||0));
+
+  el.innerHTML = entries.map(([key, f]) => {
+    const loaded = allFiles.some(af => af.key === key);
+    return `<div class="file-chip online${loaded ? ' active' : ''}" onclick="loadOnlineFile('${key}')">
+      <span class="fc-name">${esc(f.filename)}</span>
+      <span class="fc-info">${(f.rows||0).toLocaleString()} 点 &#183; ${f.temp_range||''}</span>
+    </div>`;
+  }).join('');
+}
+
+function loadOnlineFile(fileKey){
+  // 既にロード済みならそっちを選択
+  const existing = allFiles.findIndex(f => f.key === fileKey);
+  if(existing >= 0){
+    activeFileIdx = existing;
+    updateUI();
+    return;
+  }
+
+  if(!firebaseReady) return;
+
+  // Firebase からデータ取得
+  const statusEl = document.getElementById('senderStatus');
+  statusEl.innerHTML = '<span class="dot sending"></span><span>データ読み込み中...</span>';
+
+  db.ref(`cfms/files/${fileKey}/meta`).once('value').then(snap => {
+    const meta = snap.val();
+    if(!meta) return;
+
+    const chunks = meta.chunks || 1;
+    const promises = [];
+    for(let i = 0; i < chunks; i++){
+      promises.push(db.ref(`cfms/files/${fileKey}/data/${i}`).once('value'));
+    }
+
+    return Promise.all(promises).then(snaps => {
+      let data = [];
+      for(const s of snaps){
+        const chunk = s.val();
+        if(chunk && Array.isArray(chunk)) data = data.concat(chunk);
+        else if(chunk) data = data.concat(Object.values(chunk));
+      }
+
+      allFiles.push({name: meta.filename, data, source: 'online', key: fileKey});
+      activeFileIdx = allFiles.length - 1;
+      updateUI();
+      updateSenderStatusUI();
+      if(autoReceive) updateSenderStatusFromFirebase({status:'watching'});
+    });
+  });
+}
+
+function clearOnlineData(){
+  if(!confirm('Firebase上の全CFMSデータを削除しますか？')) return;
+  if(firebaseReady){
+    db.ref('cfms/files').remove();
+    db.ref('cfms/file_list').remove();
+  }
+  // オンラインファイルを allFiles から除去
+  allFiles = allFiles.filter(f => f.source !== 'online');
+  if(activeFileIdx >= allFiles.length) activeFileIdx = Math.max(0, allFiles.length - 1);
+  updateUI();
+}
+
+
+// ===== ローカルファイルドロップ =====
 function handleDrop(e){
   e.preventDefault();
   document.getElementById('dropZone').classList.remove('dragover');
@@ -187,7 +408,7 @@ function loadFiles(fileList){
     reader.onload = function(e){
       const data = parseDat(e.target.result);
       if(data.length === 0){ alert(file.name + ' のパースに失敗しました'); return; }
-      allFiles.push({name: file.name, data});
+      allFiles.push({name: file.name, data, source: 'local', key: null});
       activeFileIdx = allFiles.length - 1;
       updateUI();
     };
@@ -198,10 +419,8 @@ function loadFiles(fileList){
 function parseDat(text){
   const lines = text.split(/\r?\n/);
   if(lines.length < 2) return [];
-
   const headers = lines[0].split('\t').map(h => h.trim());
   const data = [];
-
   for(let i = 1; i < lines.length; i++){
     const line = lines[i].trim();
     if(!line) continue;
@@ -219,6 +438,7 @@ function parseDat(text){
 function removeFile(idx){
   allFiles.splice(idx, 1);
   if(activeFileIdx >= allFiles.length) activeFileIdx = Math.max(0, allFiles.length - 1);
+  if(allFiles.length === 0) activeFileIdx = -1;
   updateUI();
 }
 
@@ -227,36 +447,27 @@ function selectFile(idx){
   updateUI();
 }
 
-// ===== UI更新 =====
+
+// ===== UI =====
 function updateUI(){
-  const hasData = allFiles.length > 0;
+  const hasData = allFiles.length > 0 && activeFileIdx >= 0;
 
-  // ドロップゾーンを小さく
+  // ドロップゾーンをコンパクトに
   const dz = document.getElementById('dropZone');
-  if(hasData){
-    dz.style.padding = '16px 24px';
-    dz.querySelector('.dz-icon').style.display = 'none';
-    dz.querySelector('.dz-text').style.fontSize = '.82rem';
-    dz.querySelector('.dz-sub').style.display = 'none';
-  } else {
-    dz.style.padding = '';
-    dz.querySelector('.dz-icon').style.display = '';
-    dz.querySelector('.dz-text').style.fontSize = '';
-    dz.querySelector('.dz-sub').style.display = '';
-  }
+  dz.classList.toggle('compact', hasData);
 
-  // ファイルリスト
+  // ファイルチップ
   const fl = document.getElementById('fileList');
-  fl.classList.toggle('hidden', !hasData);
+  fl.classList.toggle('hidden', allFiles.length === 0);
   fl.innerHTML = allFiles.map((f, i) =>
-    `<div class="file-chip${i===activeFileIdx?' active':''}" onclick="selectFile(${i})">
+    `<div class="file-chip${f.source==='online'?' online':''}${i===activeFileIdx?' active':''}" onclick="selectFile(${i})">
       <span class="fc-name">${esc(f.name)}</span>
       <span class="fc-info">${f.data.length.toLocaleString()} 点</span>
       <span class="fc-close" onclick="event.stopPropagation();removeFile(${i})">&times;</span>
     </div>`
   ).join('');
 
-  // セクション表示
+  // セクション
   document.getElementById('summary').classList.toggle('hidden', !hasData);
   document.getElementById('chartSection').classList.toggle('hidden', !hasData);
   document.getElementById('tableSection').classList.toggle('hidden', !hasData);
@@ -266,240 +477,210 @@ function updateUI(){
     redrawChart();
     updateTable();
   }
+
+  // オンラインファイルリストのアクティブ状態更新
+  if(autoReceive){
+    db.ref('cfms/file_list').once('value').then(snap => {
+      const f = snap.val();
+      if(f) renderOnlineFileList(f);
+    });
+  }
 }
 
 function updateSummary(){
   const data = allFiles[activeFileIdx].data;
-  const n = data.length;
-
-  let tMin = Infinity, tMax = -Infinity;
-  let rMin = Infinity, rMax = -Infinity;
-  let bSum = 0, iSum = 0, bCount = 0;
-
+  let tMin=Infinity,tMax=-Infinity,rMin=Infinity,rMax=-Infinity,bSum=0,iSum=0,bCnt=0;
   for(const d of data){
-    const t = d['sensor_B_(K)'];
-    const r = d['R_nv'];
-    const b = d['B_digital_(T)'];
-    const is_ = d['I_s'];
-    if(t !== undefined){ if(t < tMin) tMin = t; if(t > tMax) tMax = t; }
-    if(r !== undefined){ if(r < rMin) rMin = r; if(r > rMax) rMax = r; }
-    if(b !== undefined){ bSum += b; bCount++; }
-    if(is_ !== undefined){ iSum += is_; }
+    const t=d['sensor_B_(K)'], r=d['R_nv'], b=d['B_digital_(T)'], is_=d['I_s'];
+    if(t!==undefined){if(t<tMin)tMin=t;if(t>tMax)tMax=t;}
+    if(r!==undefined){if(r<rMin)rMin=r;if(r>rMax)rMax=r;}
+    if(b!==undefined){bSum+=b;bCnt++;}
+    if(is_!==undefined) iSum+=is_;
   }
-
-  document.getElementById('sCount').textContent = n.toLocaleString();
-  document.getElementById('sTempRange').textContent = tMin < Infinity ? tMin.toFixed(1) + ' ~ ' + tMax.toFixed(1) : '---';
-  document.getElementById('sRnvRange').textContent = rMin < Infinity ? fmtR(rMin) + ' ~ ' + fmtR(rMax) : '---';
-  document.getElementById('sField').textContent = bCount > 0 ? (bSum / bCount).toFixed(4) : '---';
-  document.getElementById('sCurrent').textContent = n > 0 ? (iSum / n).toExponential(2) : '---';
+  document.getElementById('sCount').textContent = data.length.toLocaleString();
+  document.getElementById('sTempRange').textContent = tMin<Infinity ? tMin.toFixed(1)+' ~ '+tMax.toFixed(1) : '---';
+  document.getElementById('sRnvRange').textContent = rMin<Infinity ? fmtR(rMin)+' ~ '+fmtR(rMax) : '---';
+  document.getElementById('sField').textContent = bCnt>0 ? (bSum/bCnt).toFixed(4) : '---';
+  document.getElementById('sCurrent').textContent = data.length>0 ? (iSum/data.length).toExponential(2) : '---';
 }
 
 function fmtR(v){
-  const a = Math.abs(v);
-  if(a < 0.001) return (v*1e6).toFixed(2) + ' u';
-  if(a < 1) return (v*1e3).toFixed(3) + ' m';
+  const a=Math.abs(v);
+  if(a<0.001) return (v*1e6).toFixed(2)+' u';
+  if(a<1) return (v*1e3).toFixed(3)+' m';
   return v.toFixed(4);
 }
 
+
 // ===== Nice tick =====
-function niceNum(range, round){
-  if(range <= 0) return 1;
-  const exp = Math.floor(Math.log10(range));
-  const frac = range / Math.pow(10, exp);
+function niceNum(range,round){
+  if(range<=0)return 1;
+  const exp=Math.floor(Math.log10(range));
+  const frac=range/Math.pow(10,exp);
   let nice;
-  if(round){
-    if(frac < 1.5) nice = 1;
-    else if(frac < 3) nice = 2;
-    else if(frac < 7) nice = 5;
-    else nice = 10;
-  } else {
-    if(frac <= 1) nice = 1;
-    else if(frac <= 2) nice = 2;
-    else if(frac <= 5) nice = 5;
-    else nice = 10;
-  }
-  return nice * Math.pow(10, exp);
+  if(round){if(frac<1.5)nice=1;else if(frac<3)nice=2;else if(frac<7)nice=5;else nice=10;}
+  else{if(frac<=1)nice=1;else if(frac<=2)nice=2;else if(frac<=5)nice=5;else nice=10;}
+  return nice*Math.pow(10,exp);
+}
+function calcTicks(dMin,dMax,n){
+  const range=dMax-dMin||1;
+  const spacing=niceNum(range/(n-1),true);
+  const lo=Math.floor(dMin/spacing)*spacing;
+  const hi=Math.ceil(dMax/spacing)*spacing;
+  const ticks=[];
+  for(let v=lo;v<=hi+spacing*0.001;v+=spacing) ticks.push(v);
+  return {min:lo,max:hi,ticks,spacing};
 }
 
-function calcTicks(dMin, dMax, n){
-  const range = dMax - dMin || 1;
-  const spacing = niceNum(range / (n - 1), true);
-  const lo = Math.floor(dMin / spacing) * spacing;
-  const hi = Math.ceil(dMax / spacing) * spacing;
-  const ticks = [];
-  for(let v = lo; v <= hi + spacing * 0.001; v += spacing) ticks.push(v);
-  return {min: lo, max: hi, ticks, spacing};
-}
 
-// ===== チャート描画 =====
+// ===== チャート =====
 function redrawChart(){
-  if(allFiles.length === 0) return;
-  const data = allFiles[activeFileIdx].data;
+  if(allFiles.length===0||activeFileIdx<0) return;
+  const data=allFiles[activeFileIdx].data;
 
-  const canvas = document.getElementById('chartMain');
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.parentElement.clientWidth;
-  const h = 450;
-  canvas.width = w * dpr; canvas.height = h * dpr;
-  canvas.style.height = h + 'px';
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, w, h);
+  const canvas=document.getElementById('chartMain');
+  const dpr=window.devicePixelRatio||1;
+  const w=canvas.parentElement.clientWidth;
+  const h=450;
+  canvas.width=w*dpr;canvas.height=h*dpr;
+  canvas.style.height=h+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
 
-  const yKey = document.getElementById('yAxis').value;
-  const xKey = document.getElementById('xAxis').value;
+  const yKey=document.getElementById('yAxis').value;
+  const xKey=document.getElementById('xAxis').value;
 
-  const filtered = data.filter(d => d[yKey] !== undefined && d[xKey] !== undefined);
-  if(filtered.length < 2){
-    ctx.fillStyle = '#555'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('選択したカラムのデータがありません', w/2, h/2);
+  const filtered=data.filter(d=>d[yKey]!==undefined&&d[xKey]!==undefined);
+  if(filtered.length<2){
+    ctx.fillStyle='#555';ctx.font='13px sans-serif';ctx.textAlign='center';
+    ctx.fillText('選択したカラムのデータがありません',w/2,h/2);
     return;
   }
 
-  const margin = {top: 20, right: 20, bottom: 50, left: 76};
-  const pw = w - margin.left - margin.right;
-  const ph = h - margin.top - margin.bottom;
+  const margin={top:20,right:20,bottom:50,left:76};
+  const pw=w-margin.left-margin.right;
+  const ph=h-margin.top-margin.bottom;
 
-  // 範囲
-  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+  let xMin=Infinity,xMax=-Infinity,yMin=Infinity,yMax=-Infinity;
   for(const d of filtered){
-    const x = parseFloat(d[xKey]), y = parseFloat(d[yKey]);
-    if(x < xMin) xMin = x; if(x > xMax) xMax = x;
-    if(y < yMin) yMin = y; if(y > yMax) yMax = y;
+    const x=parseFloat(d[xKey]),y=parseFloat(d[yKey]);
+    if(x<xMin)xMin=x;if(x>xMax)xMax=x;
+    if(y<yMin)yMin=y;if(y>yMax)yMax=y;
   }
 
-  const yT = calcTicks(yMin, yMax, 7);
-  const xT = calcTicks(xMin, xMax, 7);
+  const yT=calcTicks(yMin,yMax,7);
+  const xT=calcTicks(xMin,xMax,7);
 
-  const xPx = v => margin.left + ((v - xT.min) / (xT.max - xT.min || 1)) * pw;
-  const yPx = v => margin.top + ph - ((v - yT.min) / (yT.max - yT.min || 1)) * ph;
+  const xPx=v=>margin.left+((v-xT.min)/(xT.max-xT.min||1))*pw;
+  const yPx=v=>margin.top+ph-((v-yT.min)/(yT.max-yT.min||1))*ph;
 
   // グリッド
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
-  for(const v of yT.ticks){ const y = yPx(v); ctx.beginPath(); ctx.moveTo(margin.left,y); ctx.lineTo(w-margin.right,y); ctx.stroke(); }
-  for(const v of xT.ticks){ const x = xPx(v); ctx.beginPath(); ctx.moveTo(x,margin.top); ctx.lineTo(x,margin.top+ph); ctx.stroke(); }
+  ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.5;
+  for(const v of yT.ticks){const y=yPx(v);ctx.beginPath();ctx.moveTo(margin.left,y);ctx.lineTo(w-margin.right,y);ctx.stroke();}
+  for(const v of xT.ticks){const x=xPx(v);ctx.beginPath();ctx.moveTo(x,margin.top);ctx.lineTo(x,margin.top+ph);ctx.stroke();}
 
-  // 軸ラベル色
-  const yColor = yKey.includes('R') ? '#22d3ee' : '#58a6ff';
-  const xColor = '#f97316';
+  const yColor=yKey.includes('R')?'#22d3ee':'#58a6ff';
+  const xColor='#f97316';
 
-  // Y軸目盛り
-  const yDec = yT.spacing >= 10 ? 0 : yT.spacing >= 1 ? 1 : yT.spacing >= 0.1 ? 2 : yT.spacing >= 0.01 ? 3 : yT.spacing >= 0.001 ? 4 : 6;
-  ctx.fillStyle = yColor; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
-  for(const v of yT.ticks){
-    const y = yPx(v);
-    if(y >= margin.top - 2 && y <= margin.top + ph + 2)
-      ctx.fillText(v.toFixed(yDec), margin.left - 8, y + 4);
-  }
+  // Y軸
+  const yDec=yT.spacing>=10?0:yT.spacing>=1?1:yT.spacing>=0.1?2:yT.spacing>=0.01?3:yT.spacing>=0.001?4:6;
+  ctx.fillStyle=yColor;ctx.font='11px sans-serif';ctx.textAlign='right';
+  for(const v of yT.ticks){const y=yPx(v);if(y>=margin.top-2&&y<=margin.top+ph+2)ctx.fillText(v.toFixed(yDec),margin.left-8,y+4);}
 
-  // X軸目盛り
-  const xDec = xT.spacing >= 10 ? 0 : xT.spacing >= 1 ? 1 : xT.spacing >= 0.1 ? 2 : 4;
-  ctx.fillStyle = xColor; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
-  for(const v of xT.ticks){
-    const x = xPx(v);
-    if(x >= margin.left - 10 && x <= w - margin.right + 10)
-      ctx.fillText(v.toFixed(xDec), x, margin.top + ph + 18);
-  }
+  // X軸
+  const xDec=xT.spacing>=10?0:xT.spacing>=1?1:xT.spacing>=0.1?2:4;
+  ctx.fillStyle=xColor;ctx.font='11px sans-serif';ctx.textAlign='center';
+  for(const v of xT.ticks){const x=xPx(v);if(x>=margin.left-10&&x<=w-margin.right+10)ctx.fillText(v.toFixed(xDec),x,margin.top+ph+18);}
 
   // 軸タイトル
-  const yLabel = yKey.replace(/_/g, ' ');
-  const xLabel = xKey === 'Time' ? 'Time (s)' : xKey.replace(/_/g, ' ');
-
-  ctx.save(); ctx.translate(16, margin.top + ph/2); ctx.rotate(-Math.PI/2);
-  ctx.fillStyle = yColor; ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif';
-  ctx.fillText(yLabel, 0, 0); ctx.restore();
-
-  ctx.fillStyle = xColor; ctx.textAlign = 'center'; ctx.font = 'bold 12px sans-serif';
-  ctx.fillText(xLabel, margin.left + pw/2, h - 6);
+  const yLabel=yKey.replace(/_/g,' ');
+  const xLabel=xKey==='Time'?'Time (s)':xKey.replace(/_/g,' ');
+  ctx.save();ctx.translate(16,margin.top+ph/2);ctx.rotate(-Math.PI/2);
+  ctx.fillStyle=yColor;ctx.textAlign='center';ctx.font='bold 13px sans-serif';
+  ctx.fillText(yLabel,0,0);ctx.restore();
+  ctx.fillStyle=xColor;ctx.textAlign='center';ctx.font='bold 12px sans-serif';
+  ctx.fillText(xLabel,margin.left+pw/2,h-6);
 
   // クリッピング
-  ctx.save();
-  ctx.beginPath(); ctx.rect(margin.left, margin.top, pw, ph); ctx.clip();
+  ctx.save();ctx.beginPath();ctx.rect(margin.left,margin.top,pw,ph);ctx.clip();
 
   // データ線
-  ctx.strokeStyle = yColor; ctx.lineWidth = 1.5;
+  ctx.strokeStyle=yColor;ctx.lineWidth=1.5;
   ctx.beginPath();
-  let first = true;
+  let first=true;
   for(const d of filtered){
-    const x = xPx(parseFloat(d[xKey])), y = yPx(parseFloat(d[yKey]));
-    if(first){ ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+    const x=xPx(parseFloat(d[xKey])),y=yPx(parseFloat(d[yKey]));
+    if(first){ctx.moveTo(x,y);first=false;}else ctx.lineTo(x,y);
   }
   ctx.stroke();
 
-  // データポイント
-  const dotR = filtered.length > 2000 ? 1 : filtered.length > 500 ? 1.5 : 2.5;
-  ctx.fillStyle = yColor;
+  // 点
+  const dotR=filtered.length>2000?1:filtered.length>500?1.5:2.5;
+  ctx.fillStyle=yColor;
   for(const d of filtered){
-    const x = xPx(parseFloat(d[xKey])), y = yPx(parseFloat(d[yKey]));
-    ctx.beginPath(); ctx.arc(x, y, dotR, 0, Math.PI*2); ctx.fill();
+    const x=xPx(parseFloat(d[xKey])),y=yPx(parseFloat(d[yKey]));
+    ctx.beginPath();ctx.arc(x,y,dotR,0,Math.PI*2);ctx.fill();
   }
-
   ctx.restore();
 
   // 枠
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
-  ctx.strokeRect(margin.left, margin.top, pw, ph);
+  ctx.strokeStyle='rgba(255,255,255,0.12)';ctx.lineWidth=1;
+  ctx.strokeRect(margin.left,margin.top,pw,ph);
 
-  // ファイル名表示
-  ctx.fillStyle = '#555'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
-  ctx.fillText(allFiles[activeFileIdx].name + '  (' + filtered.length.toLocaleString() + ' pts)', w - margin.right, margin.top - 6);
+  // ファイル名
+  ctx.fillStyle='#555';ctx.font='10px sans-serif';ctx.textAlign='right';
+  ctx.fillText(allFiles[activeFileIdx].name+'  ('+filtered.length.toLocaleString()+' pts)',w-margin.right,margin.top-6);
 }
+
 
 // ===== テーブル =====
 function updateTable(){
-  const data = allFiles[activeFileIdx].data;
-  document.getElementById('tableCount').textContent = data.length.toLocaleString() + ' 件';
-
-  // 最初と最後の25件ずつ（大量データの場合）
+  const data=allFiles[activeFileIdx].data;
+  document.getElementById('tableCount').textContent=data.length.toLocaleString()+' 件';
   let display;
-  if(data.length <= 100){
-    display = data;
-  } else {
-    display = [...data.slice(0, 25), null, ...data.slice(-25)];
-  }
+  if(data.length<=100) display=data;
+  else display=[...data.slice(0,25),null,...data.slice(-25)];
 
-  document.getElementById('tableBody').innerHTML = display.map(d => {
-    if(d === null) return '<tr><td colspan="6" style="text-align:center;color:#555">... 中略 ...</td></tr>';
+  document.getElementById('tableBody').innerHTML=display.map(d=>{
+    if(d===null)return '<tr><td colspan="6" style="text-align:center;color:#555">... 中略 ...</td></tr>';
     return `<tr>
-      <td>${fmt(d['sensor_B_(K)'], 4)}</td>
-      <td>${fmt(d['T_VTI_(K)'], 4)}</td>
-      <td>${fmt(d['R_nv'], 6)}</td>
-      <td>${fmt(d['R_s'], 4)}</td>
-      <td>${fmt(d['B_digital_(T)'], 6)}</td>
-      <td>${d['I_s'] !== undefined ? parseFloat(d['I_s']).toExponential(3) : '---'}</td>
+      <td>${fmt(d['sensor_B_(K)'],4)}</td><td>${fmt(d['T_VTI_(K)'],4)}</td>
+      <td>${fmt(d['R_nv'],6)}</td><td>${fmt(d['R_s'],4)}</td>
+      <td>${fmt(d['B_digital_(T)'],6)}</td>
+      <td>${d['I_s']!==undefined?parseFloat(d['I_s']).toExponential(3):'---'}</td>
     </tr>`;
   }).join('');
 }
 
-function fmt(v, d){ return v !== undefined ? parseFloat(v).toFixed(d) : '---'; }
-function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmt(v,d){return v!==undefined?parseFloat(v).toFixed(d):'---';}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
 
 // ===== エクスポート =====
 function exportCSV(){
-  if(allFiles.length === 0) return;
-  const data = allFiles[activeFileIdx].data;
-  const keys = Object.keys(data[0]);
-  let csv = keys.join(',') + '\n';
-  for(const d of data) csv += keys.map(k => d[k] !== undefined ? d[k] : '').join(',') + '\n';
-
-  const blob = new Blob([csv], {type:'text/csv'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = allFiles[activeFileIdx].name.replace(/\.dat$/i, '') + '.csv';
-  a.click(); URL.revokeObjectURL(url);
-}
-
-function exportPNG(){
-  const canvas = document.getElementById('chartMain');
-  const a = document.createElement('a');
-  a.download = allFiles[activeFileIdx].name.replace(/\.dat$/i, '') + '_plot.png';
-  a.href = canvas.toDataURL('image/png');
+  if(!allFiles.length||activeFileIdx<0)return;
+  const data=allFiles[activeFileIdx].data;
+  const keys=Object.keys(data[0]);
+  let csv=keys.join(',')+'\n';
+  for(const d of data) csv+=keys.map(k=>d[k]!==undefined?d[k]:'').join(',')+'\n';
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=allFiles[activeFileIdx].name.replace(/\.dat$/i,'')+'.csv';
   a.click();
 }
 
-// ===== リサイズ =====
-window.addEventListener('resize', () => { if(allFiles.length > 0) redrawChart(); });
+function exportPNG(){
+  if(!allFiles.length||activeFileIdx<0)return;
+  const a=document.createElement('a');
+  a.download=allFiles[activeFileIdx].name.replace(/\.dat$/i,'')+'_plot.png';
+  a.href=document.getElementById('chartMain').toDataURL('image/png');
+  a.click();
+}
+
+// ===== 初期化 =====
+window.addEventListener('resize',()=>{if(allFiles.length>0&&activeFileIdx>=0)redrawChart();});
 </script>
 </body>
 </html>
