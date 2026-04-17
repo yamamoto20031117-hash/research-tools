@@ -359,6 +359,63 @@
   </div>
 </div>
 
+<!-- ===== CFMS 低温物性モニター ===== -->
+<div class="tool-section" data-tool="cfms-plotter">
+  <div class="card">
+    <div class="card-top">
+      <div class="icon">&#10052;</div>
+      <div>
+        <h2>CFMS リアルタイムモニター</h2>
+        <p>CFMS-5T（Cryogenic Ltd.）低温物性測定のリアルタイム遠隔モニター。温度・抵抗・磁場のリアルタイムプロット、.datファイルのオフライン解析にも対応。</p>
+        <div class="tags">
+          <span class="tag">Firebase</span><span class="tag">リアルタイム</span>
+          <span class="tag">低温物性</span><span class="tag">CFMS-5T</span>
+        </div>
+        <a class="launch" href="/cfms-plotter/">モニターを開く &#8594;</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- スレッド板 -->
+  <div class="board" id="board-cfms-plotter">
+    <div class="board-header" onclick="toggleBoard('cfms-plotter')">
+      <h3>&#128172; スレッド板</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="count" id="count-cfms-plotter">0 スレッド</span>
+        <span class="toggle-arrow closed" id="arrow-cfms-plotter">&#9660;</span>
+      </div>
+    </div>
+    <div class="board-body collapsed" id="body-cfms-plotter">
+      <div class="thread-list" id="threads-cfms-plotter"></div>
+      <button class="new-thread-btn" id="ntbtn-cfms-plotter" onclick="showNewThread('cfms-plotter')">+ 新しいスレッドを立てる</button>
+      <div class="new-thread-form" id="newform-cfms-plotter">
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="nt-name-cfms-plotter" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <div class="pf-row"><input type="text" id="nt-title-cfms-plotter" placeholder="スレッドタイトル" maxlength="80"></div>
+          <textarea id="nt-body-cfms-plotter" placeholder="本文を入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button class="cancel-btn" onclick="hideNewThread('cfms-plotter')">キャンセル</button>
+            <button onclick="createThread('cfms-plotter')">スレッドを立てる</button>
+          </div>
+        </div>
+      </div>
+      <div class="thread-view" id="view-cfms-plotter">
+        <span class="tv-back" onclick="backToList('cfms-plotter')">&#8592; スレッド一覧に戻る</span>
+        <div class="tv-title" id="vtitle-cfms-plotter"></div>
+        <div id="replies-cfms-plotter"></div>
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="rp-name-cfms-plotter" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <textarea id="rp-body-cfms-plotter" placeholder="レスを入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button onclick="postReply('cfms-plotter')">書き込む</button>
+          </div>
+        </div>
+      </div>
+      <div class="auto-refresh" id="autorefresh-cfms-plotter"><div class="spinner"></div> リアルタイム更新中</div>
+    </div>
+  </div>
+</div>
+
 <!-- 将来のツール: tool-sectionをコピーして追加 -->
 
 </main>
@@ -684,6 +741,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadThreads('xrd-plotter');
   loadThreads('squid-plotter');
   loadThreads('dmm-monitor');
+  loadThreads('cfms-plotter');
 });
 </script>
 </body>

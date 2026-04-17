@@ -2,7 +2,8 @@
   "rewrites": [
     { "source": "/tmd-viewer", "destination": "/tmd-viewer/index.html" },
     { "source": "/xrd-plotter", "destination": "/xrd-plotter/index.html" },
-    { "source": "/squid-plotter", "destination": "/squid-plotter/index.html" }
+    { "source": "/squid-plotter", "destination": "/squid-plotter/index.html" },
+    { "source": "/cfms-plotter", "destination": "/cfms-plotter/index.html" }
   ],
   "headers": [
     {

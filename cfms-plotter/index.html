@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>CFMS Monitor — 低温物性リアルタイムモニター</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo','Hiragino Sans',sans-serif;min-height:100vh}
+
+  header{padding:20px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+    border-bottom:1px solid rgba(255,255,255,0.06)}
+  header h1{font-size:1.2rem;color:#fff;display:flex;align-items:center;gap:10px}
+  header h1 .icon{font-size:1.5rem}
+  .back-link{color:#58a6ff;text-decoration:none;font-size:.8rem}
+  .back-link:hover{text-decoration:underline}
+
+  .status-bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .status-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .status-dot.live{background:#22c55e;box-shadow:0 0 6px #22c55e;animation:pulse 2s infinite}
+  .status-dot.offline{background:#ef4444}
+  .status-dot.stale{background:#eab308}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+  .status-text{font-size:.78rem;color:#999}
+
+  /* 現在値カード */
+  .current-values{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;padding:20px 24px}
+  .val-card{background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.06);
+    border-radius:12px;padding:16px;text-align:center}
+  .val-card .label{font-size:.72rem;color:#888;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .val-card .value{font-size:2rem;font-weight:bold;font-family:'Courier New',monospace;letter-spacing:0.02em}
+  .val-card .unit{font-size:.85rem;color:#888;margin-left:4px}
+  .val-card.temp .value{color:#f97316}
+  .val-card.resist .value{color:#22d3ee}
+  .val-card.field .value{color:#a78bfa}
+  .val-card .sub{font-size:.68rem;color:#555;margin-top:4px}
+
+  /* メインチャート */
+  .chart-section{padding:0 24px 20px}
+  .chart-controls{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .chart-controls label{font-size:.78rem;color:#888}
+  .chart-controls select,.chart-controls input{background:#0e1220;border:1px solid #2a3040;border-radius:4px;
+    color:#ddd;padding:4px 8px;font-size:.78rem}
+  .chart-controls button{padding:4px 14px;background:rgba(88,166,255,0.15);color:#58a6ff;border:1px solid rgba(88,166,255,0.3);
+    border-radius:4px;font-size:.78rem;cursor:pointer;transition:.15s}
+  .chart-controls button:hover{background:rgba(88,166,255,0.25)}
+  .chart-controls button.active{background:#58a6ff;color:#0a0e17}
+
+  .chart-wrap{background:rgba(15,18,28,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:8px;overflow:hidden}
+  canvas{display:block;width:100%}
+
+  /* クライオ温度パネル */
+  .cryo-section{padding:0 24px 20px}
+  .cryo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+  .cryo-card{background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.06);
+    border-radius:8px;padding:10px;text-align:center}
+  .cryo-card .label{font-size:.68rem;color:#888;margin-bottom:4px}
+  .cryo-card .value{font-size:1.1rem;font-weight:bold;font-family:'Courier New',monospace;color:#eab308}
+  .cryo-card .unit{font-size:.7rem;color:#666}
+
+  /* データログ */
+  .log-section{padding:0 24px 24px}
+  .log-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .log-header h2{font-size:.9rem;color:#fff}
+  .log-table-wrap{max-height:300px;overflow-y:auto;background:rgba(15,18,28,0.6);border:1px solid rgba(255,255,255,0.06);
+    border-radius:8px;scrollbar-width:thin}
+  table{width:100%;border-collapse:collapse;font-size:.75rem}
+  th{background:rgba(88,166,255,0.08);color:#58a6ff;font-weight:600;position:sticky;top:0;z-index:1}
+  th,td{padding:6px 12px;text-align:right;border-bottom:1px solid rgba(255,255,255,0.04)}
+  td:first-child,th:first-child{text-align:left}
+  tr:hover td{background:rgba(88,166,255,0.03)}
+
+  /* ファイルアップロード */
+  .upload-section{padding:0 24px 20px}
+  .upload-area{background:rgba(20,25,40,0.85);border:2px dashed rgba(88,166,255,0.3);border-radius:12px;
+    padding:24px;text-align:center;cursor:pointer;transition:.2s}
+  .upload-area:hover{border-color:#58a6ff;background:rgba(20,25,40,1)}
+  .upload-area.dragover{border-color:#22c55e;background:rgba(34,197,94,0.05)}
+  .upload-area input{display:none}
+  .upload-area .icon{font-size:2rem;margin-bottom:8px}
+  .upload-area .text{font-size:.85rem;color:#888}
+  .upload-area .subtext{font-size:.72rem;color:#555;margin-top:4px}
+
+  footer{padding:16px 24px;color:#444;font-size:.7rem;text-align:center;border-top:1px solid rgba(255,255,255,0.04)}
+
+  /* スマホ対応 */
+  @media(max-width:600px){
+    header{padding:12px 14px}
+    header h1{font-size:1rem}
+    .current-values{padding:12px 14px;gap:8px;grid-template-columns:repeat(2,1fr)}
+    .val-card{padding:10px}
+    .val-card .value{font-size:1.3rem}
+    .chart-section{padding:0 14px 14px}
+    .chart-controls{gap:6px}
+    .cryo-section{padding:0 14px 14px}
+    .cryo-grid{grid-template-columns:repeat(3,1fr);gap:6px}
+    .log-section{padding:0 14px 14px}
+    th,td{padding:4px 6px;font-size:.68rem}
+    .upload-section{padding:0 14px 14px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <a class="back-link" href="/">&#8592; Research Tools に戻る</a>
+    <h1><span class="icon">&#10052;</span> CFMS リアルタイムモニター</h1>
+  </div>
+  <div class="status-bar">
+    <span class="status-dot offline" id="statusDot"></span>
+    <span class="status-text" id="statusText">データ待機中...</span>
+    <span class="status-text" id="fileInfo"></span>
+  </div>
+</header>
+
+<!-- 現在値 -->
+<div class="current-values">
+  <div class="val-card temp">
+    <div class="label">温度 sensor_B</div>
+    <div><span class="value" id="curTemp">---</span><span class="unit">K</span></div>
+    <div class="sub" id="tempTime">最終更新: ---</div>
+  </div>
+  <div class="val-card temp">
+    <div class="label">温度 T_VTI</div>
+    <div><span class="value" id="curTVTI">---</span><span class="unit">K</span></div>
+  </div>
+  <div class="val-card resist">
+    <div class="label">抵抗 R_nv</div>
+    <div><span class="value" id="curRnv">---</span><span class="unit" id="curRnvUnit">&Omega;</span></div>
+  </div>
+  <div class="val-card resist">
+    <div class="label">抵抗 R_s</div>
+    <div><span class="value" id="curRs">---</span><span class="unit">&Omega;</span></div>
+  </div>
+  <div class="val-card field">
+    <div class="label">磁場 B</div>
+    <div><span class="value" id="curB">---</span><span class="unit">T</span></div>
+  </div>
+</div>
+
+<!-- メインチャート: R vs T -->
+<div class="chart-section">
+  <div class="chart-controls">
+    <label>Y軸:</label>
+    <select id="yAxis" onchange="redrawChart()">
+      <option value="R_nv">R_nv (ナノボルト抵抗)</option>
+      <option value="R_s">R_s (ソース抵抗)</option>
+      <option value="V_nv">V_nv</option>
+      <option value="V_s">V_s</option>
+    </select>
+    <label>X軸:</label>
+    <select id="xAxis" onchange="redrawChart()">
+      <option value="sensor_B_(K)">sensor_B (K)</option>
+      <option value="T_VTI_(K)">T_VTI (K)</option>
+      <option value="Time">時間</option>
+    </select>
+    <label>表示範囲:</label>
+    <select id="dataRange" onchange="redrawChart()">
+      <option value="500" selected>最新500点</option>
+      <option value="1000">最新1000点</option>
+      <option value="2000">最新2000点</option>
+      <option value="0">全データ</option>
+    </select>
+    <button onclick="clearChart()">グラフクリア</button>
+    <button onclick="exportCSV()">CSV出力</button>
+  </div>
+  <div class="chart-wrap">
+    <div style="padding:6px 12px 0;font-size:.75rem;font-weight:600" id="chartLabel">R_nv vs sensor_B</div>
+    <canvas id="chartMain" height="400"></canvas>
+  </div>
+</div>
+
+<!-- 温度チャート（時間軸） -->
+<div class="chart-section">
+  <div class="chart-controls">
+    <span style="font-size:.82rem;font-weight:600;color:#f97316">温度トレンド</span>
+    <label>時間幅:</label>
+    <select id="tempTimeRange" onchange="redrawTempChart()">
+      <option value="300">5分</option>
+      <option value="600">10分</option>
+      <option value="1800" selected>30分</option>
+      <option value="3600">1時間</option>
+      <option value="0">全データ</option>
+    </select>
+  </div>
+  <div class="chart-wrap">
+    <div style="padding:6px 12px 0;font-size:.75rem;font-weight:600;color:#f97316">温度 (K) vs 時間</div>
+    <canvas id="chartTemp" height="250"></canvas>
+  </div>
+</div>
+
+<!-- クライオ温度 -->
+<div class="cryo-section">
+  <div style="font-size:.82rem;font-weight:600;color:#eab308;margin-bottom:8px">クライオスタット温度</div>
+  <div class="cryo-grid">
+    <div class="cryo-card"><div class="label">He Pot</div><div class="value" id="cryoHePot">---</div><div class="unit">K</div></div>
+    <div class="cryo-card"><div class="label">2nd Stage</div><div class="value" id="cryo2nd">---</div><div class="unit">K</div></div>
+    <div class="cryo-card"><div class="label">Magnet</div><div class="value" id="cryoMagnet">---</div><div class="unit">K</div></div>
+    <div class="cryo-card"><div class="label">1st Stage</div><div class="value" id="cryo1st">---</div><div class="unit">K</div></div>
+    <div class="cryo-card"><div class="label">Charcoal Trap</div><div class="value" id="cryoCharcoal">---</div><div class="unit">K</div></div>
+    <div class="cryo-card"><div class="label">Switch</div><div class="value" id="cryoSwitch">---</div><div class="unit">K</div></div>
+  </div>
+</div>
+
+<!-- .dat ファイルアップロード（オフライン解析） -->
+<div class="upload-section">
+  <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event)">
+    <div class="icon">&#128194;</div>
+    <div class="text">.dat ファイルをドラッグ＆ドロップ、またはクリックして選択</div>
+    <div class="subtext">オフライン解析: ファイルをアップロードしてグラフを表示</div>
+    <input type="file" id="fileInput" accept=".dat,.txt,.csv" onchange="handleFileSelect(event)">
+  </div>
+</div>
+
+<!-- データログテーブル -->
+<div class="log-section">
+  <div class="log-header">
+    <h2>データログ（最新50件）</h2>
+    <span style="font-size:.7rem;color:#555" id="totalCount">0 件</span>
+  </div>
+  <div class="log-table-wrap">
+    <table>
+      <thead><tr>
+        <th>sensor_B (K)</th>
+        <th>T_VTI (K)</th>
+        <th>R_nv (&Omega;)</th>
+        <th>R_s (&Omega;)</th>
+        <th>B (T)</th>
+        <th>I_s (A)</th>
+      </tr></thead>
+      <tbody id="logBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<footer>CFMS Monitor v1.0 — Cryogenic CFMS-5T — Research Tools</footer>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyClK3vIE_SQ7SGdXWbmWzZ51MdeBappDKY",
+  authDomain: "research-tools-board.firebaseapp.com",
+  databaseURL: "https://research-tools-board-default-rtdb.firebaseio.com",
+  projectId: "research-tools-board",
+  storageBucket: "research-tools-board.firebasestorage.app",
+  messagingSenderId: "359837086498",
+  appId: "1:359837086498:web:your_app_id"
+};
+
+let db=null, firebaseReady=false;
+try{
+  firebase.initializeApp(firebaseConfig);
+  db=firebase.database();
+  firebaseReady=true;
+}catch(e){ console.warn('Firebase init error',e); }
+
+// ===== データ =====
+let dataLog = [];
+let lastUpdate = 0;
+let listener = null;
+let dataSource = 'firebase'; // 'firebase' or 'file'
+
+// ===== Firebase リアルタイムリスナー =====
+function startListening(){
+  if(!firebaseReady) return;
+
+  // ライブデータ
+  const liveRef = db.ref('cfms/live');
+  liveRef.on('value', snap => {
+    const d = snap.val();
+    if(!d) return;
+    if(dataSource !== 'firebase') return;
+    onNewData(d);
+  });
+
+  // 過去ログの読み込み
+  db.ref('cfms/log').orderByKey().limitToLast(1000).once('value').then(snap => {
+    const d = snap.val();
+    if(d && dataSource === 'firebase'){
+      const entries = Object.values(d).sort((a,b) => (a.sent_at||a.Time||0) - (b.sent_at||b.Time||0));
+      for(const e of entries){
+        if(!dataLog.some(x => x.sent_at === e.sent_at && x.Time === e.Time)){
+          dataLog.push(e);
+        }
+      }
+      if(dataLog.length > 10000) dataLog = dataLog.slice(-8000);
+      redrawChart();
+      redrawTempChart();
+      updateLogTable();
+    }
+  });
+
+  // 新規ログの監視
+  db.ref('cfms/log').orderByKey().limitToLast(1).on('child_added', snap => {
+    const e = snap.val();
+    if(e && dataSource === 'firebase'){
+      const ts = e.sent_at || e.Time || 0;
+      if(ts > lastUpdate) onNewData(e);
+    }
+  });
+
+  // メタデータ
+  db.ref('cfms/meta').on('value', snap => {
+    const m = snap.val();
+    if(m){
+      document.getElementById('fileInfo').textContent = m.filename || '';
+    }
+  });
+
+  document.getElementById('statusDot').className = 'status-dot live';
+  document.getElementById('statusText').textContent = 'Firebase 接続中';
+}
+
+function onNewData(d){
+  const ts = d.sent_at || d.Time || Date.now();
+  if(ts <= lastUpdate && lastUpdate > 0) return;
+  lastUpdate = ts;
+
+  dataLog.push(d);
+  if(dataLog.length > 10000) dataLog = dataLog.slice(-8000);
+
+  updateCurrentValues(d);
+  redrawChart();
+  redrawTempChart();
+  updateLogTable();
+}
+
+function updateCurrentValues(d){
+  const temp = d['sensor_B_(K)'];
+  const tvti = d['T_VTI_(K)'];
+  const rnv  = d['R_nv'];
+  const rs   = d['R_s'];
+  const b    = d['B_digital_(T)'];
+
+  if(temp !== undefined){
+    document.getElementById('curTemp').textContent = formatNum(temp, 4);
+  }
+  if(tvti !== undefined){
+    document.getElementById('curTVTI').textContent = formatNum(tvti, 4);
+  }
+  if(rnv !== undefined){
+    const ru = getResistUnit(rnv);
+    document.getElementById('curRnv').textContent = (rnv * ru.scale).toFixed(4);
+    document.getElementById('curRnvUnit').innerHTML = ru.prefix + '&Omega;';
+  }
+  if(rs !== undefined){
+    document.getElementById('curRs').textContent = formatNum(rs, 4);
+  }
+  if(b !== undefined){
+    document.getElementById('curB').textContent = formatNum(b, 6);
+  }
+
+  // クライオ温度
+  const cryoMap = {
+    'He_Pot': 'cryoHePot', '2nd_Stage': 'cryo2nd', 'Magnet': 'cryoMagnet',
+    '1st_Stage': 'cryo1st', 'Charcoal_Trap': 'cryoCharcoal', 'Switch': 'cryoSwitch'
+  };
+  for(const [key, id] of Object.entries(cryoMap)){
+    if(d[key] !== undefined){
+      document.getElementById(id).textContent = formatNum(d[key], 2);
+    }
+  }
+
+  const now = new Date();
+  document.getElementById('tempTime').textContent = '最終更新: ' + now.toLocaleTimeString('ja-JP');
+  document.getElementById('statusDot').className = 'status-dot live';
+  document.getElementById('statusText').textContent = 'リアルタイム監視中 — ' + now.toLocaleTimeString('ja-JP');
+}
+
+function formatNum(val, digits){
+  if(val === null || val === undefined) return '---';
+  return parseFloat(val).toFixed(digits);
+}
+
+function getResistUnit(val){
+  const abs = Math.abs(val);
+  if(abs < 0.001) return {scale: 1e6, prefix: 'μ'};
+  if(abs < 1) return {scale: 1e3, prefix: 'm'};
+  if(abs >= 1e6) return {scale: 1e-6, prefix: 'M'};
+  if(abs >= 1e3) return {scale: 1e-3, prefix: 'k'};
+  return {scale: 1, prefix: ''};
+}
+
+// ===== Nice tick algorithm =====
+function niceNum(range, round){
+  if(range <= 0) return 1;
+  const exp = Math.floor(Math.log10(range));
+  const frac = range / Math.pow(10, exp);
+  let nice;
+  if(round){
+    if(frac < 1.5) nice = 1;
+    else if(frac < 3) nice = 2;
+    else if(frac < 7) nice = 5;
+    else nice = 10;
+  } else {
+    if(frac <= 1) nice = 1;
+    else if(frac <= 2) nice = 2;
+    else if(frac <= 5) nice = 5;
+    else nice = 10;
+  }
+  return nice * Math.pow(10, exp);
+}
+
+function calcTicks(dataMin, dataMax, nTicks){
+  const range = dataMax - dataMin || 1;
+  const spacing = niceNum(range / (nTicks - 1), true);
+  const yMin = Math.floor(dataMin / spacing) * spacing;
+  const yMax = Math.ceil(dataMax / spacing) * spacing;
+  const ticks = [];
+  for(let v = yMin; v <= yMax + spacing * 0.001; v += spacing) ticks.push(v);
+  return {min: yMin, max: yMax, ticks, spacing};
+}
+
+// ===== メインチャート描画 =====
+function redrawChart(){
+  const canvas = document.getElementById('chartMain');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.clientWidth;
+  const h = 400;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  const yKey = document.getElementById('yAxis').value;
+  const xKey = document.getElementById('xAxis').value;
+  const rangeN = parseInt(document.getElementById('dataRange').value) || 0;
+
+  // ラベル更新
+  const yLabel = yKey.replace(/_/g, ' ');
+  const xLabel = xKey === 'Time' ? '時間' : xKey.replace(/_/g, ' ');
+  document.getElementById('chartLabel').textContent = yLabel + ' vs ' + xLabel;
+
+  let filtered = dataLog.filter(d => d[yKey] !== undefined && d[xKey] !== undefined);
+  if(rangeN > 0 && filtered.length > rangeN) filtered = filtered.slice(-rangeN);
+
+  if(filtered.length < 2){
+    ctx.fillStyle = '#555'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('データ待機中...', w / 2, h / 2);
+    return;
+  }
+
+  const margin = {top: 14, right: 16, bottom: 42, left: 70};
+  const pw = w - margin.left - margin.right;
+  const ph = h - margin.top - margin.bottom;
+
+  // X, Y 範囲
+  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+  for(const d of filtered){
+    const x = parseFloat(d[xKey]);
+    const y = parseFloat(d[yKey]);
+    if(x < xMin) xMin = x;
+    if(x > xMax) xMax = x;
+    if(y < yMin) yMin = y;
+    if(y > yMax) yMax = y;
+  }
+
+  const yTick = calcTicks(yMin, yMax, 6);
+  const xTick = calcTicks(xMin, xMax, 6);
+
+  const xPx = v => margin.left + ((v - xTick.min) / (xTick.max - xTick.min || 1)) * pw;
+  const yPx = v => margin.top + ph - ((v - yTick.min) / (yTick.max - yTick.min || 1)) * ph;
+
+  // グリッド
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
+  for(const tv of yTick.ticks){
+    const y = yPx(tv);
+    ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(w - margin.right, y); ctx.stroke();
+  }
+  for(const tv of xTick.ticks){
+    const x = xPx(tv);
+    ctx.beginPath(); ctx.moveTo(x, margin.top); ctx.lineTo(x, h - margin.bottom); ctx.stroke();
+  }
+
+  // Y軸ラベル
+  const yColor = yKey.includes('R') ? '#22d3ee' : '#58a6ff';
+  const scaledYSpacing = yTick.spacing;
+  const yDecimals = scaledYSpacing >= 10 ? 0 : scaledYSpacing >= 1 ? 1 : scaledYSpacing >= 0.1 ? 2 : scaledYSpacing >= 0.01 ? 3 : scaledYSpacing >= 0.001 ? 4 : 6;
+  ctx.fillStyle = yColor; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+  for(const tv of yTick.ticks){
+    const y = yPx(tv);
+    if(y >= margin.top - 2 && y <= margin.top + ph + 2){
+      ctx.fillText(tv.toFixed(yDecimals), margin.left - 6, y + 4);
+    }
+  }
+
+  // X軸ラベル
+  const xColor = '#f97316';
+  const scaledXSpacing = xTick.spacing;
+  const xDecimals = scaledXSpacing >= 10 ? 0 : scaledXSpacing >= 1 ? 1 : scaledXSpacing >= 0.1 ? 2 : 4;
+  ctx.fillStyle = xColor; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+  for(const tv of xTick.ticks){
+    const x = xPx(tv);
+    if(x >= margin.left - 10 && x <= w - margin.right + 10){
+      if(xKey === 'Time'){
+        const d = new Date(tv * 1000);
+        ctx.fillText(d.toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'}), x, h - margin.bottom + 16);
+      } else {
+        ctx.fillText(tv.toFixed(xDecimals), x, h - margin.bottom + 16);
+      }
+    }
+  }
+
+  // 軸ラベル
+  ctx.save(); ctx.translate(14, margin.top + ph / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = yColor; ctx.textAlign = 'center'; ctx.font = '12px sans-serif';
+  ctx.fillText(yLabel, 0, 0); ctx.restore();
+
+  ctx.fillStyle = xColor; ctx.textAlign = 'center'; ctx.font = '11px sans-serif';
+  ctx.fillText(xLabel, margin.left + pw / 2, h - 4);
+
+  // クリッピング
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(margin.left, margin.top, pw, ph);
+  ctx.clip();
+
+  // データ線
+  ctx.strokeStyle = yColor; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  let first = true;
+  for(const d of filtered){
+    const x = xPx(parseFloat(d[xKey]));
+    const y = yPx(parseFloat(d[yKey]));
+    if(first){ ctx.moveTo(x, y); first = false; }
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // データポイント
+  ctx.fillStyle = yColor;
+  const dotSize = filtered.length > 1000 ? 1.5 : 2.5;
+  for(const d of filtered){
+    const x = xPx(parseFloat(d[xKey]));
+    const y = yPx(parseFloat(d[yKey]));
+    ctx.beginPath();
+    ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  // 枠
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
+  ctx.strokeRect(margin.left, margin.top, pw, ph);
+}
+
+// ===== 温度チャート描画 =====
+function redrawTempChart(){
+  const canvas = document.getElementById('chartTemp');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.clientWidth;
+  const h = 250;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  const rangeSec = parseInt(document.getElementById('tempTimeRange').value) || 0;
+
+  // sent_at でソート（時間軸用）
+  let filtered = dataLog.filter(d => d.sent_at && d['sensor_B_(K)'] !== undefined);
+  if(rangeSec > 0 && filtered.length > 0){
+    const cutoff = filtered[filtered.length - 1].sent_at - rangeSec * 1000;
+    filtered = filtered.filter(d => d.sent_at >= cutoff);
+  }
+
+  if(filtered.length < 2){
+    ctx.fillStyle = '#555'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('温度データ待機中...', w / 2, h / 2);
+    return;
+  }
+
+  const margin = {top: 14, right: 16, bottom: 36, left: 64};
+  const pw = w - margin.left - margin.right;
+  const ph = h - margin.top - margin.bottom;
+
+  // 時間範囲
+  const tMin = filtered[0].sent_at;
+  const tMax = filtered[filtered.length - 1].sent_at;
+
+  // 温度範囲
+  let yDataMin = Infinity, yDataMax = -Infinity;
+  for(const d of filtered){
+    const t = parseFloat(d['sensor_B_(K)']);
+    if(t < yDataMin) yDataMin = t;
+    if(t > yDataMax) yDataMax = t;
+  }
+
+  const yTick = calcTicks(yDataMin, yDataMax, 5);
+  const xPx = t => margin.left + ((t - tMin) / (tMax - tMin || 1)) * pw;
+  const yPx = v => margin.top + ph - ((v - yTick.min) / (yTick.max - yTick.min || 1)) * ph;
+
+  // グリッド
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
+  for(const tv of yTick.ticks){
+    const y = yPx(tv);
+    ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(w - margin.right, y); ctx.stroke();
+  }
+
+  // Y軸ラベル
+  const yDecimals = yTick.spacing >= 10 ? 0 : yTick.spacing >= 1 ? 1 : 2;
+  ctx.fillStyle = '#f97316'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+  for(const tv of yTick.ticks){
+    const y = yPx(tv);
+    if(y >= margin.top - 2 && y <= margin.top + ph + 2){
+      ctx.fillText(tv.toFixed(yDecimals) + ' K', margin.left - 6, y + 4);
+    }
+  }
+
+  // X軸ラベル（時刻）
+  ctx.fillStyle = '#666'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+  const tickCount = Math.min(6, Math.floor(pw / 90));
+  for(let j = 0; j <= tickCount; j++){
+    const t = tMin + (tMax - tMin) * j / tickCount;
+    const d = new Date(t);
+    ctx.fillText(d.toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit',second:'2-digit'}), xPx(t), h - margin.bottom + 16);
+  }
+
+  // クリッピング
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(margin.left, margin.top, pw, ph);
+  ctx.clip();
+
+  // sensor_B 線
+  ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  let first = true;
+  for(const d of filtered){
+    const x = xPx(d.sent_at);
+    const y = yPx(parseFloat(d['sensor_B_(K)']));
+    if(first){ ctx.moveTo(x, y); first = false; }
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // T_VTI 線（あれば）
+  const hasVTI = filtered.some(d => d['T_VTI_(K)'] !== undefined);
+  if(hasVTI){
+    ctx.strokeStyle = 'rgba(234,179,8,0.5)'; ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    first = true;
+    for(const d of filtered){
+      if(d['T_VTI_(K)'] === undefined) continue;
+      const x = xPx(d.sent_at);
+      const y = yPx(parseFloat(d['T_VTI_(K)']));
+      if(first){ ctx.moveTo(x, y); first = false; }
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.restore();
+
+  // 凡例
+  ctx.fillStyle = '#f97316'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillRect(margin.left + 8, margin.top + 8, 12, 3);
+  ctx.fillText('sensor_B', margin.left + 24, margin.top + 13);
+  if(hasVTI){
+    ctx.fillStyle = 'rgba(234,179,8,0.5)';
+    ctx.fillRect(margin.left + 8, margin.top + 22, 12, 2);
+    ctx.fillStyle = '#eab308'; ctx.fillText('T_VTI', margin.left + 24, margin.top + 27);
+  }
+
+  // 枠
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
+  ctx.strokeRect(margin.left, margin.top, pw, ph);
+}
+
+// ===== ログテーブル =====
+function updateLogTable(){
+  const tbody = document.getElementById('logBody');
+  const recent = dataLog.slice(-50).reverse();
+  document.getElementById('totalCount').textContent = dataLog.length + ' 件';
+
+  tbody.innerHTML = recent.map(d => {
+    const temp = d['sensor_B_(K)'] !== undefined ? parseFloat(d['sensor_B_(K)']).toFixed(4) : '---';
+    const tvti = d['T_VTI_(K)'] !== undefined ? parseFloat(d['T_VTI_(K)']).toFixed(4) : '---';
+    const rnv = d['R_nv'] !== undefined ? parseFloat(d['R_nv']).toFixed(6) : '---';
+    const rs = d['R_s'] !== undefined ? parseFloat(d['R_s']).toFixed(4) : '---';
+    const b = d['B_digital_(T)'] !== undefined ? parseFloat(d['B_digital_(T)']).toFixed(6) : '---';
+    const is_ = d['I_s'] !== undefined ? parseFloat(d['I_s']).toExponential(3) : '---';
+    return `<tr><td>${temp}</td><td>${tvti}</td><td>${rnv}</td><td>${rs}</td><td>${b}</td><td>${is_}</td></tr>`;
+  }).join('');
+}
+
+// ===== ファイルアップロード =====
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('uploadArea').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if(file) loadDatFile(file);
+}
+
+function handleFileSelect(e){
+  const file = e.target.files[0];
+  if(file) loadDatFile(file);
+}
+
+function loadDatFile(file){
+  dataSource = 'file';
+  dataLog = [];
+  lastUpdate = 0;
+
+  document.getElementById('statusText').textContent = 'ファイル読み込み中: ' + file.name;
+  document.getElementById('fileInfo').textContent = file.name;
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const text = e.target.result;
+    const lines = text.split(/\r?\n/);
+    if(lines.length < 2) return;
+
+    // ヘッダー解析
+    const headers = lines[0].split('\t');
+    console.log('カラム:', headers);
+
+    // データ解析
+    let count = 0;
+    for(let i = 1; i < lines.length; i++){
+      const line = lines[i].trim();
+      if(!line) continue;
+      const parts = line.split('\t');
+      const row = {};
+      for(let j = 0; j < headers.length && j < parts.length; j++){
+        const val = parseFloat(parts[j]);
+        row[headers[j]] = isNaN(val) ? parts[j] : val;
+      }
+      row.sent_at = (row.Time || 0) * 1000; // Time(秒) → ミリ秒
+      dataLog.push(row);
+      count++;
+    }
+
+    document.getElementById('statusDot').className = 'status-dot live';
+    document.getElementById('statusText').textContent = `ファイル読み込み完了: ${count.toLocaleString()} 件 — ${file.name}`;
+
+    // 最新データの値を表示
+    if(dataLog.length > 0){
+      updateCurrentValues(dataLog[dataLog.length - 1]);
+    }
+
+    redrawChart();
+    redrawTempChart();
+    updateLogTable();
+  };
+  reader.readAsText(file);
+}
+
+// ===== ユーティリティ =====
+function clearChart(){
+  dataLog = [];
+  lastUpdate = 0;
+  redrawChart();
+  redrawTempChart();
+  updateLogTable();
+  // Firebase に戻す
+  dataSource = 'firebase';
+  document.getElementById('statusText').textContent = 'データクリア — Firebase 監視中';
+}
+
+function exportCSV(){
+  if(dataLog.length === 0){ alert('データがありません'); return; }
+
+  // ヘッダーを動的に生成
+  const allKeys = new Set();
+  for(const d of dataLog){
+    for(const k of Object.keys(d)){
+      if(k !== 'sent_at') allKeys.add(k);
+    }
+  }
+  const keys = Array.from(allKeys);
+
+  let csv = keys.join(',') + '\n';
+  for(const d of dataLog){
+    csv += keys.map(k => d[k] !== undefined ? d[k] : '').join(',') + '\n';
+  }
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'cfms_data_' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ===== 初期化 =====
+window.addEventListener('load', () => {
+  startListening();
+  redrawChart();
+  redrawTempChart();
+
+  // ステータス監視
+  setInterval(() => {
+    if(dataSource === 'firebase' && lastUpdate > 0 && Date.now() - lastUpdate > 30000){
+      document.getElementById('statusDot').className = 'status-dot stale';
+      document.getElementById('statusText').textContent = 'データ途絶 — 最終: ' + new Date(lastUpdate).toLocaleTimeString('ja-JP');
+    }
+  }, 10000);
+});
+
+window.addEventListener('resize', () => {
+  redrawChart();
+  redrawTempChart();
+});
+</script>
+
+</body>
+</html>
