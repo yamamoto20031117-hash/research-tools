@@ -491,6 +491,7 @@ def main():
 
     count = 0
     errors = 0
+    cmd_check_counter = 0
     output_on = False  # OUTPUT状態トラッキング（起動時はOFF）
 
     # 自動単位フォーマット関数
@@ -512,25 +513,18 @@ def main():
     while running:
         loop_start = time.time()
         try:
-            # Webダッシュボードからのコマンドをチェック
-            cmd_result = check_command(smu)
-            if cmd_result == "OFF":
-                output_on = False
-                print("\n  OUTPUT OFF — 測定停止。コマンド待機中...")
-            elif cmd_result == "ON":
-                output_on = True
-                print("\n  OUTPUT ON — 測定開始")
-
-            # Firebaseステータスも確認（Webから直接OFF書き込みへの対応）
-            if output_on and cmd_result is None:
-                status = firebase_get("dmm/status")
-                if status and status.get("output") == False:
-                    print("\n  *** Firebase ステータス検出: OUTPUT OFF ***")
-                    safe_write(smu, "*CLS", 0.3)
-                    safe_write(smu, ":OUTP OFF", 0.5)
-                    safe_write(smu, ":SYST:LOC", 0.3)
-                    auto_stop_time = 0
+            # Webダッシュボードからのコマンドをチェック（OUTPUT OFF時は毎回、ON時は3回に1回）
+            cmd_result = None
+            cmd_check_counter += 1
+            if not output_on or cmd_check_counter >= 3:
+                cmd_check_counter = 0
+                cmd_result = check_command(smu)
+                if cmd_result == "OFF":
                     output_on = False
+                    print("\n  OUTPUT OFF — 測定停止。コマンド待機中...")
+                elif cmd_result == "ON":
+                    output_on = True
+                    print("\n  OUTPUT ON — 測定開始")
 
             # タイマー自動停止チェック
             if check_auto_stop(smu):
