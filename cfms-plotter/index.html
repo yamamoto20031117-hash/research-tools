@@ -761,6 +761,14 @@ function exportPNG(){
 
 // ===== 初期化 =====
 window.addEventListener('resize',()=>{if(allFiles.length>0&&activeFileIdx>=0)redrawChart();});
+
+// ページ読み込み時に既存のオンラインファイル一覧を表示（OFF状態でも）
+if(firebaseReady){
+  db.ref('cfms/file_list').once('value').then(snap => {
+    const files = snap.val();
+    if(files) renderOnlineFileList(files);
+  });
+}
 </script>
 </body>
 </html>
