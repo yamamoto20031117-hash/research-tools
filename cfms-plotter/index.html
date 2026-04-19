@@ -281,58 +281,11 @@ function toggleAutoReceive(){
     startAutoReceive();
     // Firebase に ON を通知 → sender が再開し未送信データを送る
     if(firebaseReady) db.ref('cfms/control').set({enabled: true, time: Date.now()});
-    // 既存の受信済みデータを全てロード
-    loadAllOnlineFiles();
   } else {
     stopAutoReceive();
     if(firebaseReady) db.ref('cfms/control').set({enabled: false, time: Date.now()});
   }
   updateSenderStatusUI();
-}
-
-function loadAllOnlineFiles(){
-  if(!firebaseReady) return;
-  db.ref('cfms/file_list').once('value').then(snap => {
-    const files = snap.val();
-    if(!files) return;
-    // まだロードされていないファイルを検出
-    const unloaded = Object.keys(files).filter(key => !allFiles.some(af => af.key === key));
-    if(unloaded.length === 0) return;
-
-    const statusEl = document.getElementById('senderStatus');
-    statusEl.innerHTML = `<span class="dot sending"></span><span>未読み込みデータ ${unloaded.length} 件を取得中...</span>`;
-
-    let loaded = 0;
-    for(const fileKey of unloaded){
-      db.ref(`cfms/files/${fileKey}/meta`).once('value').then(metaSnap => {
-        const meta = metaSnap.val();
-        if(!meta){ loaded++; return; }
-
-        const chunks = meta.chunks || 1;
-        const promises = [];
-        for(let i = 0; i < chunks; i++){
-          promises.push(db.ref(`cfms/files/${fileKey}/data/${i}`).once('value'));
-        }
-        return Promise.all(promises).then(snaps => {
-          let data = [];
-          for(const s of snaps){
-            const chunk = s.val();
-            if(chunk && Array.isArray(chunk)) data = data.concat(chunk);
-            else if(chunk) data = data.concat(Object.values(chunk));
-          }
-          if(data.length > 0){
-            allFiles.push({name: meta.filename, data, source: 'online', key: fileKey, folder: meta.folder || ''});
-            activeFileIdx = allFiles.length - 1;
-          }
-          loaded++;
-          if(loaded >= unloaded.length){
-            updateUI();
-            statusEl.innerHTML = `<span class="dot on"></span><span>全データ読み込み完了 (${unloaded.length} 件)</span>`;
-          }
-        });
-      });
-    }
-  });
 }
 
 function startAutoReceive(){
@@ -400,73 +353,73 @@ function renderOnlineFileList(files){
   document.getElementById('onlineSection').classList.remove('hidden');
   const entries = Object.entries(files);
 
-  // フォルダツリーを構築
-  // folder パスは "Okuda" や "Okuda/TiSe2 MBA" や "Okuda\\TiSe2 MBA" の形式
-  const tree = {};  // {topFolder: {_files:[], subFolder: {_files:[]}}}
+  // 再帰的なフォルダツリーを構築
+  const tree = buildTree(entries);
+  const topFolders = Object.keys(tree._children).sort((a,b) => a.localeCompare(b, 'ja'));
 
-  for(const [key, f] of entries){
-    const folder = (f.folder || '(その他)').replace(/\\/g, '/');
-    const parts = folder.split('/');
-    const top = parts[0];
-    const sub = parts.length > 1 ? parts.slice(1).join('/') : null;
-
-    if(!tree[top]) tree[top] = {_files:[], _subs:{}};
-
-    if(sub){
-      if(!tree[top]._subs[sub]) tree[top]._subs[sub] = [];
-      tree[top]._subs[sub].push({key, ...f});
-    } else {
-      tree[top]._files.push({key, ...f});
-    }
-  }
-
-  // ソート関数
-  const sortFiles = arr => arr.sort((a,b) => (b.file_created||b.uploaded_at||0) - (a.file_created||a.uploaded_at||0));
-
-  const topFolders = Object.keys(tree).sort((a,b) => a.localeCompare(b, 'ja'));
-
-  el.innerHTML = topFolders.map(top => {
-    const node = tree[top];
-    // トップフォルダ直下のファイル数 + サブフォルダ内のファイル数
-    let totalFiles = node._files.length;
-    for(const sub in node._subs) totalFiles += node._subs[sub].length;
-
-    const fid = 'fg_' + top.replace(/[^a-zA-Z0-9]/g,'_');
-
-    // トップ直下のファイルチップ
-    sortFiles(node._files);
-    const topChips = node._files.length > 0 ? `<div class="folder-group-files">${renderChips(node._files)}</div>` : '';
-
-    // サブフォルダ
-    const subFolders = Object.keys(node._subs).sort((a,b) => a.localeCompare(b, 'ja'));
-    const subHtml = subFolders.map(sub => {
-      const items = sortFiles(node._subs[sub]);
-      const sid = fid + '_sub_' + sub.replace(/[^a-zA-Z0-9]/g,'_');
-      return `<div class="sub-folder">
-        <div class="sub-folder-header" onclick="toggleFolder('${sid}')">
-          <span class="fg-arrow" id="${sid}_arrow">&#9654;</span>
-          &#128194; ${esc(sub)}
-          <span class="fg-count">(${items.length} ファイル)</span>
-        </div>
-        <div class="sub-folder-body" id="${sid}_files">
-          <div class="folder-group-files">${renderChips(items)}</div>
-        </div>
-      </div>`;
-    }).join('');
-
+  el.innerHTML = topFolders.map(name => {
+    const fid = 'fg_' + name.replace(/[^a-zA-Z0-9]/g,'_');
+    const total = countFiles(tree._children[name]);
     return `<div class="folder-group">
       <div class="folder-group-header" onclick="toggleFolder('${fid}')">
         <span class="fg-arrow" id="${fid}_arrow">&#9654;</span>
         <span class="fg-icon">&#128194;</span>
-        ${esc(top)}
-        <span class="fg-count">(${totalFiles} ファイル)</span>
+        ${esc(name)}
+        <span class="fg-count">(${total} ファイル)</span>
       </div>
       <div class="folder-group-body" id="${fid}_files">
-        ${topChips}
-        ${subHtml}
+        ${renderTreeNode(tree._children[name], fid)}
       </div>
     </div>`;
   }).join('');
+}
+
+function buildTree(entries){
+  const root = {_files:[], _children:{}};
+  for(const [key, f] of entries){
+    const folder = (f.folder || '(その他)').replace(/\\/g, '/');
+    const parts = folder.split('/').filter(p => p);
+    let node = root;
+    for(const part of parts){
+      if(!node._children[part]) node._children[part] = {_files:[], _children:{}};
+      node = node._children[part];
+    }
+    node._files.push({key, ...f});
+  }
+  return root;
+}
+
+function countFiles(node){
+  let n = node._files.length;
+  for(const k in node._children) n += countFiles(node._children[k]);
+  return n;
+}
+
+function renderTreeNode(node, parentId){
+  let html = '';
+  // このノードの直下のファイル
+  if(node._files.length > 0){
+    const sorted = node._files.sort((a,b) => (b.file_created||b.uploaded_at||0) - (a.file_created||a.uploaded_at||0));
+    html += `<div class="folder-group-files">${renderChips(sorted)}</div>`;
+  }
+  // 子フォルダ
+  const childNames = Object.keys(node._children).sort((a,b) => a.localeCompare(b, 'ja'));
+  for(const name of childNames){
+    const child = node._children[name];
+    const sid = parentId + '_' + name.replace(/[^a-zA-Z0-9]/g,'_');
+    const total = countFiles(child);
+    html += `<div class="sub-folder">
+      <div class="sub-folder-header" onclick="toggleFolder('${sid}')">
+        <span class="fg-arrow" id="${sid}_arrow">&#9654;</span>
+        &#128194; ${esc(name)}
+        <span class="fg-count">(${total} ファイル)</span>
+      </div>
+      <div class="sub-folder-body" id="${sid}_files">
+        ${renderTreeNode(child, sid)}
+      </div>
+    </div>`;
+  }
+  return html;
 }
 
 function renderChips(items){

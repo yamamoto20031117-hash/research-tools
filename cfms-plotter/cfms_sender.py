@@ -46,19 +46,22 @@ running = True
 
 
 # ===== Firebase REST API =====
-def firebase_put(path, data, timeout=30):
+def firebase_put(path, data, timeout=30, retries=3):
     url = f"{FIREBASE_URL}/{path}.json"
     payload = json.dumps(data).encode('utf-8')
-    req = urllib.request.Request(
-        url, data=payload,
-        method='PUT', headers={'Content-Type': 'application/json'}
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.status == 200
-    except Exception as e:
-        print(f"  [Firebase PUT error] {e}")
-        return False
+    for attempt in range(retries):
+        req = urllib.request.Request(
+            url, data=payload,
+            method='PUT', headers={'Content-Type': 'application/json'}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.status == 200
+        except Exception as e:
+            print(f"  [Firebase PUT error] attempt {attempt+1}/{retries}: {e}")
+            if attempt < retries - 1:
+                time.sleep(2 * (attempt + 1))
+    return False
 
 def firebase_get(path, timeout=10):
     url = f"{FIREBASE_URL}/{path}.json"
@@ -121,7 +124,7 @@ def get_file_hash(filepath):
 
 
 def sanitize_key(name):
-    for ch in '.#$[]/ ':
+    for ch in '.#$[]/ \\':
         name = name.replace(ch, '_')
     return name
 
@@ -140,7 +143,7 @@ def send_file(filepath, file_key, folder_name=""):
 
     print(f"  {len(data):,} 行パース完了")
 
-    chunk_size = 5000
+    chunk_size = 2000
     total_chunks = (len(data) + chunk_size - 1) // chunk_size
 
     # ファイル作成日時を取得
@@ -240,7 +243,7 @@ def scan_active_folders(watch_dir, known_files):
         for fpath in dat_paths:
             fhash = get_file_hash(fpath)
             if fhash and known_files.get(fpath) != fhash:
-                rel_dir = os.path.relpath(os.path.dirname(fpath), watch_dir)
+                rel_dir = os.path.relpath(os.path.dirname(fpath), watch_dir).replace('\\', '/')
                 new_files.append((fpath, rel_dir))
                 known_files[fpath] = fhash
 
@@ -393,7 +396,7 @@ def main():
                     break
                 basename = os.path.basename(fpath)
                 # サブフォルダの相対パスを取得 (例: Okuda/TiSe2 MBA)
-                rel_dir = os.path.relpath(os.path.dirname(fpath), watch_dir)
+                rel_dir = os.path.relpath(os.path.dirname(fpath), watch_dir).replace('\\', '/')
                 file_key = sanitize_key(f"{rel_dir}__{basename.replace('.dat', '')}")
                 send_file(fpath, file_key, rel_dir)
                 known_files[fpath] = get_file_hash(fpath)
