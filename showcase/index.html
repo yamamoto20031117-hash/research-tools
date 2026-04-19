@@ -590,104 +590,105 @@ function startTMD(){
   canvas.width=896;canvas.height=576;
 
   let time=0;
-  const CX=canvas.width/2, CY=canvas.height/2;
+  const W=canvas.width, H=canvas.height;
+  const CX=W/2, CY=H/2;
 
-  // Camera: gentle tilt, very slow rotation
-  let camPitch=-0.38; // ~22 deg – gentle downward look, not tilted
-  let camYaw=0.25;
-  const SCALE=28; // BIG atoms
+  // ========== Camera: nearly horizontal, very gentle tilt ==========
+  let camPitch=-0.30; // ~17 deg down — almost level like the real viewer
+  let camYaw=0.15;    // slight initial rotation
+  const SC=14;        // world-to-pixel scale (controls spacing)
 
   function project(x3,y3,z3){
     const cy=Math.cos(camYaw),sy=Math.sin(camYaw);
     const rx=x3*cy-y3*sy, ry=x3*sy+y3*cy;
     const cp=Math.cos(camPitch),sp=Math.sin(camPitch);
     const fy=ry*cp-z3*sp, fz=ry*sp+z3*cp;
-    const persp=900;
-    const s=persp/(persp+fz*0.5);
-    return {x:CX+rx*SCALE*s, y:CY+fy*SCALE*s, z:fz, s:s};
+    const persp=500;
+    const s=persp/(persp+fz*0.3);
+    return {x:CX+rx*SC*s, y:CY+fy*SC*s, z:fz, s:s};
   }
 
-  // === VSe2: 3 layers, compact hexagonal grid ===
-  const A=3.354, SQ3=Math.sqrt(3);
-  const LAYER_GAP=10; // base gap between layers
-  const layerData=[]; // [{atoms,bonds,zBase}]
+  // ========== VSe2 structure: 3 layers ==========
+  // Real VSe2: a=3.354 Å, 1T structure, P-3m1
+  // Use a=1 unit for convenience, scale via SC
+  const A=3.354;
+  const SQ3=Math.sqrt(3);
+  const LAYER_GAP=13; // vertical gap between layers in world units
+  const layerData=[];
 
   for(let li=0;li<3;li++){
-    const zBase=(li-1)*LAYER_GAP; // -10, 0, 10
+    const zBase=(li-1)*LAYER_GAP;
     const atoms=[], bonds=[];
-    const vPos=[]; // store V positions for bonds
+    const vMap={}; // for V-V bond generation
 
-    // Hexagonal grid (-3..3, -2..2) with corner trimming
-    for(let i=-3;i<=3;i++){
-      for(let j=-2;j<=2;j++){
-        if(Math.abs(i)+Math.abs(j)>4) continue;
+    for(let i=-4;i<=4;i++){
+      for(let j=-3;j<=3;j++){
+        if(Math.abs(i)+Math.abs(j)>5) continue;
         const vx=i*A+j*A*0.5;
         const vy=j*A*SQ3*0.5;
-        vPos.push({x:vx,y:vy,i,j});
+        vMap[i+','+j]={x:vx,y:vy};
 
-        // V atom (large, blue)
-        atoms.push({x:vx,y:vy,z:0,r:1,color:'#4a9eff',type:'V'});
-        // Se above and below (orange, slightly smaller)
-        const sx=vx+A*0.33, sy2=vy+A*0.19;
-        atoms.push({x:sx,y:sy2,z:-1.8,r:0.8,color:'#e8a020',type:'Se'});
-        atoms.push({x:sx,y:sy2,z:+1.8,r:0.8,color:'#e8a020',type:'Se'});
+        // V (blue, large)  - r in PIXELS not world units
+        atoms.push({x:vx,y:vy,z:0,rpx:11,color:'#4a9eff',type:'V'});
+        // Se above and below (orange)
+        const seOx=A*0.33, seOy=A*0.19;
+        atoms.push({x:vx+seOx,y:vy+seOy,z:-2.2,rpx:8.5,color:'#e8a020',type:'Se'});
+        atoms.push({x:vx+seOx,y:vy+seOy,z:+2.2,rpx:8.5,color:'#e8a020',type:'Se'});
         // V-Se bonds
-        bonds.push({x1:vx,y1:vy,z1:0,x2:sx,y2:sy2,z2:-1.8,w:1.2,color:'rgba(100,160,220,0.35)'});
-        bonds.push({x1:vx,y1:vy,z1:0,x2:sx,y2:sy2,z2:+1.8,w:1.2,color:'rgba(100,160,220,0.35)'});
+        bonds.push({x1:vx,y1:vy,z1:0,x2:vx+seOx,y2:vy+seOy,z2:-2.2,w:1.0,color:'rgba(80,140,200,0.3)'});
+        bonds.push({x1:vx,y1:vy,z1:0,x2:vx+seOx,y2:vy+seOy,z2:+2.2,w:1.0,color:'rgba(80,140,200,0.3)'});
       }
     }
-    // V-V nearest-neighbor bonds (layer skeleton)
-    const dirs=[[1,0],[0,1],[1,-1]];
-    for(const v1 of vPos){
-      for(const [di,dj] of dirs){
-        const v2=vPos.find(v=>v.i===v1.i+di&&v.j===v1.j+dj);
-        if(v2) bonds.push({x1:v1.x,y1:v1.y,z1:0,x2:v2.x,y2:v2.y,z2:0,w:0.8,color:'rgba(80,140,220,0.15)'});
+    // V-V skeleton bonds (very faint)
+    for(const key in vMap){
+      const [i,j]=key.split(',').map(Number);
+      for(const [di,dj] of [[1,0],[0,1],[1,-1]]){
+        const nk=(i+di)+','+(j+dj);
+        if(vMap[nk]){
+          const a2=vMap[key],b2=vMap[nk];
+          bonds.push({x1:a2.x,y1:a2.y,z1:0,x2:b2.x,y2:b2.y,z2:0,w:0.5,color:'rgba(80,140,220,0.08)'});
+        }
       }
     }
     layerData.push({atoms,bonds,zBase});
   }
 
-  // === DBPO-Helicene molecule ===
-  const helAtoms=[], helBonds=[];
-  const ringC=[];
+  // ========== DBPO-Helicene: 7 fused rings ==========
+  const hA=[], hB=[];
+  const rC=[];
   for(let i=0;i<7;i++){
     const tw=i*0.28;
-    const hx=(i-3)*2.0;
-    const hy=Math.sin(tw)*2.0;
-    const hz=Math.cos(tw)*0.8;
-    ringC.push({x:hx,y:hy,z:hz,tw});
+    const hx=(i-3)*2.0, hy=Math.sin(tw)*2.0, hz=Math.cos(tw)*0.8;
+    rC.push({x:hx,y:hy,z:hz,tw});
     for(let a=0;a<6;a++){
       const ang=a*Math.PI/3+tw*0.5;
       const cx=hx+1.05*Math.cos(ang), cy=hy+1.05*Math.sin(ang);
-      helAtoms.push({x:cx,y:cy,z:hz,r:0.5,color:'#888888',type:'C'});
+      hA.push({x:cx,y:cy,z:hz,rpx:5,color:'#888888',type:'C'});
       const ang2=(a+1)*Math.PI/3+tw*0.5;
-      helBonds.push({x1:cx,y1:cy,z1:hz,x2:hx+1.05*Math.cos(ang2),y2:hy+1.05*Math.sin(ang2),z2:hz});
+      hB.push({x1:cx,y1:cy,z1:hz,x2:hx+1.05*Math.cos(ang2),y2:hy+1.05*Math.sin(ang2),z2:hz});
     }
   }
-  // Inter-ring fusion
   for(let i=0;i<6;i++){
-    const r1=ringC[i],r2=ringC[i+1];
-    const a1=2*Math.PI/3+r1.tw*0.5, a2=Math.PI+r2.tw*0.5;
-    helBonds.push({x1:r1.x+1.05*Math.cos(a1),y1:r1.y+1.05*Math.sin(a1),z1:r1.z,
-      x2:r2.x+1.05*Math.cos(a2),y2:r2.y+1.05*Math.sin(a2),z2:r2.z});
+    const r1=rC[i],r2=rC[i+1];
+    hB.push({x1:r1.x+1.05*Math.cos(2*Math.PI/3+r1.tw*0.5),y1:r1.y+1.05*Math.sin(2*Math.PI/3+r1.tw*0.5),z1:r1.z,
+      x2:r2.x+1.05*Math.cos(Math.PI+r2.tw*0.5),y2:r2.y+1.05*Math.sin(Math.PI+r2.tw*0.5),z2:r2.z});
   }
-  // N, O, H atoms
-  helAtoms.push({x:ringC[1].x+0.4,y:ringC[1].y-0.9,z:ringC[1].z,r:0.55,color:'#3366ff',type:'N'});
-  helAtoms.push({x:ringC[5].x-0.4,y:ringC[5].y+0.9,z:ringC[5].z,r:0.55,color:'#3366ff',type:'N'});
-  helAtoms.push({x:ringC[0].x-1.2,y:ringC[0].y-0.5,z:ringC[0].z,r:0.5,color:'#dd2222',type:'O'});
-  helAtoms.push({x:ringC[6].x+1.2,y:ringC[6].y+0.5,z:ringC[6].z,r:0.5,color:'#dd2222',type:'O'});
+  hA.push({x:rC[1].x+0.4,y:rC[1].y-0.9,z:rC[1].z,rpx:5.5,color:'#3366ff',type:'N'});
+  hA.push({x:rC[5].x-0.4,y:rC[5].y+0.9,z:rC[5].z,rpx:5.5,color:'#3366ff',type:'N'});
+  hA.push({x:rC[0].x-1.2,y:rC[0].y-0.5,z:rC[0].z,rpx:5,color:'#dd2222',type:'O'});
+  hA.push({x:rC[6].x+1.2,y:rC[6].y+0.5,z:rC[6].z,rpx:5,color:'#dd2222',type:'O'});
   for(let i=0;i<7;i++){
-    const rc=ringC[i];
+    const rc=rC[i];
     for(let a=0;a<3;a++){
       const ang=(a*2+1)*Math.PI/3+rc.tw*0.5;
-      helAtoms.push({x:rc.x+1.6*Math.cos(ang),y:rc.y+1.6*Math.sin(ang),z:rc.z,r:0.28,color:'#cccccc',type:'H'});
+      hA.push({x:rc.x+1.6*Math.cos(ang),y:rc.y+1.6*Math.sin(ang),z:rc.z,rpx:2.5,color:'#cccccc',type:'H'});
     }
   }
 
-  // 2 molecules: one between layer0-1, one between layer1-2
+  // 2 molecules: layer0-1 gap and layer1-2 gap
   const mols=[
-    {ox:0,oy:0,zTgt:-LAYER_GAP/2, zCur:-45,done:false,ang:0,tgtAng:0.35},
-    {ox:3,oy:2,zTgt: LAYER_GAP/2, zCur: 45,done:false,ang:Math.PI*0.25,tgtAng:-0.15},
+    {ox:0,oy:0,zTgt:-LAYER_GAP/2,zCur:-55,done:false,ang:0,tgtAng:0.35},
+    {ox:4,oy:2.5,zTgt:LAYER_GAP/2,zCur:55,done:false,ang:Math.PI*0.25,tgtAng:-0.15},
   ];
 
   let optimizing=false;
@@ -710,8 +711,8 @@ function startTMD(){
     {t:660,fn:()=>{
       document.getElementById('tmd-btn-cap').classList.add('active');
       document.getElementById('tmd-status').textContent='Capturing screenshot...';
-      const flash=document.getElementById('tmd-flash');
-      flash.classList.add('flash');setTimeout(()=>flash.classList.remove('flash'),200);
+      const fl=document.getElementById('tmd-flash');
+      fl.classList.add('flash');setTimeout(()=>fl.classList.remove('flash'),200);
     }},
     {t:720,fn:()=>{
       document.getElementById('tmd-btn-cap').classList.remove('active');
@@ -725,52 +726,57 @@ function startTMD(){
       document.getElementById('tmd-btn-trans').classList.remove('active');
       document.getElementById('tmd-status').textContent='transparent_bg.png exported!';
       document.getElementById('tmd-preview').classList.add('visible','transparent');
-      drawPrev();
+      drawMiniPreview();
     }},
   ];
   let phIdx=0;
 
-  function drawPrev(){
+  function drawMiniPreview(){
     const pc=document.getElementById('tmd-preview-canvas');
     const px=pc.getContext('2d');pc.width=180;pc.height=120;px.clearRect(0,0,180,120);
-    const ms=5,mx=90,my=60,myw=camYaw;
+    const ms=3.5,mx=90,my=60;
     function mp(x,y,z){
-      const c=Math.cos(myw),s=Math.sin(myw);
+      const c=Math.cos(camYaw),s=Math.sin(camYaw);
       const rx=x*c-y*s,ry=x*s+y*c;
-      const c2=Math.cos(-0.35),s2=Math.sin(-0.35);
+      const c2=Math.cos(-0.25),s2=Math.sin(-0.25);
       return{x:mx+rx*ms,y:my+(ry*c2-z*s2)*ms};
     }
     for(let li=0;li<2;li++){
       const zz=(li-0.5)*LAYER_GAP;
-      for(let i=-2;i<=2;i++){for(let j=-1;j<=1;j++){
-        if(Math.abs(i)+Math.abs(j)>3)continue;
+      for(let i=-3;i<=3;i++){for(let j=-2;j<=2;j++){
+        if(Math.abs(i)+Math.abs(j)>4)continue;
         const p=mp(i*A+j*A*0.5,j*A*SQ3*0.5,zz);
         px.beginPath();px.arc(p.x,p.y,3,0,Math.PI*2);px.fillStyle='rgba(74,158,255,0.5)';px.fill();
+        px.beginPath();px.arc(p.x+1,p.y+0.5,2.2,0,Math.PI*2);px.fillStyle='rgba(232,160,32,0.4)';px.fill();
       }}
     }
-    for(const ha of helAtoms){if(ha.type==='H')continue;const p=mp(ha.x,ha.y,ha.z);px.beginPath();px.arc(p.x,p.y,ha.r*ms*0.4,0,Math.PI*2);px.fillStyle=ha.color;px.fill();}
+    for(const ha of hA){if(ha.type==='H')continue;const p=mp(ha.x,ha.y,ha.z);px.beginPath();px.arc(p.x,p.y,ha.rpx*0.25,0,Math.PI*2);px.fillStyle=ha.color;px.fill();}
   }
 
+  // ========== Main draw loop ==========
   function drawTMD(){
     if(!scene.classList.contains('active')){tmdAnimId=null;return;}
-    ctx.fillStyle='#0a0e17';ctx.fillRect(0,0,canvas.width,canvas.height);
-    time++;
 
-    while(phIdx<phases.length&&time>=phases[phIdx].t){phases[phIdx].fn();phIdx++;}
+    // *** CRITICAL: respect global paused state ***
+    if(!paused){
+      time++;
+      // Phase timers only advance when not paused
+      while(phIdx<phases.length&&time>=phases[phIdx].t){phases[phIdx].fn();phIdx++;}
+      // Very slow rotation (0.0015 rad/frame = ~5 deg/sec)
+      camYaw+=0.0015;
+      if(optimizing) camYaw+=0.006;
+    }
 
-    // Very slow rotation
-    camYaw+=0.002;
-    if(optimizing) camYaw+=0.008;
+    ctx.fillStyle='#0a0e17';ctx.fillRect(0,0,W,H);
 
-    // Layer separation: opens gap for molecules
-    const SEP=Math.min(time*0.02,4);
+    // Layer separation animation
+    const SEP=Math.min(time*0.018,5);
 
-    const dl=[]; // draw list
+    const dl=[];
 
-    // Layers
+    // === VSe2 layers ===
     for(let li=0;li<3;li++){
       const ld=layerData[li];
-      // Shift: layer 0 goes down, layer 2 goes up, layer 1 stays
       let zOff=ld.zBase;
       if(li===0) zOff=ld.zBase-SEP;
       else if(li===2) zOff=ld.zBase+SEP;
@@ -783,71 +789,78 @@ function startTMD(){
       }
       for(const a of ld.atoms){
         const p=project(a.x,a.y,a.z+zOff);
-        const r=a.r*SCALE*p.s*0.13;
-        dl.push({px:p.x,py:p.y,pz:p.z,r:r,color:a.color,kind:'a',s:p.s});
+        // rpx = radius in pixels at s=1, scale by perspective
+        const r=a.rpx*p.s;
+        dl.push({px:p.x,py:p.y,pz:p.z,r:r,color:a.color,kind:'a'});
       }
     }
 
-    // Molecules
-    for(const mi of mols){
-      if(!mi.done){
-        mi.zCur+=(mi.zTgt-mi.zCur)*0.02;
-        if(Math.abs(mi.zCur-mi.zTgt)<0.15){mi.zCur=mi.zTgt;mi.done=true;}
+    // === Molecules ===
+    if(!paused){
+      for(const mi of mols){
+        if(!mi.done){
+          mi.zCur+=(mi.zTgt-mi.zCur)*0.018;
+          if(Math.abs(mi.zCur-mi.zTgt)<0.12){mi.zCur=mi.zTgt;mi.done=true;}
+        }
+        if(optimizing) mi.ang+=(mi.tgtAng-mi.ang)*0.01;
       }
-      if(optimizing) mi.ang+=(mi.tgtAng-mi.ang)*0.012;
-      const mc=Math.cos(mi.ang),ms2=Math.sin(mi.ang);
+    }
 
-      for(const b of helBonds){
-        const bx1=b.x1*mc-b.y1*ms2+mi.ox, by1=b.x1*ms2+b.y1*mc+mi.oy;
-        const bx2=b.x2*mc-b.y2*ms2+mi.ox, by2=b.x2*ms2+b.y2*mc+mi.oy;
+    for(const mi of mols){
+      const mc=Math.cos(mi.ang),ms2=Math.sin(mi.ang);
+      for(const b of hB){
+        const bx1=b.x1*mc-b.y1*ms2+mi.ox,by1=b.x1*ms2+b.y1*mc+mi.oy;
+        const bx2=b.x2*mc-b.y2*ms2+mi.ox,by2=b.x2*ms2+b.y2*mc+mi.oy;
         const p1=project(bx1,by1,b.z1+mi.zCur),p2=project(bx2,by2,b.z2+mi.zCur);
         dl.push({px:(p1.x+p2.x)/2,py:(p1.y+p2.y)/2,pz:(p1.z+p2.z)/2,
           x1:p1.x,y1:p1.y,x2:p2.x,y2:p2.y,kind:'mb',s:(p1.s+p2.s)/2});
       }
-      for(const ha of helAtoms){
-        const ax=ha.x*mc-ha.y*ms2+mi.ox, ay=ha.x*ms2+ha.y*mc+mi.oy;
+      for(const ha of hA){
+        const ax=ha.x*mc-ha.y*ms2+mi.ox,ay=ha.x*ms2+ha.y*mc+mi.oy;
         const p=project(ax,ay,ha.z+mi.zCur);
-        const r=ha.r*SCALE*p.s*0.12;
-        dl.push({px:p.x,py:p.y,pz:p.z,r:Math.max(r,1.5),color:ha.color,kind:'a',s:p.s});
+        const r=ha.rpx*p.s;
+        dl.push({px:p.x,py:p.y,pz:p.z,r:Math.max(r,1.5),color:ha.color,kind:'a'});
       }
     }
 
-    // Depth sort
+    // Depth sort (far first)
     dl.sort((a,b)=>b.pz-a.pz);
 
-    // Render
+    // ========== Render ==========
     for(const d of dl){
       if(d.kind==='lb'){
         ctx.beginPath();ctx.moveTo(d.x1,d.y1);ctx.lineTo(d.x2,d.y2);
         ctx.strokeStyle=d.color;ctx.lineWidth=Math.max(d.w*d.s,0.3);ctx.stroke();
       }else if(d.kind==='mb'){
         ctx.beginPath();ctx.moveTo(d.x1,d.y1);ctx.lineTo(d.x2,d.y2);
-        ctx.strokeStyle='rgba(200,200,200,0.65)';ctx.lineWidth=Math.max(1.8*d.s,0.6);ctx.stroke();
+        ctx.strokeStyle='rgba(200,200,200,0.6)';ctx.lineWidth=Math.max(2*d.s,0.6);ctx.stroke();
       }else{
-        const r=d.r;if(r<0.4)continue;
+        const r=d.r;if(r<0.5)continue;
         ctx.beginPath();ctx.arc(d.px,d.py,r,0,Math.PI*2);
         const g=ctx.createRadialGradient(d.px-r*0.3,d.py-r*0.3,r*0.05,d.px,d.py,r);
-        g.addColorStop(0,lightenColor(d.color,60));
-        g.addColorStop(0.5,d.color);
-        g.addColorStop(1,darkenColor(d.color,50));
+        g.addColorStop(0,lightenColor(d.color,70));
+        g.addColorStop(0.45,d.color);
+        g.addColorStop(1,darkenColor(d.color,55));
         ctx.fillStyle=g;ctx.fill();
-        ctx.strokeStyle=darkenColor(d.color,70);ctx.lineWidth=0.5;ctx.stroke();
+        ctx.strokeStyle=darkenColor(d.color,80);ctx.lineWidth=0.6;ctx.stroke();
       }
     }
 
-    // Labels
+    // Info text
     ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='12px sans-serif';
     ctx.fillText('VSe\u2082 + DBPO-Helicene (1040766)',16,24);
     ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='10px sans-serif';
     ctx.fillText('P-3m1 (No.164) \u2014 a = 3.354 \u00C5, c = 6.10 \u00C5',16,40);
-    // Legend
-    const lx=canvas.width-180,ly=canvas.height-28;
-    ctx.beginPath();ctx.arc(lx,ly,5,0,Math.PI*2);ctx.fillStyle='#4a9eff';ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='10px sans-serif';ctx.fillText('V',lx+9,ly+4);
-    ctx.beginPath();ctx.arc(lx+40,ly,4,0,Math.PI*2);ctx.fillStyle='#e8a020';ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.fillText('Se',lx+48,ly+4);
-    ctx.beginPath();ctx.arc(lx+82,ly,3,0,Math.PI*2);ctx.fillStyle='#888';ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.fillText('1040766',lx+90,ly+4);
+
+    // Legend bar
+    const lx=W-200,ly=H-26;
+    [{x:lx,r:6,c:'#4a9eff',t:'V'},{x:lx+50,r:5,c:'#e8a020',t:'Se'},{x:lx+100,r:4,c:'#888',t:'1040766'}].forEach(e=>{
+      ctx.beginPath();ctx.arc(e.x,ly,e.r,0,Math.PI*2);
+      const gg=ctx.createRadialGradient(e.x-e.r*0.3,ly-e.r*0.3,0,e.x,ly,e.r);
+      gg.addColorStop(0,lightenColor(e.c,50));gg.addColorStop(1,e.c);
+      ctx.fillStyle=gg;ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='10px sans-serif';ctx.fillText(e.t,e.x+e.r+4,ly+4);
+    });
 
     tmdAnimId=requestAnimationFrame(drawTMD);
   }
@@ -913,6 +926,7 @@ function startDMM(){
   let vData=[],iData=[],step=0;const maxPoints=80;
   const iv=setInterval(()=>{
     if(!scene.classList.contains('active')){clearInterval(iv);return;}
+    if(paused)return; // respect pause
     step++;const t=step*0.05;
     const voltage=0.85+0.15*Math.sin(t*0.3)+(Math.random()-0.5)*0.02+t*0.005;
     const current=2.000+(Math.random()-0.5)*0.005;
