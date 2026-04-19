@@ -9,17 +9,15 @@
 body{background:#050810;overflow:hidden;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;color:#fff}
 canvas#bg{position:fixed;inset:0;z-index:0}
 
-/* 全体コンテナ */
 #app{position:fixed;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;perspective:1200px}
 
-/* タイトルシーン */
+/* タイトル */
 #title-scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
   opacity:0;transform:scale(0.9);transition:opacity 1.2s,transform 1.2s}
 #title-scene.active{opacity:1;transform:scale(1)}
 #title-scene h1{font-size:4.5rem;font-weight:800;letter-spacing:0.06em;
   background:linear-gradient(135deg,#58a6ff 0%,#a78bfa 50%,#22d3ee 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-  text-shadow:none;margin-bottom:16px}
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:16px}
 #title-scene .subtitle{font-size:1.3rem;color:#888;letter-spacing:0.1em;opacity:0;
   transform:translateY(20px);transition:opacity .8s .6s,transform .8s .6s}
 #title-scene.active .subtitle{opacity:1;transform:translateY(0)}
@@ -29,39 +27,88 @@ canvas#bg{position:fixed;inset:0;z-index:0}
 .title-tag{padding:6px 16px;border-radius:20px;font-size:.85rem;border:1px solid rgba(88,166,255,0.3);color:#58a6ff;
   background:rgba(88,166,255,0.06)}
 
-/* ラップトップ3D */
+/* ラップトップ */
 #laptop{position:absolute;width:900px;height:580px;transform-style:preserve-3d;
   opacity:0;transition:opacity 1s,transform 1.5s cubic-bezier(0.16,1,0.3,1)}
 #laptop.active{opacity:1}
 #laptop-screen{width:100%;height:100%;background:#0a0e17;border-radius:12px;border:2px solid #1a2030;
-  overflow:hidden;box-shadow:0 0 80px rgba(88,166,255,0.08),inset 0 0 1px rgba(255,255,255,0.1);
-  position:relative}
+  overflow:hidden;box-shadow:0 0 80px rgba(88,166,255,0.08),inset 0 0 1px rgba(255,255,255,0.1);position:relative}
 #laptop-base{position:absolute;bottom:-28px;left:-40px;right:-40px;height:28px;
   background:linear-gradient(180deg,#1a1e28 0%,#0e1118 100%);border-radius:0 0 8px 8px;
   transform:rotateX(-80deg);transform-origin:top center}
 
-/* スクリーン内コンテンツ */
 .screen-content{position:absolute;inset:0;opacity:0;transition:opacity .8s;padding:0;overflow:hidden}
 .screen-content.active{opacity:1}
 
-/* ツール名オーバーレイ */
 .tool-label{position:absolute;bottom:20px;left:20px;z-index:10;opacity:0;transform:translateY(10px);
   transition:opacity .6s .3s,transform .6s .3s}
 .screen-content.active .tool-label{opacity:1;transform:translateY(0)}
 .tool-label h2{font-size:1.4rem;color:#fff;margin-bottom:4px;text-shadow:0 2px 20px rgba(0,0,0,0.8)}
 .tool-label p{font-size:.8rem;color:#aaa;text-shadow:0 1px 10px rgba(0,0,0,0.8)}
 
-/* 右下のシーン番号 */
-.scene-num{position:fixed;bottom:30px;right:40px;font-size:.75rem;color:#444;z-index:10;letter-spacing:0.1em}
+.scene-num{position:fixed;bottom:54px;right:40px;font-size:.75rem;color:#444;z-index:10;letter-spacing:0.1em}
 
-/* プログレスバー */
-#progress{position:fixed;bottom:0;left:0;height:3px;background:linear-gradient(90deg,#58a6ff,#a78bfa,#22d3ee);
-  z-index:20;transition:width .3s linear;width:0}
+/* Seekbar (YouTube-like) */
+#seekbar-wrap{position:fixed;bottom:0;left:0;right:0;height:44px;z-index:30;
+  background:linear-gradient(transparent,rgba(0,0,0,0.85));padding:0 12px;
+  display:flex;align-items:center;gap:10px;opacity:0;transition:opacity .4s}
+#seekbar-wrap.visible{opacity:1}
+#play-pause{width:32px;height:32px;background:none;border:none;color:#fff;cursor:pointer;font-size:1.1rem;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#play-pause:hover{color:#58a6ff}
+#time-display{font-size:.7rem;color:#aaa;font-family:'Courier New',monospace;flex-shrink:0;min-width:90px}
+#seekbar{flex:1;height:28px;position:relative;cursor:pointer;display:flex;align-items:center}
+#seekbar-track{width:100%;height:4px;background:rgba(255,255,255,0.12);border-radius:2px;position:relative;overflow:visible}
+#seekbar-track:hover{height:6px}
+#seekbar-fill{height:100%;background:linear-gradient(90deg,#58a6ff,#a78bfa,#22d3ee);border-radius:2px;width:0;
+  position:absolute;top:0;left:0;pointer-events:none}
+#seekbar-hover{height:100%;background:rgba(255,255,255,0.1);border-radius:2px;width:0;
+  position:absolute;top:0;left:0;pointer-events:none}
+#seekbar-thumb{width:14px;height:14px;background:#fff;border-radius:50%;position:absolute;top:50%;
+  transform:translate(-50%,-50%);left:0;pointer-events:none;opacity:0;transition:opacity .2s;
+  box-shadow:0 0 6px rgba(88,166,255,0.5)}
+#seekbar:hover #seekbar-thumb{opacity:1}
+/* Section markers */
+.seek-section{position:absolute;top:-18px;font-size:.55rem;color:#888;white-space:nowrap;
+  transform:translateX(-50%);pointer-events:none;opacity:0;transition:opacity .3s}
+#seekbar:hover .seek-section{opacity:1}
+.seek-marker{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,0.2);
+  transform:translateX(-50%);pointer-events:none}
+/* Hover tooltip */
+#seek-tooltip{position:absolute;bottom:20px;background:rgba(20,25,40,0.95);border:1px solid rgba(88,166,255,0.3);
+  border-radius:4px;padding:3px 8px;font-size:.65rem;color:#fff;white-space:nowrap;
+  transform:translateX(-50%);pointer-events:none;opacity:0;transition:opacity .2s}
+#seekbar:hover #seek-tooltip{opacity:1}
 
-/* ===== TMD シーン ===== */
+/* TMD */
 #tmd-scene canvas{width:100%;height:100%}
+/* TMD UI overlay elements */
+.tmd-ui-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:5}
+.tmd-toolbar{position:absolute;top:10px;right:10px;display:flex;gap:6px;opacity:0;transition:opacity .5s}
+.tmd-toolbar.visible{opacity:1}
+.tmd-btn{padding:5px 12px;background:rgba(30,40,60,0.9);border:1px solid rgba(88,166,255,0.3);
+  border-radius:6px;font-size:.7rem;color:#58a6ff;cursor:pointer;display:flex;align-items:center;gap:4px;
+  transition:all .3s;pointer-events:auto}
+.tmd-btn:hover,.tmd-btn.active{background:rgba(88,166,255,0.15);border-color:#58a6ff}
+.tmd-btn.capture{color:#22c55e;border-color:rgba(34,197,94,0.3)}
+.tmd-btn.capture:hover,.tmd-btn.capture.active{background:rgba(34,197,94,0.15);border-color:#22c55e}
+.tmd-status{position:absolute;top:50px;right:10px;padding:6px 12px;background:rgba(20,25,40,0.9);
+  border:1px solid rgba(167,139,250,0.3);border-radius:6px;font-size:.68rem;color:#a78bfa;
+  opacity:0;transition:opacity .5s;max-width:200px}
+.tmd-status.visible{opacity:1}
+.tmd-flash{position:absolute;inset:0;background:#fff;opacity:0;transition:opacity .1s;z-index:8}
+.tmd-flash.flash{opacity:0.8}
+.tmd-preview{position:absolute;bottom:60px;right:10px;width:180px;height:140px;
+  border:2px solid rgba(34,197,94,0.4);border-radius:8px;overflow:hidden;opacity:0;
+  transition:opacity .5s;box-shadow:0 4px 20px rgba(0,0,0,0.5);z-index:6}
+.tmd-preview.visible{opacity:1}
+.tmd-preview canvas{width:100%;height:100%}
+.tmd-preview-label{position:absolute;bottom:0;left:0;right:0;padding:3px 6px;
+  background:rgba(0,0,0,0.7);font-size:.6rem;color:#22c55e;text-align:center}
+/* checkerboard for transparent bg */
+.tmd-preview.transparent{background:repeating-conic-gradient(#333 0% 25%, #444 0% 50%) 50% / 12px 12px}
 
-/* ===== XRD シーン ===== */
+/* XRD */
 #xrd-scene{background:#0a0e17}
 .xrd-header{padding:12px 16px;border-bottom:1px solid rgba(88,166,255,0.1);display:flex;align-items:center;gap:10px}
 .xrd-header h3{font-size:.9rem;color:#fff}
@@ -69,18 +116,16 @@ canvas#bg{position:fixed;inset:0;z-index:0}
 .xrd-drop.dropping{border-color:#58a6ff;background:rgba(88,166,255,0.05)}
 .xrd-drop p{color:#58a6ff;font-size:.9rem}
 .xrd-file{position:absolute;width:120px;padding:10px;background:rgba(30,40,60,0.95);border:1px solid rgba(88,166,255,0.3);
-  border-radius:8px;font-size:.75rem;color:#58a6ff;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.5);
-  opacity:0;z-index:5}
+  border-radius:8px;font-size:.75rem;color:#58a6ff;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.5);opacity:0;z-index:5}
 .xrd-chart{position:absolute;bottom:0;left:0;right:0;height:55%;background:rgba(15,18,28,0.8);
   border-top:1px solid rgba(88,166,255,0.1);opacity:0;transition:opacity .6s}
 .xrd-chart.visible{opacity:1}
 .xrd-chart canvas{width:100%;height:100%}
 
-/* ===== DMM シーン ===== */
+/* DMM */
 #dmm-scene{background:#0a0e17}
 .dmm-header{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:10px}
-.dmm-header .dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 6px #22c55e;
-  animation:pulse-dot 2s infinite}
+.dmm-header .dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 6px #22c55e;animation:pulse-dot 2s infinite}
 @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
 .dmm-cards{display:flex;gap:12px;padding:16px;justify-content:center}
 .dmm-val{flex:1;max-width:280px;background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.06);
@@ -93,23 +138,19 @@ canvas#bg{position:fixed;inset:0;z-index:0}
 .dmm-chart{height:40%;padding:10px 16px}
 .dmm-chart canvas{width:100%;height:100%;border-radius:8px}
 
-/* ===== CFMS シーン ===== */
+/* CFMS */
 #cfms-scene{background:#0a0e17}
-.cfms-top{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;
-  border-bottom:1px solid rgba(255,255,255,0.06)}
+.cfms-top{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.06)}
 .cfms-top h3{font-size:.9rem;color:#fff;display:flex;align-items:center;gap:6px}
 .cfms-toggle{width:40px;height:22px;border-radius:22px;background:#22c55e;position:relative;cursor:pointer}
-.cfms-toggle::after{content:'';width:16px;height:16px;background:#fff;border-radius:50%;
-  position:absolute;top:3px;right:3px;transition:.2s}
+.cfms-toggle::after{content:'';width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:3px;right:3px;transition:.2s}
 .cfms-body{display:flex;height:calc(100% - 48px)}
 .cfms-folders{width:35%;border-right:1px solid rgba(255,255,255,0.06);padding:10px;overflow:hidden}
-.cfms-folder{padding:6px 8px;border-radius:6px;font-size:.75rem;color:#a78bfa;cursor:pointer;
-  display:flex;align-items:center;gap:4px;margin-bottom:3px}
+.cfms-folder{padding:6px 8px;border-radius:6px;font-size:.75rem;color:#a78bfa;cursor:pointer;display:flex;align-items:center;gap:4px;margin-bottom:3px}
 .cfms-folder:hover{background:rgba(167,139,250,0.06)}
 .cfms-folder .arrow{font-size:.6rem;color:#555;transition:transform .2s}
 .cfms-folder .arrow.open{transform:rotate(90deg)}
-.cfms-subfolder{margin-left:16px;padding:4px 8px;font-size:.7rem;color:#8b9dc3;border-radius:4px;
-  margin-bottom:2px;display:none}
+.cfms-subfolder{margin-left:16px;padding:4px 8px;font-size:.7rem;color:#8b9dc3;border-radius:4px;margin-bottom:2px;display:none}
 .cfms-subfolder.visible{display:block}
 .cfms-subfolder:hover{background:rgba(139,157,195,0.06)}
 .cfms-file-chip{margin-left:28px;padding:4px 10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);
@@ -121,21 +162,22 @@ canvas#bg{position:fixed;inset:0;z-index:0}
 .cfms-graph{flex:1;padding:12px;display:flex;flex-direction:column}
 .cfms-graph canvas{flex:1;border-radius:8px}
 .cfms-summary{display:flex;gap:8px;margin-bottom:8px}
-.cfms-stat{flex:1;background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.06);
-  border-radius:8px;padding:8px;text-align:center}
+.cfms-stat{flex:1;background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px;text-align:center}
 .cfms-stat .sl{font-size:.6rem;color:#888}
 .cfms-stat .sv{font-size:1rem;font-weight:bold;font-family:'Courier New',monospace}
 .cfms-stat.temp .sv{color:#f97316}
 .cfms-stat.resist .sv{color:#22d3ee}
 
-/* ===== アウトロ ===== */
+/* アウトロ */
 #outro-scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
   opacity:0;transition:opacity 1.2s}
 #outro-scene.active{opacity:1}
-.outro-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px;max-width:600px}
+.outro-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;max-width:600px}
 .outro-card{background:rgba(20,25,40,0.85);border:1px solid rgba(88,166,255,0.15);border-radius:12px;
-  padding:20px;text-align:center;opacity:0;transform:translateY(20px);transition:opacity .6s,transform .6s}
+  padding:20px;text-align:center;opacity:0;transform:translateY(20px);transition:opacity .6s,transform .6s;
+  cursor:pointer;text-decoration:none;display:block}
 .outro-card.show{opacity:1;transform:translateY(0)}
+.outro-card:hover{border-color:rgba(88,166,255,0.5);background:rgba(30,40,60,0.85)}
 .outro-card .oc-icon{font-size:2rem;margin-bottom:8px}
 .outro-card h3{font-size:.95rem;color:#fff;margin-bottom:4px}
 .outro-card p{font-size:.72rem;color:#888}
@@ -144,86 +186,96 @@ canvas#bg{position:fixed;inset:0;z-index:0}
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
   opacity:0;transform:scale(0.9);transition:opacity .8s .8s,transform .8s .8s}
 #outro-scene.active .final-text{opacity:1;transform:scale(1)}
+.outro-links{display:flex;gap:12px;margin-top:20px;opacity:0;transition:opacity .8s 1.2s}
+#outro-scene.active .outro-links{opacity:1}
+.outro-link{padding:8px 20px;border-radius:8px;font-size:.8rem;text-decoration:none;transition:all .3s;
+  display:flex;align-items:center;gap:6px}
+.outro-link.primary{background:rgba(88,166,255,0.15);border:1px solid rgba(88,166,255,0.4);color:#58a6ff}
+.outro-link.primary:hover{background:rgba(88,166,255,0.25)}
+.outro-link.yt{background:rgba(255,0,0,0.1);border:1px solid rgba(255,0,0,0.3);color:#ff4444}
+.outro-link.yt:hover{background:rgba(255,0,0,0.2)}
 
-/* リプレイボタン */
-#replay{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);padding:10px 30px;
-  background:rgba(88,166,255,0.15);border:1px solid rgba(88,166,255,0.4);border-radius:8px;
-  color:#58a6ff;font-size:.9rem;cursor:pointer;z-index:20;opacity:0;transition:opacity .5s;
-  pointer-events:none}
-#replay.show{opacity:1;pointer-events:auto}
-#replay:hover{background:rgba(88,166,255,0.25)}
+/* (replay button removed - seekbar replaces it) */
 </style>
 </head>
 <body>
 <canvas id="bg"></canvas>
-<div id="progress"></div>
 
 <div id="app">
-  <!-- タイトルシーン -->
   <div id="title-scene">
     <h1>Research Tools</h1>
-    <div class="subtitle">材料科学・物性物理の研究支援ツール</div>
+    <div class="subtitle">Materials Science Research Suite</div>
     <div class="tags-row">
-      <span class="title-tag">TMD 結晶構造</span>
-      <span class="title-tag">XRD データ解析</span>
-      <span class="title-tag">DMM リアルタイム監視</span>
-      <span class="title-tag">CFMS 低温物性</span>
+      <span class="title-tag">TMD Crystal Viewer</span>
+      <span class="title-tag">XRD Plotter</span>
+      <span class="title-tag">DMM Monitor</span>
+      <span class="title-tag">CFMS Plotter</span>
     </div>
   </div>
 
-  <!-- ラップトップ3D -->
   <div id="laptop">
     <div id="laptop-screen">
-      <!-- TMD シーン -->
+      <!-- TMD -->
       <div class="screen-content" id="tmd-scene">
         <canvas id="tmd-canvas"></canvas>
+        <div class="tmd-ui-overlay">
+          <div class="tmd-toolbar" id="tmd-toolbar">
+            <div class="tmd-btn" id="tmd-btn-opt">&#9881; Optimize</div>
+            <div class="tmd-btn capture" id="tmd-btn-cap">&#128247; Screenshot</div>
+            <div class="tmd-btn capture" id="tmd-btn-trans">&#9634; Transparent</div>
+          </div>
+          <div class="tmd-status" id="tmd-status"></div>
+          <div class="tmd-flash" id="tmd-flash"></div>
+          <div class="tmd-preview" id="tmd-preview">
+            <canvas id="tmd-preview-canvas"></canvas>
+            <div class="tmd-preview-label">transparent_bg.png</div>
+          </div>
+        </div>
         <div class="tool-label">
-          <h2>TMD 結晶構造ビューア</h2>
-          <p>Three.js で結晶構造を3D可視化 — インターカレーション対応</p>
+          <h2>TMD Crystal Viewer</h2>
+          <p>VSe&#8322; + DBPO-Helicene &mdash; 3D Intercalation Visualization</p>
         </div>
       </div>
 
-      <!-- XRD シーン -->
+      <!-- XRD -->
       <div class="screen-content" id="xrd-scene">
         <div class="xrd-header">
           <span style="color:#58a6ff;font-size:.8rem">&#8592; Research Tools</span>
-          <h3>XRD データプロッター</h3>
+          <h3>XRD Data Plotter</h3>
         </div>
-        <div class="xrd-drop" id="xrd-drop">
-          <p>&#128194; .txt ファイルをドロップ</p>
-        </div>
+        <div class="xrd-drop" id="xrd-drop"><p>&#128194; Drop .txt file here</p></div>
         <div class="xrd-file" id="xrd-file">&#128196; TiSe2_XRD.txt</div>
         <div class="xrd-chart" id="xrd-chart"><canvas id="xrd-canvas"></canvas></div>
         <div class="tool-label">
-          <h2>XRD データプロッター</h2>
-          <p>ドラッグ&ドロップで自動グラフ生成 — ピーク自動検出</p>
+          <h2>XRD Data Plotter</h2>
+          <p>Drag &amp; Drop &mdash; Auto Peak Detection</p>
         </div>
       </div>
 
-      <!-- DMM シーン -->
+      <!-- DMM -->
       <div class="screen-content" id="dmm-scene">
         <div class="dmm-header">
           <span class="dot"></span>
           <span style="font-size:.8rem;color:#22c55e">LIVE</span>
-          <span style="font-size:.8rem;color:#fff;margin-left:8px">DMM リアルタイムモニター</span>
+          <span style="font-size:.8rem;color:#fff;margin-left:8px">DMM Real-time Monitor</span>
         </div>
         <div class="dmm-cards">
-          <div class="dmm-val volt"><div class="lbl">電圧 (Voltage)</div><div class="num" id="dmm-v">0.000</div><div class="unit">V</div></div>
-          <div class="dmm-val curr"><div class="lbl">電流 (Current)</div><div class="num" id="dmm-i">0.000</div><div class="unit">mA</div></div>
+          <div class="dmm-val volt"><div class="lbl">Voltage</div><div class="num" id="dmm-v">0.000</div><div class="unit">V</div></div>
+          <div class="dmm-val curr"><div class="lbl">Current</div><div class="num" id="dmm-i">0.000</div><div class="unit">mA</div></div>
         </div>
         <div class="dmm-chart"><canvas id="dmm-canvas"></canvas></div>
         <div class="tool-label">
-          <h2>DMM リアルタイムモニター</h2>
-          <p>遠隔で電流・電圧を監視 — インターカレーション実験の制御</p>
+          <h2>DMM Real-time Monitor</h2>
+          <p>Remote V/I Monitoring &mdash; Intercalation Control</p>
         </div>
       </div>
 
-      <!-- CFMS シーン -->
+      <!-- CFMS -->
       <div class="screen-content" id="cfms-scene">
         <div class="cfms-top">
-          <h3>&#10052; CFMS データプロッター</h3>
+          <h3>&#10052; CFMS Data Plotter</h3>
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:.7rem;color:#22c55e">&#9679; 監視中</span>
+            <span style="font-size:.7rem;color:#22c55e">&#9679; Monitoring</span>
             <div class="cfms-toggle"></div>
           </div>
         </div>
@@ -235,50 +287,62 @@ canvas#bg{position:fixed;inset:0;z-index:0}
           </div>
         </div>
         <div class="tool-label">
-          <h2>CFMS データプロッター</h2>
-          <p>自動ファイル取得 — R-T プロットをワンクリック生成</p>
+          <h2>CFMS Data Plotter</h2>
+          <p>Auto File Sync &mdash; R-T Plot Generation</p>
         </div>
       </div>
     </div>
     <div id="laptop-base"></div>
   </div>
 
-  <!-- アウトロシーン -->
+  <!-- アウトロ -->
   <div id="outro-scene">
     <div class="outro-grid">
-      <div class="outro-card" id="oc1"><div class="oc-icon">&#128300;</div><h3>TMD 結晶構造ビューア</h3><p>13種TMD × インターカレーション3D可視化</p></div>
-      <div class="outro-card" id="oc2"><div class="oc-icon">&#128200;</div><h3>XRD データプロッター</h3><p>ドラッグ&ドロップ × ピーク自動検出</p></div>
-      <div class="outro-card" id="oc3"><div class="oc-icon">&#9889;</div><h3>DMM リアルタイムモニター</h3><p>遠隔監視 × リアルタイムデータストリーム</p></div>
-      <div class="outro-card" id="oc4"><div class="oc-icon">&#10052;</div><h3>CFMS データプロッター</h3><p>自動受信 × R-T グラフ自動生成</p></div>
+      <a class="outro-card" id="oc1" href="/tmd-viewer" target="_blank"><div class="oc-icon">&#128300;</div><h3>TMD Crystal Viewer</h3><p>13 TMDs + Intercalation 3D</p></a>
+      <a class="outro-card" id="oc2" href="/xrd-plotter" target="_blank"><div class="oc-icon">&#128200;</div><h3>XRD Data Plotter</h3><p>Drag &amp; Drop + Auto Peaks</p></a>
+      <a class="outro-card" id="oc3" href="/dmm-monitor" target="_blank"><div class="oc-icon">&#9889;</div><h3>DMM Monitor</h3><p>Real-time Data Stream</p></a>
+      <a class="outro-card" id="oc4" href="/cfms-plotter" target="_blank"><div class="oc-icon">&#10052;</div><h3>CFMS Plotter</h3><p>Auto Sync + R-T Graphs</p></a>
     </div>
     <div class="final-text">Research Tools</div>
+    <div class="outro-links">
+      <a class="outro-link primary" href="/" target="_blank">&#127968; Home</a>
+      <a class="outro-link primary" href="/tmd-viewer" target="_blank">&#128300; Try TMD Viewer</a>
+      <a class="outro-link yt" href="https://youtube.com" target="_blank">&#9654; YouTube</a>
+    </div>
   </div>
 </div>
 
 <div class="scene-num" id="scene-num"></div>
-<button id="replay" onclick="startAnimation()">&#9654; もう一度再生</button>
+
+<!-- Seekbar -->
+<div id="seekbar-wrap">
+  <button id="play-pause" onclick="togglePlayPause()">&#9646;&#9646;</button>
+  <span id="time-display">0:00 / 1:08</span>
+  <div id="seekbar">
+    <div id="seekbar-track">
+      <div id="seekbar-hover"></div>
+      <div id="seekbar-fill"></div>
+      <div id="seekbar-thumb"></div>
+      <!-- Section markers added by JS -->
+    </div>
+    <div id="seek-tooltip"></div>
+  </div>
+</div>
 
 <script>
-// ===== 背景パーティクル =====
-const bgCanvas = document.getElementById('bg');
-const bgCtx = bgCanvas.getContext('2d');
-let particles = [];
-function resizeBg(){bgCanvas.width=innerWidth;bgCanvas.height=innerHeight;}
-resizeBg();
-window.addEventListener('resize',resizeBg);
-
+// ===== Background Particles =====
+const bgCanvas=document.getElementById('bg'),bgCtx=bgCanvas.getContext('2d');
+let particles=[];
+function resizeBg(){bgCanvas.width=innerWidth;bgCanvas.height=innerHeight}
+resizeBg();window.addEventListener('resize',resizeBg);
 for(let i=0;i<120;i++){
-  particles.push({
-    x:Math.random()*innerWidth, y:Math.random()*innerHeight,
-    vx:(Math.random()-0.5)*0.3, vy:(Math.random()-0.5)*0.3,
-    r:Math.random()*1.5+0.5, a:Math.random()*0.4+0.1,
-    color:`hsl(${210+Math.random()*60},70%,${50+Math.random()*30}%)`
-  });
+  particles.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,
+    vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,
+    r:Math.random()*1.5+0.5,a:Math.random()*0.4+0.1,
+    color:`hsl(${210+Math.random()*60},70%,${50+Math.random()*30}%)`});
 }
-
 function drawBg(){
-  bgCtx.fillStyle='rgba(5,8,16,0.15)';
-  bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height);
+  bgCtx.fillStyle='rgba(5,8,16,0.15)';bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height);
   for(const p of particles){
     p.x+=p.vx;p.y+=p.vy;
     if(p.x<0)p.x=bgCanvas.width;if(p.x>bgCanvas.width)p.x=0;
@@ -286,239 +350,464 @@ function drawBg(){
     bgCtx.beginPath();bgCtx.arc(p.x,p.y,p.r,0,Math.PI*2);
     bgCtx.fillStyle=p.color;bgCtx.globalAlpha=p.a;bgCtx.fill();
   }
-  // 線を描画
   bgCtx.globalAlpha=0.03;bgCtx.strokeStyle='#58a6ff';bgCtx.lineWidth=0.5;
   for(let i=0;i<particles.length;i++){
     for(let j=i+1;j<particles.length;j++){
       const dx=particles[i].x-particles[j].x,dy=particles[i].y-particles[j].y;
-      if(dx*dx+dy*dy<15000){
-        bgCtx.beginPath();bgCtx.moveTo(particles[i].x,particles[i].y);
-        bgCtx.lineTo(particles[j].x,particles[j].y);bgCtx.stroke();
-      }
+      if(dx*dx+dy*dy<15000){bgCtx.beginPath();bgCtx.moveTo(particles[i].x,particles[i].y);bgCtx.lineTo(particles[j].x,particles[j].y);bgCtx.stroke();}
     }
   }
-  bgCtx.globalAlpha=1;
-  requestAnimationFrame(drawBg);
+  bgCtx.globalAlpha=1;requestAnimationFrame(drawBg);
 }
 drawBg();
 
-// ===== タイムライン =====
-const TIMELINE = [
-  {t:0, action:'title_in'},
-  {t:4000, action:'title_out'},
-  {t:4500, action:'laptop_in'},
-  {t:5500, action:'tmd_in'},
-  {t:15500, action:'tmd_out'},
-  {t:16000, action:'xrd_in'},
-  {t:26000, action:'xrd_out'},
-  {t:26500, action:'dmm_in'},
-  {t:36500, action:'dmm_out'},
-  {t:37000, action:'cfms_in'},
-  {t:50000, action:'cfms_out'},
-  {t:50500, action:'laptop_out'},
-  {t:51000, action:'outro_in'},
-  {t:58000, action:'done'},
+// ===== Timeline =====
+const TIMELINE=[
+  {t:0,action:'title_in'},
+  {t:4000,action:'title_out'},
+  {t:4500,action:'laptop_in'},
+  {t:5500,action:'tmd_in'},
+  {t:25500,action:'tmd_out'},
+  {t:26000,action:'xrd_in'},
+  {t:36000,action:'xrd_out'},
+  {t:36500,action:'dmm_in'},
+  {t:46500,action:'dmm_out'},
+  {t:47000,action:'cfms_in'},
+  {t:60000,action:'cfms_out'},
+  {t:60500,action:'laptop_out'},
+  {t:61000,action:'outro_in'},
+  {t:68000,action:'done'},
 ];
-
-const TOTAL_DURATION = 58000;
-let startTime = 0;
-let timelineIdx = 0;
-let animRunning = false;
-let animIntervals = [];
-
+const SECTIONS=[
+  {t:0,label:'Intro'},
+  {t:5500,label:'TMD Viewer'},
+  {t:26000,label:'XRD Plotter'},
+  {t:36500,label:'DMM Monitor'},
+  {t:47000,label:'CFMS Plotter'},
+  {t:61000,label:'Outro'},
+];
+const TOTAL_DURATION=68000;
+let startTime=0,timelineIdx=0,animRunning=false,animIntervals=[],paused=false,pauseElapsed=0;
 function clearIntervals(){animIntervals.forEach(clearInterval);animIntervals=[];}
 
-function startAnimation(){
+function fmtTime(ms){const s=Math.floor(ms/1000);return Math.floor(s/60)+':'+(s%60<10?'0':'')+s%60;}
+
+// Seekbar setup
+function initSeekbar(){
+  const track=document.getElementById('seekbar-track');
+  // Add section markers
+  SECTIONS.forEach(sec=>{
+    if(sec.t===0)return;
+    const pct=sec.t/TOTAL_DURATION*100;
+    const marker=document.createElement('div');marker.className='seek-marker';
+    marker.style.left=pct+'%';track.appendChild(marker);
+    const label=document.createElement('div');label.className='seek-section';
+    label.style.left=pct+'%';label.textContent=sec.label;track.appendChild(label);
+  });
+  document.getElementById('seekbar-wrap').classList.add('visible');
+}
+
+// Seekbar interaction
+(function(){
+  const seekbar=document.getElementById('seekbar');
+  const tooltip=document.getElementById('seek-tooltip');
+  const hoverBar=document.getElementById('seekbar-hover');
+  let dragging=false;
+
+  function getSeekPos(e){
+    const rect=seekbar.getBoundingClientRect();
+    return Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+  }
+  function getSceneName(ms){
+    for(let i=SECTIONS.length-1;i>=0;i--){if(ms>=SECTIONS[i].t)return SECTIONS[i].label;}
+    return'Intro';
+  }
+
+  seekbar.addEventListener('mousemove',e=>{
+    const pct=getSeekPos(e);const ms=pct*TOTAL_DURATION;
+    hoverBar.style.width=pct*100+'%';
+    tooltip.textContent=fmtTime(ms)+' \u2014 '+getSceneName(ms);
+    tooltip.style.left=pct*100+'%';
+  });
+  seekbar.addEventListener('mouseleave',()=>{hoverBar.style.width='0';});
+
+  seekbar.addEventListener('mousedown',e=>{dragging=true;seekTo(getSeekPos(e));e.preventDefault();});
+  document.addEventListener('mousemove',e=>{if(dragging)seekTo(getSeekPos(e));});
+  document.addEventListener('mouseup',()=>{dragging=false;});
+})();
+
+function seekTo(pct){
+  const targetMs=pct*TOTAL_DURATION;
+  resetAll();
+  // Replay all actions up to targetMs instantly
+  for(let i=0;i<TIMELINE.length;i++){
+    if(TIMELINE[i].t<=targetMs){
+      runAction(TIMELINE[i].action,true);
+      timelineIdx=i+1;
+    }else break;
+  }
+  // Adjust start time so elapsed = targetMs
+  if(paused){pauseElapsed=targetMs;}
+  else{startTime=performance.now()-targetMs;}
+  updateSeekbarUI(targetMs);
+}
+
+function updateSeekbarUI(elapsed){
+  const pct=Math.min(elapsed/TOTAL_DURATION,1);
+  document.getElementById('seekbar-fill').style.width=pct*100+'%';
+  document.getElementById('seekbar-thumb').style.left=pct*100+'%';
+  document.getElementById('time-display').textContent=fmtTime(elapsed)+' / '+fmtTime(TOTAL_DURATION);
+  let s='';
+  if(elapsed>5500&&elapsed<25500)s='01 / 04  TMD Viewer';
+  else if(elapsed>26000&&elapsed<36000)s='02 / 04  XRD Plotter';
+  else if(elapsed>36500&&elapsed<46500)s='03 / 04  DMM Monitor';
+  else if(elapsed>47000&&elapsed<60000)s='04 / 04  CFMS Plotter';
+  document.getElementById('scene-num').textContent=s;
+}
+
+function togglePlayPause(){
+  const btn=document.getElementById('play-pause');
+  if(paused){
+    // Resume
+    paused=false;
+    startTime=performance.now()-pauseElapsed;
+    animRunning=true;
+    btn.innerHTML='\u2016'; // pause icon
+    requestAnimationFrame(tick);
+  }else{
+    // Pause
+    paused=true;
+    pauseElapsed=performance.now()-startTime;
+    animRunning=false;
+    btn.innerHTML='\u25B6'; // play icon
+  }
+}
+
+function resetAll(){
   clearIntervals();
-  // Reset all
+  // Remove all active states
   document.getElementById('title-scene').classList.remove('active');
-  document.getElementById('laptop').classList.remove('active');
-  document.getElementById('laptop').style.transform='rotateX(15deg) rotateY(-8deg) translateZ(-100px)';
+  document.getElementById('title-scene').style.opacity='';document.getElementById('title-scene').style.transition='';
+  const lp=document.getElementById('laptop');
+  lp.classList.remove('active');lp.style.transform='rotateX(15deg) rotateY(-8deg) translateZ(-100px)';lp.style.opacity='';
   document.querySelectorAll('.screen-content').forEach(e=>e.classList.remove('active'));
   document.getElementById('outro-scene').classList.remove('active');
   document.querySelectorAll('.outro-card').forEach(e=>e.classList.remove('show'));
-  document.getElementById('replay').classList.remove('show');
   document.getElementById('xrd-chart').classList.remove('visible');
   document.getElementById('xrd-drop').classList.remove('dropping');
+  document.getElementById('xrd-drop').style.display='';
   document.getElementById('xrd-file').style.cssText='opacity:0';
   document.getElementById('cfms-folders').innerHTML='';
   document.getElementById('cfms-summary').style.opacity='0';
+  document.getElementById('tmd-toolbar').classList.remove('visible');
+  document.getElementById('tmd-status').classList.remove('visible');
+  document.getElementById('tmd-status').textContent='';
+  document.getElementById('tmd-flash').classList.remove('flash');
+  document.getElementById('tmd-preview').classList.remove('visible','transparent');
+  document.querySelectorAll('.tmd-btn').forEach(b=>b.classList.remove('active'));
+  timelineIdx=0;
+}
 
-  startTime = performance.now();
-  timelineIdx = 0;
-  animRunning = true;
+function startAnimation(){
+  resetAll();
+  paused=false;
+  document.getElementById('play-pause').innerHTML='\u2016';
+  startTime=performance.now();animRunning=true;
+  initSeekbar();
   requestAnimationFrame(tick);
 }
 
 function tick(now){
-  if(!animRunning) return;
-  const elapsed = now - startTime;
-
-  // プログレスバー
-  document.getElementById('progress').style.width = Math.min(elapsed/TOTAL_DURATION*100,100)+'%';
-
-  // タイムラインイベント処理
-  while(timelineIdx < TIMELINE.length && elapsed >= TIMELINE[timelineIdx].t){
-    runAction(TIMELINE[timelineIdx].action);
-    timelineIdx++;
+  if(!animRunning)return;
+  const elapsed=now-startTime;
+  updateSeekbarUI(elapsed);
+  while(timelineIdx<TIMELINE.length&&elapsed>=TIMELINE[timelineIdx].t){
+    runAction(TIMELINE[timelineIdx].action,false);timelineIdx++;
   }
-
-  // シーン番号
-  let sceneText = '';
-  if(elapsed>5500&&elapsed<15500) sceneText='01 / 04  TMD Viewer';
-  else if(elapsed>16000&&elapsed<26000) sceneText='02 / 04  XRD Plotter';
-  else if(elapsed>26500&&elapsed<36500) sceneText='03 / 04  DMM Monitor';
-  else if(elapsed>37000&&elapsed<50000) sceneText='04 / 04  CFMS Plotter';
-  document.getElementById('scene-num').textContent=sceneText;
-
-  if(elapsed < TOTAL_DURATION) requestAnimationFrame(tick);
+  if(elapsed<TOTAL_DURATION)requestAnimationFrame(tick);
+  else{
+    animRunning=false;paused=true;pauseElapsed=TOTAL_DURATION;
+    document.getElementById('play-pause').innerHTML='\u25B6';
+  }
 }
 
-function runAction(action){
-  switch(action){
-    case 'title_in':
-      document.getElementById('title-scene').classList.add('active');
-      break;
-    case 'title_out':
-      document.getElementById('title-scene').classList.remove('active');
-      document.getElementById('title-scene').style.transition='opacity .8s';
-      document.getElementById('title-scene').style.opacity='0';
-      break;
-    case 'laptop_in':
-      const lp=document.getElementById('laptop');
-      lp.classList.add('active');
+function runAction(a,instant){
+  switch(a){
+    case 'title_in':document.getElementById('title-scene').classList.add('active');break;
+    case 'title_out':{
+      const ts=document.getElementById('title-scene');
+      ts.classList.remove('active');
+      if(instant){ts.style.opacity='0';ts.style.transition='none';}
+      else{ts.style.transition='opacity .8s';ts.style.opacity='0';}
+      break;}
+    case 'laptop_in':{
+      const lp=document.getElementById('laptop');lp.classList.add('active');
       lp.style.transform='rotateX(5deg) rotateY(-5deg) translateZ(0)';
-      break;
-    case 'laptop_out':
-      document.getElementById('laptop').style.transform='rotateX(15deg) rotateY(10deg) translateZ(-200px)';
-      document.getElementById('laptop').style.opacity='0';
-      break;
-
-    // TMD
-    case 'tmd_in': startTMD(); break;
-    case 'tmd_out': document.getElementById('tmd-scene').classList.remove('active'); break;
-
-    // XRD
-    case 'xrd_in': startXRD(); break;
-    case 'xrd_out': document.getElementById('xrd-scene').classList.remove('active'); break;
-
-    // DMM
-    case 'dmm_in': startDMM(); break;
-    case 'dmm_out':
-      document.getElementById('dmm-scene').classList.remove('active');
-      clearIntervals();
-      break;
-
-    // CFMS
-    case 'cfms_in': startCFMS(); break;
-    case 'cfms_out': document.getElementById('cfms-scene').classList.remove('active'); break;
-
-    // Outro
-    case 'outro_in': startOutro(); break;
-    case 'done':
-      animRunning=false;
-      document.getElementById('replay').classList.add('show');
-      break;
+      if(instant)lp.style.transition='none';break;}
+    case 'laptop_out':{
+      const lp=document.getElementById('laptop');
+      lp.style.transform='rotateX(15deg) rotateY(10deg) translateZ(-200px)';lp.style.opacity='0';
+      if(instant)lp.style.transition='none';break;}
+    case 'tmd_in':if(!instant)startTMD();else document.getElementById('tmd-scene').classList.add('active');break;
+    case 'tmd_out':document.getElementById('tmd-scene').classList.remove('active');break;
+    case 'xrd_in':if(!instant)startXRD();else{document.getElementById('xrd-scene').classList.add('active');document.getElementById('xrd-chart').classList.add('visible');document.getElementById('xrd-drop').style.display='none';}break;
+    case 'xrd_out':document.getElementById('xrd-scene').classList.remove('active');break;
+    case 'dmm_in':if(!instant)startDMM();else document.getElementById('dmm-scene').classList.add('active');break;
+    case 'dmm_out':document.getElementById('dmm-scene').classList.remove('active');clearIntervals();break;
+    case 'cfms_in':if(!instant)startCFMS();else document.getElementById('cfms-scene').classList.add('active');break;
+    case 'cfms_out':document.getElementById('cfms-scene').classList.remove('active');break;
+    case 'outro_in':if(!instant)startOutro();else{document.getElementById('outro-scene').classList.add('active');document.querySelectorAll('.outro-card').forEach(c=>c.classList.add('show'));}break;
+    case 'done':break;
   }
 }
 
-
-// ===== TMD 結晶構造アニメーション =====
+// ===== TMD: VSe2 + DBPO-Helicene (3D with z-rotation) =====
 function startTMD(){
-  const scene = document.getElementById('tmd-scene');
+  const scene=document.getElementById('tmd-scene');
   scene.classList.add('active');
-  const canvas = document.getElementById('tmd-canvas');
-  const ctx = canvas.getContext('2d');
-  canvas.width = 896; canvas.height = 576;
+  const canvas=document.getElementById('tmd-canvas');
+  const ctx=canvas.getContext('2d');
+  canvas.width=896;canvas.height=576;
 
-  let time = 0;
-  const atoms = [];
-  // 層構造を生成
-  for(let layer=0;layer<3;layer++){
-    const y0 = 140 + layer*160;
-    for(let i=0;i<8;i++){
-      for(let j=0;j<4;j++){
-        const x = 180 + i*70 + (j%2)*35;
-        const y = y0 + j*30;
-        // 遷移金属
-        atoms.push({x,y,r:10,color:'#58a6ff',type:'M',layer,baseY:y});
-        // カルコゲン上下
-        atoms.push({x:x+15,y:y-18,r:7,color:'#f97316',type:'X',layer,baseY:y-18});
-        atoms.push({x:x+15,y:y+18,r:7,color:'#f97316',type:'X',layer,baseY:y+18});
+  let time=0;
+  const CX=canvas.width/2, CY=canvas.height/2;
+
+  // 3D projection: oblique top-down view with z-rotation
+  let camPitch=-0.65; // looking down from above (~37 degrees)
+  let camYaw=0; // rotates over time
+  const SCALE=11;
+
+  function project(x3,y3,z3){
+    // Rotate around z-axis (yaw)
+    const cx=Math.cos(camYaw),sy=Math.sin(camYaw);
+    const rx=x3*cx-y3*sy, ry=x3*sy+y3*cx, rz=z3;
+    // Rotate around x-axis (pitch - tilt)
+    const cp=Math.cos(camPitch),sp=Math.sin(camPitch);
+    const fy=ry*cp-rz*sp, fz=ry*sp+rz*cp;
+    // Simple perspective
+    const perspective=600;
+    const s=perspective/(perspective+fz*0.5);
+    return {x:CX+rx*SCALE*s, y:CY+fy*SCALE*s, z:fz, s:s};
+  }
+
+  // Build VSe2 1T hexagonal layers (3 layers)
+  const allObjects=[]; // {x3,y3,z3,r,color,type}
+  const bonds=[];
+  const layerZ=[-18,0,18]; // layer positions (z)
+  const SEP_TARGET=12; // separation when intercalated
+
+  for(let li=0;li<3;li++){
+    const zBase=layerZ[li];
+    // Hexagonal grid for V atoms
+    for(let i=-4;i<=4;i++){
+      for(let j=-3;j<=3;j++){
+        const x=i*3.2+j*1.6;
+        const y=j*2.77;
+        // V atom (center, blue)
+        allObjects.push({x3:x,y3:y,z3:zBase,r:1.3,color:'#4a9eff',type:'V',layer:li});
+        // Se atoms above and below
+        allObjects.push({x3:x+1.07,y3:y+0.62,z3:zBase-1.6,r:0.95,color:'#e8a020',type:'Se',layer:li});
+        allObjects.push({x3:x+1.07,y3:y+0.62,z3:zBase+1.6,r:0.95,color:'#e8a020',type:'Se',layer:li});
       }
     }
   }
 
-  // インターカレーション分子
-  const molecules = [];
-  for(let i=0;i<6;i++){
-    molecules.push({
-      x: 250 + i*80 + Math.random()*40,
-      y: -30 - i*15,
-      targetY: 220 + Math.random()*20,
-      r:8, color:'#22c55e', arrived:false, speed: 1.5+Math.random()
+  // DBPO-Helicene molecule atoms from CIF (simplified key atoms: C=dark gray, N=blue, O=red, H=white)
+  // Build helicene as twisted polycyclic aromatic: 7 fused six-membered rings in helix shape
+  const helAtoms=[];
+  const helBonds=[];
+  // Generate helicene rings: each ring offset by twist
+  const ringCenters=[];
+  for(let i=0;i<7;i++){
+    const twist=i*0.32; // helical twist
+    const hx=(i-3)*2.3;
+    const hy=Math.sin(twist)*2.8;
+    const hz=Math.cos(twist)*1.2;
+    ringCenters.push({x:hx,y:hy,z:hz});
+    // 6 carbon atoms per ring (hexagon)
+    for(let a=0;a<6;a++){
+      const ang=a*Math.PI/3+twist*0.5;
+      const cx=hx+1.2*Math.cos(ang);
+      const cy=hy+1.2*Math.sin(ang);
+      const cz=hz;
+      helAtoms.push({x:cx,y:cy,z:cz,r:0.5,color:'#555555',type:'C'});
+      // Bond to next vertex
+      const ang2=(a+1)*Math.PI/3+twist*0.5;
+      helBonds.push({
+        x1:cx,y1:cy,z1:cz,
+        x2:hx+1.2*Math.cos(ang2),y2:hy+1.2*Math.sin(ang2),z2:hz
+      });
+    }
+  }
+  // Add N atoms at ring 1 and ring 5
+  helAtoms.push({x:ringCenters[1].x,y:ringCenters[1].y,z:ringCenters[1].z,r:0.55,color:'#3355ff',type:'N'});
+  helAtoms.push({x:ringCenters[5].x,y:ringCenters[5].y,z:ringCenters[5].z,r:0.55,color:'#3355ff',type:'N'});
+  // Add O atoms near ring 0 and ring 6
+  helAtoms.push({x:ringCenters[0].x-1.0,y:ringCenters[0].y-0.8,z:ringCenters[0].z,r:0.5,color:'#dd2222',type:'O'});
+  helAtoms.push({x:ringCenters[6].x+1.0,y:ringCenters[6].y+0.8,z:ringCenters[6].z,r:0.5,color:'#dd2222',type:'O'});
+  // Add H atoms on outer edges
+  for(let i=0;i<7;i++){
+    const rc=ringCenters[i];const tw=i*0.32;
+    for(let a=0;a<3;a++){
+      const ang=(a*2+1)*Math.PI/3+tw*0.5;
+      helAtoms.push({x:rc.x+1.9*Math.cos(ang),y:rc.y+1.9*Math.sin(ang),z:rc.z,r:0.3,color:'#cccccc',type:'H'});
+    }
+  }
+
+  // Intercalant molecules (2 copies between layers)
+  const molInstances=[
+    {offX:0,offY:0,zTarget:-9,zStart:-35,arrived:false,molAngle:0,targetAngle:0},
+    {offX:5,offY:4,zTarget:9,zStart:35,arrived:false,molAngle:Math.PI*0.3,targetAngle:0},
+  ];
+
+  let optimizing=false, optimizeStart=0;
+
+  // Phase timers
+  const phaseTimers=[
+    {t:240,fn:()=>{document.getElementById('tmd-toolbar').classList.add('visible');}},
+    {t:360,fn:()=>{
+      document.getElementById('tmd-btn-opt').classList.add('active');
+      document.getElementById('tmd-status').textContent='Optimizing orientation...';
+      document.getElementById('tmd-status').classList.add('visible');
+      optimizing=true;optimizeStart=time;
+    }},
+    {t:540,fn:()=>{
+      optimizing=false;
+      document.getElementById('tmd-btn-opt').classList.remove('active');
+      document.getElementById('tmd-status').textContent='Optimization complete';
+      molInstances.forEach(m=>{m.molAngle=m.targetAngle;});
+    }},
+    {t:660,fn:()=>{
+      document.getElementById('tmd-btn-cap').classList.add('active');
+      document.getElementById('tmd-status').textContent='Capturing screenshot...';
+      const flash=document.getElementById('tmd-flash');
+      flash.classList.add('flash');setTimeout(()=>flash.classList.remove('flash'),200);
+    }},
+    {t:720,fn:()=>{
+      document.getElementById('tmd-btn-cap').classList.remove('active');
+      document.getElementById('tmd-status').textContent='Screenshot saved!';
+    }},
+    {t:840,fn:()=>{
+      document.getElementById('tmd-btn-trans').classList.add('active');
+      document.getElementById('tmd-status').textContent='Generating transparent PNG...';
+    }},
+    {t:960,fn:()=>{
+      document.getElementById('tmd-btn-trans').classList.remove('active');
+      document.getElementById('tmd-status').textContent='transparent_bg.png exported!';
+      const preview=document.getElementById('tmd-preview');
+      preview.classList.add('visible','transparent');
+      drawPreview();
+    }},
+  ];
+  let phaseIdx=0;
+
+  function drawPreview(){
+    const pc=document.getElementById('tmd-preview-canvas');
+    const pctx=pc.getContext('2d');pc.width=180;pc.height=120;pctx.clearRect(0,0,180,120);
+    // Mini version
+    const mScale=3,mCX=90,mCY=60,mYaw=camYaw;
+    function mp(x,y,z){
+      const cx2=Math.cos(mYaw),sy2=Math.sin(mYaw);
+      const rx2=x*cx2-y*sy2,ry2=x*sy2+y*cx2;
+      const cp2=Math.cos(-0.6),sp2=Math.sin(-0.6);
+      const fy2=ry2*cp2-z*sp2;
+      return{x:mCX+rx2*mScale,y:mCY+fy2*mScale};
+    }
+    // Draw a few layer atoms
+    for(let li=0;li<2;li++){
+      const zz=li===0?-6:6;
+      for(let i=-2;i<=2;i++){for(let j=-1;j<=1;j++){
+        const xx=i*3.2+j*1.6,yy=j*2.77;
+        const p=mp(xx,yy,zz);
+        pctx.beginPath();pctx.arc(p.x,p.y,3,0,Math.PI*2);pctx.fillStyle='rgba(74,158,255,0.6)';pctx.fill();
+      }}
+    }
+    // Helicene
+    helAtoms.forEach(ha=>{
+      const p=mp(ha.x,ha.y,ha.z);
+      pctx.beginPath();pctx.arc(p.x,p.y,ha.r*mScale*0.3,0,Math.PI*2);pctx.fillStyle=ha.color;pctx.fill();
     });
   }
 
   function drawTMD(){
-    if(!scene.classList.contains('active')) return;
+    if(!scene.classList.contains('active'))return;
     ctx.clearRect(0,0,canvas.width,canvas.height);
     time++;
 
-    // 層間分離アニメーション（分子が近づくと層が開く）
-    const separation = Math.min(time*0.3, 30);
+    // Phase timers
+    while(phaseIdx<phaseTimers.length&&time>=phaseTimers[phaseIdx].t){phaseTimers[phaseIdx].fn();phaseIdx++;}
 
-    // 結合線
-    ctx.strokeStyle='rgba(88,166,255,0.15)';ctx.lineWidth=1;
-    for(let i=0;i<atoms.length;i++){
-      for(let j=i+1;j<atoms.length;j++){
-        if(atoms[i].layer!==atoms[j].layer) continue;
-        const dx=atoms[i].x-atoms[j].x,dy=atoms[i].baseY-atoms[j].baseY;
-        if(Math.sqrt(dx*dx+dy*dy)<50){
-          const yOff1 = atoms[i].layer>=1 ? separation : 0;
-          const yOff2 = atoms[j].layer>=1 ? separation : 0;
-          ctx.beginPath();
-          ctx.moveTo(atoms[i].x,atoms[i].baseY+yOff1+Math.sin(time*0.02+i)*2);
-          ctx.lineTo(atoms[j].x,atoms[j].baseY+yOff2+Math.sin(time*0.02+j)*2);
-          ctx.stroke();
-        }
+    // Continuous z-rotation (slow)
+    camYaw+=0.006;
+    // During optimize, wobble faster
+    if(optimizing) camYaw+=0.02;
+
+    // Intercalation: layers separate
+    const sep=Math.min(time*0.04,SEP_TARGET);
+
+    // Collect all drawable objects with projected coordinates
+    const drawList=[];
+
+    // VSe2 layer atoms
+    for(const a of allObjects){
+      let z3=a.z3;
+      // Separate layers
+      if(a.layer===0) z3=a.z3-sep;
+      else if(a.layer===2) z3=a.z3+sep;
+      const p=project(a.x3,a.y3,z3);
+      const r=a.r*SCALE*p.s*0.08;
+      drawList.push({px:p.x,py:p.y,pz:p.z,r:r,color:a.color,type:a.type,kind:'atom'});
+    }
+
+    // Helicene molecules
+    for(const mi of molInstances){
+      // Animate entry
+      if(!mi.arrived){
+        mi.zStart+=(mi.zTarget-mi.zStart)*0.03;
+        if(Math.abs(mi.zStart-mi.zTarget)<0.3){mi.zStart=mi.zTarget;mi.arrived=true;}
+      }
+      if(optimizing){mi.molAngle+=(mi.targetAngle-mi.molAngle)*0.02;}
+      const mcos=Math.cos(mi.molAngle),msin=Math.sin(mi.molAngle);
+
+      // Draw helicene bonds
+      for(const b of helBonds){
+        const bx1=b.x1*mcos-b.y1*msin+mi.offX, by1=b.x1*msin+b.y1*mcos+mi.offY, bz1=b.z1+mi.zStart;
+        const bx2=b.x2*mcos-b.y2*msin+mi.offX, by2=b.x2*msin+b.y2*mcos+mi.offY, bz2=b.z2+mi.zStart;
+        const p1=project(bx1,by1,bz1),p2=project(bx2,by2,bz2);
+        drawList.push({px:(p1.x+p2.x)/2,py:(p1.y+p2.y)/2,pz:(p1.z+p2.z)/2,
+          x1:p1.x,y1:p1.y,x2:p2.x,y2:p2.y,kind:'bond',color:'#666'});
+      }
+      // Draw helicene atoms
+      for(const ha of helAtoms){
+        const ax=ha.x*mcos-ha.y*msin+mi.offX, ay=ha.x*msin+ha.y*mcos+mi.offY, az=ha.z+mi.zStart;
+        const p=project(ax,ay,az);
+        const r=ha.r*SCALE*p.s*0.08;
+        drawList.push({px:p.x,py:p.y,pz:p.z,r:Math.max(r,1.5),color:ha.color,type:ha.type,kind:'atom'});
       }
     }
 
-    // 原子を描画
-    for(const a of atoms){
-      const yOff = a.layer>=1 ? separation : 0;
-      const y = a.baseY + yOff + Math.sin(time*0.02+a.x*0.01)*2;
-      ctx.beginPath();ctx.arc(a.x,y,a.r,0,Math.PI*2);
-      const grad=ctx.createRadialGradient(a.x-2,y-2,0,a.x,y,a.r);
-      grad.addColorStop(0,a.color);grad.addColorStop(1,a.color+'44');
-      ctx.fillStyle=grad;ctx.fill();
-      ctx.strokeStyle=a.color+'88';ctx.lineWidth=0.5;ctx.stroke();
-    }
+    // Sort by depth (far first)
+    drawList.sort((a,b)=>b.pz-a.pz);
 
-    // インターカレーション分子
-    for(const m of molecules){
-      if(!m.arrived){
-        m.y += m.speed;
-        if(m.y >= m.targetY + separation/2){
-          m.y = m.targetY + separation/2;
-          m.arrived = true;
-        }
-      } else {
-        m.y = m.targetY + separation/2 + Math.sin(time*0.03+m.x*0.02)*3;
+    // Draw
+    for(const d of drawList){
+      if(d.kind==='bond'){
+        ctx.beginPath();ctx.moveTo(d.x1,d.y1);ctx.lineTo(d.x2,d.y2);
+        ctx.strokeStyle='rgba(120,120,120,0.5)';ctx.lineWidth=1.2;ctx.stroke();
+      }else{
+        ctx.beginPath();ctx.arc(d.px,d.py,d.r,0,Math.PI*2);
+        const g=ctx.createRadialGradient(d.px-d.r*0.3,d.py-d.r*0.3,0,d.px,d.py,d.r);
+        g.addColorStop(0,d.color);g.addColorStop(1,d.color+'55');
+        ctx.fillStyle=g;ctx.fill();
+        ctx.strokeStyle=d.color+'44';ctx.lineWidth=0.4;ctx.stroke();
       }
-      ctx.beginPath();ctx.arc(m.x,m.y,m.r,0,Math.PI*2);
-      const grad=ctx.createRadialGradient(m.x-2,m.y-2,0,m.x,m.y,m.r);
-      grad.addColorStop(0,'#22c55e');grad.addColorStop(1,'#22c55e44');
-      ctx.fillStyle=grad;ctx.fill();
-      ctx.strokeStyle='#22c55e88';ctx.lineWidth=0.5;ctx.stroke();
     }
 
-    // ラベル
-    ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='11px sans-serif';
-    ctx.fillText('TMD Layer (1T)',50,130+Math.min(time*0.3,0));
-    ctx.fillText('Intercalant Molecules',50,230+separation/2);
-    ctx.fillText('TMD Layer',50,310+separation);
+    // Labels
+    ctx.fillStyle='rgba(255,255,255,0.35)';ctx.font='11px sans-serif';
+    ctx.fillText('VSe\u2082 + DBPO-Helicene',20,25);
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='10px sans-serif';
+    ctx.fillText('3D view \u2014 auto-rotating',20,42);
 
     requestAnimationFrame(drawTMD);
   }
@@ -526,338 +815,177 @@ function startTMD(){
 }
 
 
-// ===== XRD プロッターアニメーション =====
+// ===== XRD =====
 function startXRD(){
-  const scene = document.getElementById('xrd-scene');
-  scene.classList.add('active');
-
-  // ファイルドロップアニメーション
-  const fileEl = document.getElementById('xrd-file');
-  const dropEl = document.getElementById('xrd-drop');
-
-  setTimeout(()=>{
-    fileEl.style.cssText='opacity:1;top:20px;right:80px;transition:all 1.2s cubic-bezier(0.16,1,0.3,1)';
-  },500);
-  setTimeout(()=>{
-    fileEl.style.cssText='opacity:1;top:90px;left:50%;transform:translateX(-50%);transition:all 1s cubic-bezier(0.16,1,0.3,1)';
-    dropEl.classList.add('dropping');
-  },1800);
-  setTimeout(()=>{
-    fileEl.style.opacity='0';
-    dropEl.style.display='none';
-    document.getElementById('xrd-chart').classList.add('visible');
-    drawXRDChart();
-  },3200);
+  const scene=document.getElementById('xrd-scene');scene.classList.add('active');
+  const fileEl=document.getElementById('xrd-file'),dropEl=document.getElementById('xrd-drop');
+  setTimeout(()=>{fileEl.style.cssText='opacity:1;top:20px;right:80px;transition:all 1.2s cubic-bezier(0.16,1,0.3,1)';},500);
+  setTimeout(()=>{fileEl.style.cssText='opacity:1;top:90px;left:50%;transform:translateX(-50%);transition:all 1s cubic-bezier(0.16,1,0.3,1)';dropEl.classList.add('dropping');},1800);
+  setTimeout(()=>{fileEl.style.opacity='0';dropEl.style.display='none';document.getElementById('xrd-chart').classList.add('visible');drawXRDChart();},3200);
 }
 
 function drawXRDChart(){
-  const canvas = document.getElementById('xrd-canvas');
-  const ctx = canvas.getContext('2d');
-  canvas.width = 880; canvas.height = 300;
-
-  // XRDピークデータ（TiSe2の典型的パターン）
-  const peaks = [
-    {pos:14.5,h:0.95,w:0.3},{pos:29.2,h:0.6,w:0.35},{pos:34.1,h:0.3,w:0.4},
+  const canvas=document.getElementById('xrd-canvas'),ctx=canvas.getContext('2d');
+  canvas.width=880;canvas.height=300;
+  const peaks=[{pos:14.5,h:0.95,w:0.3},{pos:29.2,h:0.6,w:0.35},{pos:34.1,h:0.3,w:0.4},
     {pos:41.5,h:0.45,w:0.3},{pos:44.2,h:0.7,w:0.35},{pos:53.8,h:0.25,w:0.4},
-    {pos:57.1,h:0.35,w:0.3},{pos:62.5,h:0.2,w:0.4},{pos:70.2,h:0.15,w:0.35}
-  ];
-
-  let progress = 0;
+    {pos:57.1,h:0.35,w:0.3},{pos:62.5,h:0.2,w:0.4},{pos:70.2,h:0.15,w:0.35}];
+  let progress=0;
   function drawFrame(){
-    if(progress>1.05) return;
-    progress += 0.012;
+    if(progress>1.05)return;progress+=0.012;
     ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    const ml=60,mr=20,mt=20,mb=40;
-    const pw=canvas.width-ml-mr,ph=canvas.height-mt-mb;
-
-    // グリッド
+    const ml=60,mr=20,mt=20,mb=40,pw=canvas.width-ml-mr,ph=canvas.height-mt-mb;
     ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=0.5;
-    for(let i=0;i<=5;i++){
-      const y=mt+ph*i/5;
-      ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+pw,y);ctx.stroke();
-    }
-
-    // XRDカーブ
+    for(let i=0;i<=5;i++){const y=mt+ph*i/5;ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+pw,y);ctx.stroke();}
     ctx.beginPath();ctx.strokeStyle='#58a6ff';ctx.lineWidth=2;
-    const drawTo = ml + pw * Math.min(progress,1);
+    const drawTo=ml+pw*Math.min(progress,1);
     for(let px=ml;px<=drawTo;px++){
-      const twoTheta = 10 + (px-ml)/pw * 70;
-      let intensity = 0.02;
-      for(const p of peaks){
-        const d = (twoTheta-p.pos)/p.w;
-        intensity += p.h * Math.exp(-d*d*2);
-      }
-      intensity += (Math.random()-0.5)*0.008;
-      const y = mt + ph * (1-intensity);
-      if(px===ml) ctx.moveTo(px,y); else ctx.lineTo(px,y);
+      const twoTheta=10+(px-ml)/pw*70;let intensity=0.02;
+      for(const p of peaks){const d=(twoTheta-p.pos)/p.w;intensity+=p.h*Math.exp(-d*d*2);}
+      intensity+=(Math.random()-0.5)*0.008;
+      const y=mt+ph*(1-intensity);px===ml?ctx.moveTo(px,y):ctx.lineTo(px,y);
     }
     ctx.stroke();
-
-    // ピークラベル
     if(progress>0.3){
       ctx.fillStyle='rgba(249,115,22,0.7)';ctx.font='9px sans-serif';ctx.textAlign='center';
       for(const p of peaks){
-        const px_pos = ml + (p.pos-10)/70*pw;
-        if(px_pos<drawTo-10){
-          const y = mt+ph*(1-p.h)-12;
-          ctx.fillText(p.pos.toFixed(1)+'°',px_pos,y);
-          // ピークマーカー
-          ctx.beginPath();ctx.arc(px_pos,mt+ph*(1-p.h),3,0,Math.PI*2);ctx.fill();
-        }
+        const px_pos=ml+(p.pos-10)/70*pw;
+        if(px_pos<drawTo-10){ctx.fillText(p.pos.toFixed(1)+'\u00B0',px_pos,mt+ph*(1-p.h)-12);
+          ctx.beginPath();ctx.arc(px_pos,mt+ph*(1-p.h),3,0,Math.PI*2);ctx.fill();}
       }
     }
-
-    // 軸ラベル
     ctx.fillStyle='#888';ctx.font='11px sans-serif';ctx.textAlign='center';
-    ctx.fillText('2θ (degree)',ml+pw/2,canvas.height-8);
-    ctx.save();ctx.translate(14,mt+ph/2);ctx.rotate(-Math.PI/2);
-    ctx.fillText('Intensity (a.u.)',0,0);ctx.restore();
-
-    // 軸数値
+    ctx.fillText('2\u03B8 (degree)',ml+pw/2,canvas.height-8);
+    ctx.save();ctx.translate(14,mt+ph/2);ctx.rotate(-Math.PI/2);ctx.fillText('Intensity (a.u.)',0,0);ctx.restore();
     ctx.textAlign='center';ctx.fillStyle='#666';ctx.font='9px sans-serif';
-    for(let t=10;t<=80;t+=10){
-      const x=ml+(t-10)/70*pw;
-      ctx.fillText(t,x,canvas.height-26);
-    }
-
+    for(let t=10;t<=80;t+=10)ctx.fillText(t,ml+(t-10)/70*pw,canvas.height-26);
     requestAnimationFrame(drawFrame);
   }
   drawFrame();
 }
 
 
-// ===== DMM モニターアニメーション =====
+// ===== DMM =====
 function startDMM(){
-  const scene = document.getElementById('dmm-scene');
-  scene.classList.add('active');
-
-  const canvas = document.getElementById('dmm-canvas');
-  const ctx = canvas.getContext('2d');
-  canvas.width = 860; canvas.height = 200;
-
-  let vData=[], iData=[];
-  let step=0;
-  const maxPoints=80;
-
-  const iv = setInterval(()=>{
+  const scene=document.getElementById('dmm-scene');scene.classList.add('active');
+  const canvas=document.getElementById('dmm-canvas'),ctx=canvas.getContext('2d');
+  canvas.width=860;canvas.height=200;
+  let vData=[],iData=[],step=0;const maxPoints=80;
+  const iv=setInterval(()=>{
     if(!scene.classList.contains('active')){clearInterval(iv);return;}
-    step++;
-    // シミュレーション: 定電流インターカレーション
-    const t = step*0.05;
-    const voltage = 0.85 + 0.15*Math.sin(t*0.3) + (Math.random()-0.5)*0.02 + t*0.005;
-    const current = 2.000 + (Math.random()-0.5)*0.005;
-
-    document.getElementById('dmm-v').textContent = voltage.toFixed(3);
-    document.getElementById('dmm-i').textContent = current.toFixed(3);
-
+    step++;const t=step*0.05;
+    const voltage=0.85+0.15*Math.sin(t*0.3)+(Math.random()-0.5)*0.02+t*0.005;
+    const current=2.000+(Math.random()-0.5)*0.005;
+    document.getElementById('dmm-v').textContent=voltage.toFixed(3);
+    document.getElementById('dmm-i').textContent=current.toFixed(3);
     vData.push(voltage);iData.push(current);
     if(vData.length>maxPoints){vData.shift();iData.shift();}
-
-    // チャート描画
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    const ml=50,mr=50,mt=10,mb=25;
-    const pw=canvas.width-ml-mr,ph=canvas.height-mt-mb;
-
-    // グリッド
+    const ml=50,mr=50,mt=10,mb=25,pw=canvas.width-ml-mr,ph=canvas.height-mt-mb;
     ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=0.5;
-    for(let i=0;i<=4;i++){
-      const y=mt+ph*i/4;
-      ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+pw,y);ctx.stroke();
-    }
-
-    // 電圧ライン
+    for(let i=0;i<=4;i++){const y=mt+ph*i/4;ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+pw,y);ctx.stroke();}
     if(vData.length>1){
       const vMin=Math.min(...vData)-0.05,vMax=Math.max(...vData)+0.05;
       ctx.beginPath();ctx.strokeStyle='#58a6ff';ctx.lineWidth=2;
-      for(let i=0;i<vData.length;i++){
-        const x=ml+i/(maxPoints-1)*pw;
-        const y=mt+ph*(1-(vData[i]-vMin)/(vMax-vMin));
-        i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-      }
-      ctx.stroke();
-      // グロー
-      ctx.strokeStyle='rgba(88,166,255,0.2)';ctx.lineWidth=6;ctx.stroke();
-
-      ctx.fillStyle='#58a6ff';ctx.font='10px sans-serif';ctx.textAlign='left';
-      ctx.fillText('V',ml+pw+8,mt+ph*0.3);
+      for(let i=0;i<vData.length;i++){const x=ml+i/(maxPoints-1)*pw;const y=mt+ph*(1-(vData[i]-vMin)/(vMax-vMin));i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+      ctx.stroke();ctx.strokeStyle='rgba(88,166,255,0.2)';ctx.lineWidth=6;ctx.stroke();
+      ctx.fillStyle='#58a6ff';ctx.font='10px sans-serif';ctx.textAlign='left';ctx.fillText('V',ml+pw+8,mt+ph*0.3);
     }
-
-    // 電流ライン
     if(iData.length>1){
       const iMin=Math.min(...iData)-0.01,iMax=Math.max(...iData)+0.01;
       ctx.beginPath();ctx.strokeStyle='#f97316';ctx.lineWidth=2;
-      for(let i=0;i<iData.length;i++){
-        const x=ml+i/(maxPoints-1)*pw;
-        const y=mt+ph*(1-(iData[i]-iMin)/(iMax-iMin));
-        i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-      }
-      ctx.stroke();
-      ctx.strokeStyle='rgba(249,115,22,0.2)';ctx.lineWidth=6;ctx.stroke();
-
-      ctx.fillStyle='#f97316';ctx.font='10px sans-serif';
-      ctx.fillText('I',ml+pw+8,mt+ph*0.7);
+      for(let i=0;i<iData.length;i++){const x=ml+i/(maxPoints-1)*pw;const y=mt+ph*(1-(iData[i]-iMin)/(iMax-iMin));i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+      ctx.stroke();ctx.strokeStyle='rgba(249,115,22,0.2)';ctx.lineWidth=6;ctx.stroke();
+      ctx.fillStyle='#f97316';ctx.font='10px sans-serif';ctx.fillText('I',ml+pw+8,mt+ph*0.7);
     }
   },100);
   animIntervals.push(iv);
 }
 
 
-// ===== CFMS プロッターアニメーション =====
+// ===== CFMS =====
 function startCFMS(){
-  const scene = document.getElementById('cfms-scene');
-  scene.classList.add('active');
-
-  const foldersEl = document.getElementById('cfms-folders');
-
-  // フォルダツリーを段階的に表示
-  const folders = [
-    {name:'Okuda', subs:['TiSe2 MBA','TiSe2 MBA R-H re2','TiSe2 pristine'], files:['RT 2mA 300K-2K.dat','MR 5T 2K.dat','Hall 300K.dat']},
-    {name:'Yamamoto', subs:['VSe2 intercalation','VSe2 pristine'], files:['VSe2 001 300-2K.dat','VSe2 002 2-300K.dat']},
-    {name:'Yokoi', subs:[], files:['NbSe2 RT.dat']},
+  const scene=document.getElementById('cfms-scene');scene.classList.add('active');
+  const foldersEl=document.getElementById('cfms-folders');
+  const folders=[
+    {name:'Okuda',subs:['TiSe2 MBA','TiSe2 MBA R-H re2','TiSe2 pristine'],files:['RT 2mA 300K-2K.dat','MR 5T 2K.dat','Hall 300K.dat']},
+    {name:'Yamamoto',subs:['VSe2 intercalation','VSe2 pristine'],files:['VSe2 001 300-2K.dat','VSe2 002 2-300K.dat']},
+    {name:'Yokoi',subs:[],files:['NbSe2 RT.dat']},
   ];
-
   let html='';
   folders.forEach((f,fi)=>{
     const fid=`cf_${fi}`;
     html+=`<div class="cfms-folder" id="${fid}" style="opacity:0" onclick="toggleCfmsFolder('${fid}')">
       <span class="arrow" id="${fid}_a">&#9654;</span> &#128194; ${f.name}
-      <span style="color:#666;font-size:.6rem;margin-left:auto">(${f.files.length+f.subs.length*2})</span>
-    </div>`;
-    f.subs.forEach((s,si)=>{
-      html+=`<div class="cfms-subfolder" id="${fid}_s${si}">&#128194; ${s}</div>`;
-    });
-    f.files.forEach((file,ffi)=>{
-      html+=`<div class="cfms-file-chip" id="${fid}_f${ffi}" onclick="selectCfmsFile(this)">${file}</div>`;
-    });
+      <span style="color:#666;font-size:.6rem;margin-left:auto">(${f.files.length+f.subs.length*2})</span></div>`;
+    f.subs.forEach((s,si)=>{html+=`<div class="cfms-subfolder" id="${fid}_s${si}">&#128194; ${s}</div>`;});
+    f.files.forEach((file,ffi)=>{html+=`<div class="cfms-file-chip" id="${fid}_f${ffi}" onclick="selectCfmsFile(this)">${file}</div>`;});
   });
   foldersEl.innerHTML=html;
-
-  // フォルダを順次表示
-  folders.forEach((f,fi)=>{
-    setTimeout(()=>{
-      const el=document.getElementById(`cf_${fi}`);
-      if(el) el.style.cssText='opacity:1;transition:opacity .5s';
-    }, 800+fi*600);
-  });
-
-  // 2秒後にOkudaを開く
+  folders.forEach((f,fi)=>{setTimeout(()=>{const el=document.getElementById(`cf_${fi}`);if(el)el.style.cssText='opacity:1;transition:opacity .5s';},800+fi*600);});
   setTimeout(()=>{
-    const arrow = document.getElementById('cf_0_a');
-    if(arrow) arrow.classList.add('open');
-    // サブフォルダ表示
-    folders[0].subs.forEach((s,si)=>{
-      setTimeout(()=>{
-        const el=document.getElementById(`cf_0_s${si}`);
-        if(el) el.classList.add('visible');
-      },si*300);
-    });
-    // ファイル表示
-    folders[0].files.forEach((file,fi)=>{
-      setTimeout(()=>{
-        const el=document.getElementById(`cf_0_f${fi}`);
-        if(el) el.classList.add('visible');
-      },folders[0].subs.length*300+fi*200);
-    });
+    const arrow=document.getElementById('cf_0_a');if(arrow)arrow.classList.add('open');
+    folders[0].subs.forEach((s,si)=>{setTimeout(()=>{const el=document.getElementById(`cf_0_s${si}`);if(el)el.classList.add('visible');},si*300);});
+    folders[0].files.forEach((file,fi)=>{setTimeout(()=>{const el=document.getElementById(`cf_0_f${fi}`);if(el)el.classList.add('visible');},folders[0].subs.length*300+fi*200);});
   },2500);
-
-  // 5秒後にファイルを選択してグラフ描画
   setTimeout(()=>{
-    const chip = document.getElementById('cf_0_f0');
-    if(chip) chip.classList.add('selected');
+    const chip=document.getElementById('cf_0_f0');if(chip)chip.classList.add('selected');
     drawCFMSChart();
     document.getElementById('cfms-summary').style.cssText='opacity:1;transition:opacity .5s';
     document.getElementById('cfms-summary').innerHTML=`
-      <div class="cfms-stat info"><div class="sl">データ点数</div><div class="sv" style="color:#888">4,334</div></div>
-      <div class="cfms-stat temp"><div class="sl">温度範囲</div><div class="sv">12.5~298.7 K</div></div>
-      <div class="cfms-stat resist"><div class="sl">R_nv</div><div class="sv">0.101~0.414</div></div>
-    `;
+      <div class="cfms-stat info"><div class="sl">Data Points</div><div class="sv" style="color:#888">4,334</div></div>
+      <div class="cfms-stat temp"><div class="sl">Temperature</div><div class="sv">12.5~298.7 K</div></div>
+      <div class="cfms-stat resist"><div class="sl">R_nv</div><div class="sv">0.101~0.414</div></div>`;
   },6000);
 }
-
-window.toggleCfmsFolder = function(fid){
-  const arrow = document.getElementById(fid+'_a');
-  if(arrow) arrow.classList.toggle('open');
-};
-window.selectCfmsFile = function(el){
-  document.querySelectorAll('.cfms-file-chip').forEach(e=>e.classList.remove('selected'));
-  el.classList.add('selected');
-};
+window.toggleCfmsFolder=function(fid){const a=document.getElementById(fid+'_a');if(a)a.classList.toggle('open');};
+window.selectCfmsFile=function(el){document.querySelectorAll('.cfms-file-chip').forEach(e=>e.classList.remove('selected'));el.classList.add('selected');};
 
 function drawCFMSChart(){
-  const canvas = document.getElementById('cfms-canvas');
-  const ctx = canvas.getContext('2d');
-  canvas.width = 560; canvas.height = 400;
-
-  // R-Tデータをシミュレート
+  const canvas=document.getElementById('cfms-canvas'),ctx=canvas.getContext('2d');
+  canvas.width=560;canvas.height=400;
   const data=[];
   for(let T=300;T>=12;T-=0.5){
-    const R = 0.28 + 0.15*Math.exp(-((T-150)/80)**2) - 0.001*(300-T) + (Math.random()-0.5)*0.003;
+    const R=0.28+0.15*Math.exp(-(((T-150)/80)**2))-0.001*(300-T)+(Math.random()-0.5)*0.003;
     data.push({T,R});
   }
-
   let progress=0;
   function draw(){
-    if(progress>1.05) return;
-    progress+=0.015;
+    if(progress>1.05)return;progress+=0.015;
     ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    const ml=55,mr=15,mt=15,mb=35;
-    const pw=canvas.width-ml-mr,ph=canvas.height-mt-mb;
-
-    // グリッド
+    const ml=55,mr=15,mt=15,mb=35,pw=canvas.width-ml-mr,ph=canvas.height-mt-mb;
     ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=0.5;
     for(let i=0;i<=5;i++){
       const y=mt+ph*i/5;ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+pw,y);ctx.stroke();
       const x=ml+pw*i/5;ctx.beginPath();ctx.moveTo(x,mt);ctx.lineTo(x,mt+ph);ctx.stroke();
     }
-
     const drawCount=Math.floor(data.length*Math.min(progress,1));
-    if(drawCount<2) {requestAnimationFrame(draw);return;}
-
+    if(drawCount<2){requestAnimationFrame(draw);return;}
     const Tmin=10,Tmax=310,Rmin=0.08,Rmax=0.45;
     const xPx=v=>ml+(v-Tmin)/(Tmax-Tmin)*pw;
     const yPx=v=>mt+ph*(1-(v-Rmin)/(Rmax-Rmin));
-
-    // データ線
     ctx.beginPath();ctx.strokeStyle='#22d3ee';ctx.lineWidth=2;
-    for(let i=0;i<drawCount;i++){
-      const x=xPx(data[i].T),y=yPx(data[i].R);
-      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-    // グロー
-    ctx.strokeStyle='rgba(34,211,238,0.15)';ctx.lineWidth=6;ctx.stroke();
-
-    // ドット
+    for(let i=0;i<drawCount;i++){const x=xPx(data[i].T),y=yPx(data[i].R);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+    ctx.stroke();ctx.strokeStyle='rgba(34,211,238,0.15)';ctx.lineWidth=6;ctx.stroke();
     if(drawCount>0){
       const last=data[drawCount-1];
-      ctx.beginPath();ctx.arc(xPx(last.T),yPx(last.R),4,0,Math.PI*2);
-      ctx.fillStyle='#22d3ee';ctx.fill();
-      ctx.strokeStyle='rgba(34,211,238,0.4)';ctx.lineWidth=8;
-      ctx.beginPath();ctx.arc(xPx(last.T),yPx(last.R),4,0,Math.PI*2);ctx.stroke();
+      ctx.beginPath();ctx.arc(xPx(last.T),yPx(last.R),4,0,Math.PI*2);ctx.fillStyle='#22d3ee';ctx.fill();
+      ctx.strokeStyle='rgba(34,211,238,0.4)';ctx.lineWidth=8;ctx.beginPath();ctx.arc(xPx(last.T),yPx(last.R),4,0,Math.PI*2);ctx.stroke();
     }
-
-    // 軸ラベル
     ctx.fillStyle='#f97316';ctx.font='11px sans-serif';ctx.textAlign='center';
     ctx.fillText('sensor_B (K)',ml+pw/2,canvas.height-6);
-    ctx.save();ctx.translate(12,mt+ph/2);ctx.rotate(-Math.PI/2);
-    ctx.fillStyle='#22d3ee';ctx.fillText('R_nv (Ω)',0,0);ctx.restore();
-
-    // 軸数値
-    ctx.fillStyle='#666';ctx.font='9px sans-serif';
-    ctx.textAlign='center';
-    for(let t=50;t<=300;t+=50) ctx.fillText(t,xPx(t),canvas.height-22);
+    ctx.save();ctx.translate(12,mt+ph/2);ctx.rotate(-Math.PI/2);ctx.fillStyle='#22d3ee';ctx.fillText('R_nv (\u03A9)',0,0);ctx.restore();
+    ctx.fillStyle='#666';ctx.font='9px sans-serif';ctx.textAlign='center';
+    for(let t=50;t<=300;t+=50)ctx.fillText(t,xPx(t),canvas.height-22);
     ctx.textAlign='right';
-    for(let r=0.1;r<=0.45;r+=0.05) ctx.fillText(r.toFixed(2),ml-6,yPx(r)+3);
-
+    for(let r=0.1;r<=0.45;r+=0.05)ctx.fillText(r.toFixed(2),ml-6,yPx(r)+3);
     requestAnimationFrame(draw);
   }
   draw();
 }
 
 
-// ===== アウトロ =====
+// ===== Outro =====
 function startOutro(){
   document.getElementById('outro-scene').classList.add('active');
   ['oc1','oc2','oc3','oc4'].forEach((id,i)=>{
@@ -865,8 +993,7 @@ function startOutro(){
   });
 }
 
-
-// ===== 開始 =====
+// ===== Start =====
 setTimeout(startAnimation,500);
 </script>
 </body>
