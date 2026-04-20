@@ -137,6 +137,7 @@
   <div class="status-bar">
     <span class="status-dot offline" id="statusDot"></span>
     <span class="status-text" id="statusText">データ待機中...</span>
+    <span style="font-size:.65rem;color:#555;padding:2px 8px;border:1px solid #333;border-radius:4px" id="syncBadge">WS: ---</span>
     <button class="chart-controls" style="padding:4px 12px;background:rgba(88,166,255,0.15);color:#58a6ff;border:1px solid rgba(88,166,255,0.3);border-radius:4px;font-size:.75rem;cursor:pointer" onclick="toggleSettings()">&#9881; 設定</button>
   </div>
 </header>
@@ -279,7 +280,14 @@
 <div class="settings-panel" id="settingsPanel">
   <div class="settings-grid">
     <div class="setting-group">
-      <h3>Firebase 接続</h3>
+      <h3>WebSocket 同期 (高速)</h3>
+      <div class="setting-row"><label>ステータス:</label><span id="wsStatus" style="color:#888">未接続</span></div>
+      <div class="setting-row"><label>サーバーURL:</label><input id="wsUrl" value="" placeholder="ws://localhost:8765" onchange="reconnectWS()"></div>
+      <div class="setting-row"><label>レイテンシ:</label><span id="wsLatency" style="color:#888">---</span></div>
+      <div class="setting-row"><label>接続者数:</label><span id="wsClients" style="color:#888">---</span></div>
+    </div>
+    <div class="setting-group">
+      <h3>Firebase 接続 (バックアップ)</h3>
       <div class="setting-row"><label>ステータス:</label><span id="fbStatus" style="color:#22c55e">確認中...</span></div>
       <div class="setting-row"><label>データパス:</label><input id="fbPath" value="dmm/live" onchange="reconnect()"></div>
     </div>
@@ -323,6 +331,130 @@ let listener=null;
 let outputState=false;
 let timerInterval=null;
 let timerEndTime=0;
+
+// ===== WebSocket 同期 (超低レイテンシ) =====
+let ws=null;
+let wsReconnectTimer=null;
+let wsReconnectDelay=1000;
+let wsConnected=false;
+let wsLatencyHistory=[];
+
+function getDefaultWsUrl(){
+  // 同じホストのポート8765をデフォルトに
+  const h=location.hostname||'localhost';
+  return 'ws://'+h+':8765';
+}
+
+function connectWebSocket(){
+  if(ws && (ws.readyState===WebSocket.CONNECTING||ws.readyState===WebSocket.OPEN)) return;
+
+  const url=document.getElementById('wsUrl').value||getDefaultWsUrl();
+  document.getElementById('wsUrl').value=url;
+
+  try{
+    ws=new WebSocket(url);
+    ws.binaryType='arraybuffer';
+  }catch(e){
+    document.getElementById('wsStatus').textContent='URL無効';
+    document.getElementById('wsStatus').style.color='#ef4444';
+    return;
+  }
+
+  document.getElementById('wsStatus').textContent='接続中...';
+  document.getElementById('wsStatus').style.color='#eab308';
+
+  ws.onopen=()=>{
+    wsConnected=true;
+    wsReconnectDelay=1000;
+    ws.send(JSON.stringify({type:'hello',role:'viewer'}));
+    document.getElementById('wsStatus').textContent='接続済み';
+    document.getElementById('wsStatus').style.color='#22c55e';
+    const badge=document.getElementById('syncBadge');
+    badge.textContent='WS: ON';badge.style.color='#22c55e';badge.style.borderColor='#22c55e';
+    // レイテンシ測定開始
+    measureWsLatency();
+  };
+
+  ws.onmessage=(evt)=>{
+    if(evt.data instanceof ArrayBuffer){
+      // バイナリ: 24バイト [timestamp_f64, voltage_f64, current_f64]
+      if(evt.data.byteLength>=24){
+        const view=new Float64Array(evt.data);
+        const t=view[0], v=view[1], i=view[2];
+        onNewData({time:t, voltage:v, current:i});
+      }
+    }else{
+      // JSONメッセージ
+      try{
+        const msg=JSON.parse(evt.data);
+        handleWsMessage(msg);
+      }catch(e){}
+    }
+  };
+
+  ws.onclose=(evt)=>{
+    wsConnected=false;
+    document.getElementById('wsStatus').textContent='切断 (再接続中...)';
+    document.getElementById('wsStatus').style.color='#ef4444';
+    const badge=document.getElementById('syncBadge');
+    badge.textContent='WS: OFF';badge.style.color='#ef4444';badge.style.borderColor='#ef4444';
+    // 再接続 (exponential backoff)
+    wsReconnectTimer=setTimeout(()=>{
+      connectWebSocket();
+      wsReconnectDelay=Math.min(wsReconnectDelay*1.5, 15000);
+    }, wsReconnectDelay);
+  };
+
+  ws.onerror=()=>{
+    // oncloseが呼ばれるのでここでは何もしない
+  };
+}
+
+function handleWsMessage(msg){
+  switch(msg.type){
+    case 'welcome':
+      document.getElementById('wsClients').textContent=
+        `Sender: ${msg.senders||0}, Viewer: ${msg.viewers||0}`;
+      break;
+    case 'pong_measure':{
+      const rtt=Date.now()-msg.clientTime;
+      wsLatencyHistory.push(rtt);
+      if(wsLatencyHistory.length>50) wsLatencyHistory=wsLatencyHistory.slice(-30);
+      const avg=wsLatencyHistory.reduce((a,b)=>a+b,0)/wsLatencyHistory.length;
+      document.getElementById('wsLatency').textContent=
+        `${rtt}ms (平均 ${avg.toFixed(1)}ms)`;
+      document.getElementById('wsLatency').style.color=rtt<50?'#22c55e':rtt<200?'#eab308':'#ef4444';
+      break;
+    }
+    case 'sender_disconnected':
+      document.getElementById('statusDot').className='status-dot stale';
+      document.getElementById('statusText').textContent='Sender切断';
+      break;
+    case 'status':
+      if(msg.output!==undefined) setOutputUI(msg.output);
+      break;
+  }
+}
+
+function measureWsLatency(){
+  if(!wsConnected||!ws||ws.readyState!==WebSocket.OPEN) return;
+  ws.send(JSON.stringify({type:'ping_measure',clientTime:Date.now()}));
+  setTimeout(measureWsLatency, 5000);
+}
+
+function reconnectWS(){
+  if(ws){try{ws.close();}catch(e){}}
+  if(wsReconnectTimer){clearTimeout(wsReconnectTimer);wsReconnectTimer=null;}
+  wsReconnectDelay=1000;
+  connectWebSocket();
+}
+
+// WebSocket経由でコマンド送信
+function sendWsCommand(action, params){
+  if(!wsConnected||!ws||ws.readyState!==WebSocket.OPEN) return false;
+  ws.send(JSON.stringify({type:'command', action:action, ...params}));
+  return true;
+}
 
 // ===== Firebase リアルタイムリスナー =====
 function startListening(){
@@ -718,13 +850,16 @@ function setInterval2(){
 
 // ===== 機器制御 =====
 function sendCommand(cmd, params){
-  if(!firebaseReady) return;
-  db.ref('dmm/command').set({
-    action: cmd,
-    ...params,
-    time: Date.now(),
-    from: 'web'
-  });
+  // WebSocket優先（低レイテンシ）、Firebase フォールバック
+  const sent=sendWsCommand(cmd, params);
+  if(!sent && firebaseReady){
+    db.ref('dmm/command').set({
+      action: cmd,
+      ...params,
+      time: Date.now(),
+      from: 'web'
+    });
+  }
 }
 
 function startSource(){
@@ -843,6 +978,10 @@ function watchOutputState(){
 
 // ===== 初期化 =====
 window.addEventListener('load',()=>{
+  // WebSocket同期 (最速パス)
+  connectWebSocket();
+
+  // Firebase (バックアップ / ログ取得)
   startListening();
   watchOutputState();
   redrawChart();

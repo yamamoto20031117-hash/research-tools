@@ -3,15 +3,23 @@
 Keithley 2400 SourceMeter リアルタイムモニター — ラボPC用送信スクリプト
 
 使い方:
-  1. pip install pyvisa pyvisa-py pyserial
+  1. pip install pyvisa pyvisa-py pyserial websocket-client
   2. Keithley 2400 を USB or GPIB でラボPCに接続
   3. python dmm_sender.py で実行（まずテストモードで動作確認）
   4. 接続確認後、--live オプションで実機モードに切り替え
 
 コマンド:
-  python dmm_sender.py          # テストモード（ダミーデータ）
-  python dmm_sender.py --live   # 実機モード（Keithley 2400 に接続）
-  python dmm_sender.py --list   # 接続可能なVISAデバイス一覧を表示
+  python dmm_sender.py               # テストモード（ダミーデータ、WebSocket同期）
+  python dmm_sender.py --live        # 実機モード（Keithley 2400 に接続）
+  python dmm_sender.py --list        # 接続可能なVISAデバイス一覧を表示
+  python dmm_sender.py --ws-only     # WebSocketのみ（Firebase無効）
+  python dmm_sender.py --firebase-only  # Firebase のみ（WebSocket無効）
+  python dmm_sender.py --ws-url ws://192.168.1.10:8765  # WebSocketサーバー指定
+
+同期モード:
+  デフォルト: WebSocket (超低レイテンシ) + Firebase (バックアップ/ログ)
+  --ws-only:  WebSocket のみ (最速、LAN内推奨)
+  --firebase-only: Firebase のみ (従来互換)
 """
 
 import time
@@ -20,6 +28,7 @@ import signal
 import sys
 import threading
 import queue
+import struct
 from datetime import datetime
 import urllib.request
 import urllib.error
@@ -29,10 +38,19 @@ FIREBASE_URL = "https://research-tools-board-default-rtdb.firebaseio.com"
 FIREBASE_PATH_LIVE = "dmm/live"       # リアルタイム値（最新1件を上書き）
 FIREBASE_PATH_LOG = "dmm/log"         # ログ（追記）
 INTERVAL = 1.0                         # 測定間隔（秒）デフォルト値
+WS_URL = "ws://localhost:8765"         # WebSocket sync server URL
 
 # GPIB接続の場合: "GPIB0::24::INSTR" (アドレス24が一般的)
 # USB接続の場合: 自動検出を試みる
 DMM_ADDRESS = ""  # 空欄なら自動検出
+
+# コマンドライン引数で上書き
+for i, arg in enumerate(sys.argv):
+    if arg == "--ws-url" and i + 1 < len(sys.argv):
+        WS_URL = sys.argv[i + 1]
+
+USE_WEBSOCKET = "--firebase-only" not in sys.argv
+USE_FIREBASE = "--ws-only" not in sys.argv
 
 
 # ===== スレッド間共有変数 =====
@@ -42,8 +60,11 @@ running = True
 output_on = False          # OUTPUT状態
 command_queue = queue.Queue()   # コマンド受信キュー（command_thread → main）
 data_queue = queue.Queue(maxsize=100)  # データ送信キュー（main → sender_thread）
+ws_data_queue = queue.Queue(maxsize=200)  # WebSocket送信キュー
 smu_lock = threading.Lock()    # Keithleyシリアル通信の排他制御
 last_source_config = {}        # 前回のソース設定（再設定スキップ用）
+ws_connection = None           # WebSocket接続オブジェクト
+ws_connected = False           # WebSocket接続状態
 
 
 # ===== Firebase REST API（タイムアウト短縮） =====
@@ -127,6 +148,103 @@ def safe_write(smu, cmd, delay=0.1):
     time.sleep(delay)
 
 
+# ===== WebSocket 接続・送信 =====
+def ws_connect():
+    """WebSocketサーバーに接続"""
+    global ws_connection, ws_connected
+    try:
+        import websocket
+        ws = websocket.WebSocket()
+        ws.settimeout(5)
+        ws.connect(WS_URL, suppress_origin=True)
+        # TCP_NODELAY for minimum latency
+        ws.sock.setsockopt(6, 1, 1)  # IPPROTO_TCP, TCP_NODELAY
+        ws.send(json.dumps({"type": "hello", "role": "sender"}))
+        resp = ws.recv()
+        welcome = json.loads(resp)
+        print(f"  [WS] 接続成功 (ID #{welcome.get('id', '?')})")
+        ws_connection = ws
+        ws_connected = True
+        return ws
+    except ImportError:
+        print("  [WS] websocket-client がインストールされていません")
+        print("       pip install websocket-client")
+        return None
+    except Exception as e:
+        print(f"  [WS] 接続失敗: {e}")
+        ws_connected = False
+        return None
+
+
+def ws_sender_thread():
+    """WebSocketキューからバイナリデータを送信（最速パス）"""
+    global ws_connection, ws_connected
+    reconnect_wait = 1
+
+    while running:
+        # 接続がなければ再接続
+        if not ws_connected or ws_connection is None:
+            ws = ws_connect()
+            if ws is None:
+                time.sleep(min(reconnect_wait, 10))
+                reconnect_wait = min(reconnect_wait * 2, 30)
+                continue
+            reconnect_wait = 1
+
+        try:
+            data = ws_data_queue.get(timeout=1)
+            if data is None:
+                break
+
+            # バイナリ24バイト: [timestamp_f64, voltage_f64, current_f64]
+            binary = struct.pack('<ddd', data['time'], data['voltage'], data['current'])
+            ws_connection.send_binary(binary)
+            ws_data_queue.task_done()
+
+        except queue.Empty:
+            continue
+        except Exception as e:
+            print(f"  [WS] 送信エラー: {e}")
+            ws_connected = False
+            try:
+                ws_connection.close()
+            except:
+                pass
+            ws_connection = None
+
+
+def ws_command_listener_thread():
+    """WebSocketサーバーからコマンドを受信"""
+    global ws_connection, ws_connected, auto_stop_time, interval, output_on
+
+    while running:
+        if not ws_connected or ws_connection is None:
+            time.sleep(1)
+            continue
+
+        try:
+            ws_connection.settimeout(1)
+            msg_raw = ws_connection.recv()
+            if not msg_raw:
+                continue
+
+            # バイナリメッセージは無視 (sender echo はサーバーがフィルタ済み)
+            if isinstance(msg_raw, bytes):
+                continue
+
+            msg = json.loads(msg_raw)
+
+            if msg.get("type") == "command":
+                action = msg.get("action")
+                if action:
+                    command_queue.put(("WS_CMD", msg))
+                    print(f"  [WS] コマンド受信: {action}")
+
+        except Exception:
+            # タイムアウトは正常
+            continue
+
+
 # ===== Firebase データ送信スレッド =====
 def firebase_sender_thread():
     """データキューからFirebaseへ非同期送信"""
@@ -142,7 +260,7 @@ def firebase_sender_thread():
         except queue.Empty:
             continue
         except Exception as e:
-            print(f"  [Sender error] {e}")
+            print(f"  [Firebase] 送信エラー: {e}")
 
 
 # ===== Firebase コマンド監視スレッド =====
@@ -412,14 +530,15 @@ def main():
         list_visa_resources()
         return
 
-    print("=" * 56)
-    print("  Keithley 2400 リアルタイムモニター (v2 threaded)")
-    print("=" * 56)
-    print(f"  モード:     {'実機接続' if mode=='live' else 'テスト（ダミーデータ）'}")
-    print(f"  Firebase:   {FIREBASE_URL}")
-    print(f"  測定間隔:   {INTERVAL} 秒")
-    print(f"  停止:       Ctrl+C")
-    print("=" * 56)
+    print("=" * 60)
+    print("  Keithley 2400 リアルタイムモニター (v3 WebSocket sync)")
+    print("=" * 60)
+    print(f"  モード:       {'実機接続' if mode=='live' else 'テスト（ダミーデータ）'}")
+    print(f"  WebSocket:    {WS_URL if USE_WEBSOCKET else '無効'}")
+    print(f"  Firebase:     {FIREBASE_URL if USE_FIREBASE else '無効'}")
+    print(f"  測定間隔:     {INTERVAL} 秒")
+    print(f"  停止:         Ctrl+C")
+    print("=" * 60)
 
     smu = None
     if mode == "live":
@@ -449,14 +568,21 @@ def main():
     print("  [初期化] 古いコマンドをクリア")
 
     # ----- スレッド起動 -----
-    sender = threading.Thread(target=firebase_sender_thread, daemon=True)
-    sender.start()
+    if USE_FIREBASE:
+        sender = threading.Thread(target=firebase_sender_thread, daemon=True)
+        sender.start()
+        cmd_thread = threading.Thread(target=firebase_command_thread, args=(smu,), daemon=True)
+        cmd_thread.start()
+        print("  [スレッド] Firebase送信スレッド 起動")
+        print("  [スレッド] Firebaseコマンド監視スレッド 起動")
 
-    cmd_thread = threading.Thread(target=firebase_command_thread, args=(smu,), daemon=True)
-    cmd_thread.start()
-
-    print("  [スレッド] Firebase送信スレッド 起動")
-    print("  [スレッド] コマンド監視スレッド 起動")
+    if USE_WEBSOCKET:
+        ws_sender = threading.Thread(target=ws_sender_thread, daemon=True)
+        ws_sender.start()
+        ws_cmd = threading.Thread(target=ws_command_listener_thread, daemon=True)
+        ws_cmd.start()
+        print("  [スレッド] WebSocket送信スレッド 起動")
+        print("  [スレッド] WebSocketコマンド監視スレッド 起動")
 
     # ----- メインループ: 測定のみに集中 -----
     count = 0
@@ -483,13 +609,39 @@ def main():
             # コマンドスレッドからの通知を確認（ノンブロッキング）
             try:
                 while True:
-                    cmd_msg, _ = command_queue.get_nowait()
+                    cmd_msg, cmd_data = command_queue.get_nowait()
                     if cmd_msg == "OFF":
                         output_on = False
                         print("\n  OUTPUT OFF -- 測定停止")
                     elif cmd_msg == "ON":
                         output_on = True
                         print("\n  OUTPUT ON -- 測定開始")
+                    elif cmd_msg == "WS_CMD":
+                        # WebSocket経由のコマンド処理
+                        action = cmd_data.get("action", "")
+                        if action == "OUTPUT_OFF":
+                            print("\n  *** WS: OUTPUT OFF ***")
+                            with smu_lock:
+                                if smu: safe_write(smu, ":OUTP OFF", 0.2)
+                            auto_stop_time = 0
+                            output_on = False
+                            if USE_FIREBASE: update_output_status(False)
+                        elif action == "SOURCE_START":
+                            src_mode = cmd_data.get("mode", "CURR")
+                            value = float(cmd_data.get("value", 0))
+                            compliance = float(cmd_data.get("compliance", 21))
+                            duration = float(cmd_data.get("duration", 0))
+                            with smu_lock:
+                                if smu: configure_source(smu, src_mode, value, compliance)
+                                if smu: safe_write(smu, ":OUTP ON", 0.3)
+                            output_on = True
+                            if duration > 0:
+                                auto_stop_time = time.time() + duration
+                            if USE_FIREBASE: update_output_status(True)
+                            print(f"\n  *** WS: SOURCE START ({src_mode}) ***")
+                        elif action == "SET_INTERVAL":
+                            interval = max(0.1, min(float(cmd_data.get("interval", 1.0)), 60.0))
+                            print(f"\n  *** WS: 測定間隔 -> {interval} 秒 ***")
             except queue.Empty:
                 pass
 
@@ -512,16 +664,22 @@ def main():
                 "current": round(current, 8),
             }
 
-            # データキューに投入（Firebaseスレッドが非同期で送信）
-            try:
-                data_queue.put_nowait(data)
-            except queue.Full:
-                # キューが満杯なら古いデータを捨てる
+            # データキューに投入（送信スレッドが非同期で送信）
+            if USE_FIREBASE:
                 try:
-                    data_queue.get_nowait()
-                except:
-                    pass
-                data_queue.put_nowait(data)
+                    data_queue.put_nowait(data)
+                except queue.Full:
+                    try: data_queue.get_nowait()
+                    except: pass
+                    data_queue.put_nowait(data)
+
+            if USE_WEBSOCKET:
+                try:
+                    ws_data_queue.put_nowait(data)
+                except queue.Full:
+                    try: ws_data_queue.get_nowait()
+                    except: pass
+                    ws_data_queue.put_nowait(data)
 
             count += 1
             ts = datetime.now().strftime("%H:%M:%S")

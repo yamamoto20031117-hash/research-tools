@@ -635,8 +635,8 @@ function startTMD(){
         atoms.push({x:vx+seOx,y:vy+seOy,z:-2.2,rpx:8.5,color:'#e8a020',type:'Se'});
         atoms.push({x:vx+seOx,y:vy+seOy,z:+2.2,rpx:8.5,color:'#e8a020',type:'Se'});
         // V-Se bonds
-        bonds.push({x1:vx,y1:vy,z1:0,x2:vx+seOx,y2:vy+seOy,z2:-2.2,w:1.0,color:'rgba(80,140,200,0.3)'});
-        bonds.push({x1:vx,y1:vy,z1:0,x2:vx+seOx,y2:vy+seOy,z2:+2.2,w:1.0,color:'rgba(80,140,200,0.3)'});
+        bonds.push({x1:vx,y1:vy,z1:0,x2:vx+seOx,y2:vy+seOy,z2:-2.2,w:1.2,color:'rgba(100,170,240,0.55)'});
+        bonds.push({x1:vx,y1:vy,z1:0,x2:vx+seOx,y2:vy+seOy,z2:+2.2,w:1.2,color:'rgba(100,170,240,0.55)'});
       }
     }
     // V-V skeleton bonds (very faint)
@@ -646,44 +646,101 @@ function startTMD(){
         const nk=(i+di)+','+(j+dj);
         if(vMap[nk]){
           const a2=vMap[key],b2=vMap[nk];
-          bonds.push({x1:a2.x,y1:a2.y,z1:0,x2:b2.x,y2:b2.y,z2:0,w:0.5,color:'rgba(80,140,220,0.08)'});
+          bonds.push({x1:a2.x,y1:a2.y,z1:0,x2:b2.x,y2:b2.y,z2:0,w:0.7,color:'rgba(100,160,240,0.18)'});
         }
       }
     }
     layerData.push({atoms,bonds,zBase});
   }
 
-  // ========== DBPO-Helicene: 7 fused rings ==========
-  const hA=[], hB=[];
-  const rC=[];
-  for(let i=0;i<7;i++){
-    const tw=i*0.28;
-    const hx=(i-3)*2.0, hy=Math.sin(tw)*2.0, hz=Math.cos(tw)*0.8;
-    rC.push({x:hx,y:hy,z:hz,tw});
-    for(let a=0;a<6;a++){
-      const ang=a*Math.PI/3+tw*0.5;
-      const cx=hx+1.05*Math.cos(ang), cy=hy+1.05*Math.sin(ang);
-      hA.push({x:cx,y:cy,z:hz,rpx:5,color:'#888888',type:'C'});
-      const ang2=(a+1)*Math.PI/3+tw*0.5;
-      hB.push({x1:cx,y1:cy,z1:hz,x2:hx+1.05*Math.cos(ang2),y2:hy+1.05*Math.sin(ang2),z2:hz});
-    }
-  }
-  for(let i=0;i<6;i++){
-    const r1=rC[i],r2=rC[i+1];
-    hB.push({x1:r1.x+1.05*Math.cos(2*Math.PI/3+r1.tw*0.5),y1:r1.y+1.05*Math.sin(2*Math.PI/3+r1.tw*0.5),z1:r1.z,
-      x2:r2.x+1.05*Math.cos(Math.PI+r2.tw*0.5),y2:r2.y+1.05*Math.sin(Math.PI+r2.tw*0.5),z2:r2.z});
-  }
-  hA.push({x:rC[1].x+0.4,y:rC[1].y-0.9,z:rC[1].z,rpx:5.5,color:'#3366ff',type:'N'});
-  hA.push({x:rC[5].x-0.4,y:rC[5].y+0.9,z:rC[5].z,rpx:5.5,color:'#3366ff',type:'N'});
-  hA.push({x:rC[0].x-1.2,y:rC[0].y-0.5,z:rC[0].z,rpx:5,color:'#dd2222',type:'O'});
-  hA.push({x:rC[6].x+1.2,y:rC[6].y+0.5,z:rC[6].z,rpx:5,color:'#dd2222',type:'O'});
-  for(let i=0;i<7;i++){
-    const rc=rC[i];
-    for(let a=0;a<3;a++){
-      const ang=(a*2+1)*Math.PI/3+rc.tw*0.5;
-      hA.push({x:rc.x+1.6*Math.cos(ang),y:rc.y+1.6*Math.sin(ang),z:rc.z,rpx:2.5,color:'#cccccc',type:'H'});
-    }
-  }
+  // ========== DBPO-Helicene from CIF 1040766 (C40H22N2O2) ==========
+  const molAtoms=[
+{x:-0.37,y:3.41,z:1.21,r:4.8,c:'#dd2222'},
+{x:2.03,y:0.29,z:-0.15,r:4.8,c:'#dd2222'},
+{x:-1.01,y:2.38,z:0.65,r:5.0,c:'#3344dd'},
+{x:2.62,y:1.23,z:0.39,r:5.0,c:'#3344dd'},
+{x:-1.73,y:2.86,z:0.74,r:4.5,c:'#444444'},
+{x:-2.48,y:2.53,z:0.33,r:4.5,c:'#444444'},
+{x:-2.52,y:1.71,z:-0.02,r:4.5,c:'#444444'},
+{x:-1.78,y:1.19,z:0.01,r:4.5,c:'#444444'},
+{x:-1.03,y:1.56,z:0.42,r:4.5,c:'#444444'},
+{x:-0.21,y:1.10,z:0.46,r:4.5,c:'#444444'},
+{x:-0.09,y:0.28,z:0.12,r:4.5,c:'#444444'},
+{x:0.70,y:-0.14,z:0.18,r:4.5,c:'#444444'},
+{x:1.41,y:0.26,z:0.58,r:4.5,c:'#444444'},
+{x:1.33,y:1.09,z:0.89,r:4.5,c:'#444444'},
+{x:0.52,y:1.50,z:0.85,r:4.5,c:'#444444'},
+{x:0.42,y:2.35,z:1.20,r:4.5,c:'#444444'},
+{x:-0.35,y:2.75,z:1.15,r:4.5,c:'#444444'},
+{x:1.12,y:2.78,z:1.58,r:4.5,c:'#444444'},
+{x:1.07,y:3.62,z:1.90,r:4.5,c:'#444444'},
+{x:1.78,y:4.03,z:2.27,r:4.5,c:'#444444'},
+{x:2.53,y:3.61,z:2.33,r:4.5,c:'#444444'},
+{x:2.61,y:2.79,z:2.01,r:4.5,c:'#444444'},
+{x:1.90,y:2.36,z:1.64,r:4.5,c:'#444444'},
+{x:1.95,y:1.50,z:1.31,r:4.5,c:'#444444'},
+{x:-1.78,y:0.33,z:-0.35,r:4.5,c:'#444444'},
+{x:-2.51,y:-0.03,z:-0.74,r:4.5,c:'#444444'},
+{x:-2.49,y:-0.86,z:-1.08,r:4.5,c:'#444444'},
+{x:-1.75,y:-1.34,z:-1.04,r:4.5,c:'#444444'},
+{x:-1.04,y:-0.99,z:-0.65,r:4.5,c:'#444444'},
+{x:-1.04,y:-0.15,z:-0.32,r:4.5,c:'#444444'},
+{x:-0.26,y:0.21,z:0.05,r:4.5,c:'#444444'},
+{x:-1.75,y:-2.22,z:-1.39,r:4.5,c:'#444444'},
+{x:-1.04,y:-2.66,z:-1.36,r:4.5,c:'#444444'},
+{x:-0.32,y:-2.29,z:-0.98,r:4.5,c:'#444444'},
+{x:-0.31,y:-1.48,z:-0.64,r:4.5,c:'#444444'},
+{x:-1.01,y:-3.54,z:-1.71,r:4.5,c:'#444444'},
+{x:-0.30,y:-3.94,z:-1.68,r:4.5,c:'#444444'},
+{x:0.42,y:-3.46,z:-1.31,r:4.5,c:'#444444'},
+{x:0.41,y:-2.60,z:-0.98,r:4.5,c:'#444444'},
+{x:-0.28,y:-4.84,z:-2.02,r:4.5,c:'#444444'},
+{x:0.44,y:-5.22,z:-1.99,r:4.5,c:'#444444'},
+{x:1.14,y:-4.73,z:-1.62,r:4.5,c:'#444444'},
+{x:1.14,y:-3.85,z:-1.30,r:4.5,c:'#444444'},
+{x:1.88,y:-3.40,z:-0.94,r:4.5,c:'#444444'},
+{x:-2.50,y:3.09,z:0.39,r:2.0,c:'#aaaaaa'},
+{x:-3.07,y:1.37,z:-0.36,r:2.0,c:'#aaaaaa'},
+{x:-0.62,y:-0.11,z:-0.14,r:2.0,c:'#aaaaaa'},
+{x:0.76,y:-0.73,z:-0.06,r:2.0,c:'#aaaaaa'},
+{x:0.50,y:3.95,z:1.86,r:2.0,c:'#aaaaaa'},
+{x:1.72,y:4.62,z:2.50,r:2.0,c:'#aaaaaa'},
+{x:3.04,y:3.91,z:2.61,r:2.0,c:'#aaaaaa'},
+{x:3.19,y:2.49,z:2.05,r:2.0,c:'#aaaaaa'},
+{x:-3.14,y:0.32,z:-0.76,r:2.0,c:'#aaaaaa'},
+{x:-1.98,y:-0.53,z:-1.38,r:2.0,c:'#aaaaaa'},
+{x:-2.27,y:-2.49,z:-1.66,r:2.0,c:'#aaaaaa'},
+{x:0.23,y:-2.02,z:-0.68,r:2.0,c:'#aaaaaa'},
+{x:-1.54,y:-3.86,z:-2.00,r:2.0,c:'#aaaaaa'},
+{x:0.49,y:-4.18,z:-1.95,r:2.0,c:'#aaaaaa'},
+{x:1.70,y:-5.03,z:-1.59,r:2.0,c:'#aaaaaa'},
+{x:1.85,y:-2.75,z:-0.69,r:2.0,c:'#aaaaaa'},
+{x:2.44,y:-3.73,z:-0.92,r:2.0,c:'#aaaaaa'},
+{x:1.11,y:-2.40,z:-0.68,r:2.0,c:'#aaaaaa'},
+{x:-0.80,y:-5.35,z:-2.32,r:2.0,c:'#aaaaaa'},
+{x:0.44,y:-5.88,z:-2.24,r:2.0,c:'#aaaaaa'},
+{x:-1.62,y:3.72,z:0.95,r:2.0,c:'#aaaaaa'},
+{x:2.66,y:0.83,z:0.12,r:2.0,c:'#aaaaaa'},
+];
+  const molBonds=[
+[0,16],[1,12],[2,8],[2,16],[2,4],
+[3,13],[3,23],[3,12],[4,5],[4,16],
+[5,6],[6,7],[7,8],[7,24],[8,9],
+[9,14],[9,10],[10,11],[10,30],[11,12],
+[12,13],[13,14],[14,15],[15,16],[15,17],
+[17,18],[17,22],[18,19],[19,20],[20,21],
+[21,22],[22,23],[24,25],[24,29],[25,26],
+[26,27],[27,28],[27,31],[28,29],[29,30],
+[31,32],[31,38],[32,33],[32,35],[33,34],
+[34,28],[35,36],[35,39],[36,37],[36,40],
+[37,38],[37,42],[38,43],[39,40],[40,41],
+[41,42],[42,43],
+[4,64],[5,44],[6,45],[10,46],[11,47],
+[18,48],[19,49],[20,50],[21,51],[25,52],
+[26,53],[31,54],[34,55],[35,56],[40,57],
+[41,58],[43,59],[43,60],[38,61],[39,62],
+[39,63],[3,65],
+];
 
   // 2 molecules: layer0-1 gap and layer1-2 gap
   const mols=[
@@ -750,7 +807,7 @@ function startTMD(){
         px.beginPath();px.arc(p.x+1,p.y+0.5,2.2,0,Math.PI*2);px.fillStyle='rgba(232,160,32,0.4)';px.fill();
       }}
     }
-    for(const ha of hA){if(ha.type==='H')continue;const p=mp(ha.x,ha.y,ha.z);px.beginPath();px.arc(p.x,p.y,ha.rpx*0.25,0,Math.PI*2);px.fillStyle=ha.color;px.fill();}
+    for(const ma of molAtoms){if(ma.r<3)continue;const p=mp(ma.x,ma.y,ma.z);px.beginPath();px.arc(p.x,p.y,ma.r*0.25,0,Math.PI*2);px.fillStyle=ma.c;px.fill();}
   }
 
   // ========== Main draw loop ==========
@@ -808,18 +865,21 @@ function startTMD(){
 
     for(const mi of mols){
       const mc=Math.cos(mi.ang),ms2=Math.sin(mi.ang);
-      for(const b of hB){
-        const bx1=b.x1*mc-b.y1*ms2+mi.ox,by1=b.x1*ms2+b.y1*mc+mi.oy;
-        const bx2=b.x2*mc-b.y2*ms2+mi.ox,by2=b.x2*ms2+b.y2*mc+mi.oy;
-        const p1=project(bx1,by1,b.z1+mi.zCur),p2=project(bx2,by2,b.z2+mi.zCur);
+      // Draw molecule bonds from CIF data
+      for(const [ia,ib] of molBonds){
+        const a=molAtoms[ia],b=molAtoms[ib];
+        const ax1=a.x*mc-a.y*ms2+mi.ox,ay1=a.x*ms2+a.y*mc+mi.oy;
+        const ax2=b.x*mc-b.y*ms2+mi.ox,ay2=b.x*ms2+b.y*mc+mi.oy;
+        const p1=project(ax1,ay1,a.z+mi.zCur),p2=project(ax2,ay2,b.z+mi.zCur);
         dl.push({px:(p1.x+p2.x)/2,py:(p1.y+p2.y)/2,pz:(p1.z+p2.z)/2,
           x1:p1.x,y1:p1.y,x2:p2.x,y2:p2.y,kind:'mb',s:(p1.s+p2.s)/2});
       }
-      for(const ha of hA){
-        const ax=ha.x*mc-ha.y*ms2+mi.ox,ay=ha.x*ms2+ha.y*mc+mi.oy;
-        const p=project(ax,ay,ha.z+mi.zCur);
-        const r=ha.rpx*p.s;
-        dl.push({px:p.x,py:p.y,pz:p.z,r:Math.max(r,1.5),color:ha.color,kind:'a'});
+      // Draw molecule atoms from CIF data
+      for(const ma of molAtoms){
+        const ax=ma.x*mc-ma.y*ms2+mi.ox,ay=ma.x*ms2+ma.y*mc+mi.oy;
+        const p=project(ax,ay,ma.z+mi.zCur);
+        const r=ma.r*p.s;
+        dl.push({px:p.x,py:p.y,pz:p.z,r:Math.max(r,1.5),color:ma.c,kind:'a'});
       }
     }
 
