@@ -63,7 +63,8 @@
   .data-table th{background:rgba(88,166,255,0.1);color:#58a6ff;padding:4px 8px;text-align:left;position:sticky;top:0}
   .data-table td{padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.04);color:#bbb}
 
-  #xrdCanvas{width:100%;background:#fff;border-radius:4px;cursor:crosshair}
+  .canvas-scroll{overflow-x:auto;overflow-y:hidden;max-width:100%}
+  #xrdCanvas{background:#fff;border-radius:4px;cursor:crosshair}
   #xrdCanvas.dragging{cursor:grabbing}
   #xrdCanvas.hovering-label{cursor:grab}
 
@@ -112,7 +113,7 @@
   <a href="/">&#8592; Research Tools</a>
   <h1>XRD データプロッター</h1>
   <button class="btn" onclick="toggleTable()">データ表示</button>
-  <button class="btn" onclick="detectPeaks()">ピーク検出</button>
+  <button class="btn btn-primary" onclick="autoIdentify00l()" title="ピーク検出 + (00l)自動同定">&#9733; (00l) 自動同定</button>
   <button class="btn" onclick="analyzePeaks()">解析</button>
   <button class="btn" onclick="exportXLSX()">Excel出力</button>
   <button class="btn btn-primary" onclick="exportPNG()">PNG保存</button>
@@ -138,8 +139,14 @@
   <div class="chart-wrap" id="chartWrap">
     <div class="chart-toolbar">
       <label>X範囲:</label>
-      <input type="number" id="xMin" placeholder="min" style="width:60px" onchange="redraw()">
-      <input type="number" id="xMax" placeholder="max" style="width:60px" onchange="redraw()">
+      <input type="number" id="xMin" placeholder="min" style="width:55px" onchange="redraw()">
+      <input type="number" id="xMax" placeholder="max" style="width:55px" onchange="redraw()">
+      <input type="hidden" id="yMin" value="">
+      <input type="hidden" id="yMax" value="">
+      <input type="hidden" id="zoomW" value="0">
+      <label style="font-size:.72rem;color:#888">高さ:</label>
+      <input type="range" id="zoomH" min="150" max="1200" step="10" value="0" oninput="redraw()" style="width:80px;accent-color:#58a6ff" title="グラフ高さ（左端=自動）">
+      <button class="btn" onclick="resetZoom()" title="サイズリセット" style="padding:3px 8px;font-size:.72rem">↺</button>
       <label>線幅:</label>
       <input type="range" id="lineWidth" min="0.5" max="4" step="0.5" value="1.5" oninput="redraw()">
       <label>Y軸:</label>
@@ -154,7 +161,7 @@
         <option value="overlay">重ね合わせ</option>
       </select>
       <button class="btn" onclick="normalizeOverlay()" title="最大ピークに合わせて正規化">正規化</button>
-      <label><input type="checkbox" id="chkGrid" checked onchange="redraw()"> グリッド</label>
+      <label><input type="checkbox" id="chkGrid" onchange="redraw()"> グリッド</label>
       <label><input type="checkbox" id="chkPeakLabel" onchange="redraw()"> ピークラベル</label>
       <label><input type="checkbox" id="chkFWHM" onchange="redraw()"> FWHM</label>
       <span style="font-size:.72rem;color:#666">λ=1.5418Å (Cu Kα)</span>
@@ -163,7 +170,9 @@
 
     <div class="chart-body" id="chartBody">
       <div class="canvas-col">
-        <canvas id="xrdCanvas"></canvas>
+        <div class="canvas-scroll" id="canvasScroll">
+          <canvas id="xrdCanvas"></canvas>
+        </div>
       </div>
       <div class="settings-panel" id="settingsPanel">
         <h3>グラフカスタマイズ</h3>
@@ -250,7 +259,6 @@
 const COLORS=['#2F5496','#CC0000','#228B22','#FF8C00','#8B008B','#008B8B','#B22222','#4169E1'];
 let fileList=[]; // {name, label, color, x[], y[], peaks[], yOffset, yScale}
 let titlePos={x:null, y:null}; // null=デフォルト位置、ドラッグで変更可能
-
 // ===== ファイル読み込み =====
 const dropZone=document.getElementById('dropZone');
 const fileInput=document.getElementById('fileInput');
@@ -472,10 +480,18 @@ function toggleSettings(){
 function redraw(){
   const canvas=document.getElementById('xrdCanvas');
   const dpr=window.devicePixelRatio||1;
-  const w=canvas.parentElement.clientWidth;
+  const containerW=document.getElementById('canvasScroll').clientWidth;
   const isOverlay=document.getElementById('displayMode').value==='overlay';
+
+  // サイズ: スライダー優先 → カスタム設定 → 自動
+  const zoomH=parseInt(document.getElementById('zoomH').value)||0;
+  const zoomW=parseInt(document.getElementById('zoomW').value)||0;
   const customH=parseInt(document.getElementById('canvasH').value)||0;
-  const h=customH>0?customH:(isOverlay?Math.max(450,400):Math.max(400, fileList.length*250+100));
+
+  const autoH=isOverlay?Math.round(containerW*0.76):Math.max(Math.round(containerW*0.76), fileList.length*250+100);
+  const h=zoomH>0?zoomH:(customH>0?customH:autoH);
+  const w=zoomW>0?Math.max(zoomW, containerW):containerW;
+
   canvas.style.width=w+'px';
   canvas.style.height=h+'px';
   canvas.width=w*dpr;
@@ -545,6 +561,11 @@ function redraw(){
     }
   }
 
+
+  // Y範囲入力
+  const userYMin=document.getElementById('yMin').value!==''?parseFloat(document.getElementById('yMin').value):null;
+  const userYMax=document.getElementById('yMax').value!==''?parseFloat(document.getElementById('yMax').value):null;
+
   if(isOverlay){
     // ===== 重ね合わせモード =====
     // 全データセットの変換後Y値の範囲を計算
@@ -558,6 +579,9 @@ function redraw(){
         }
       }
     }
+    // ユーザ指定Y範囲があれば適用
+    if(userYMin!==null) globalTyMin=transformY(userYMin);
+    if(userYMax!==null) globalTyMax=transformY(userYMax);
     const tyRange=globalTyMax-globalTyMin||1;
     const plotH=ph*0.9;
     const plotBot=margin.top+ph-ph*0.05;
@@ -622,8 +646,10 @@ function redraw(){
       }
       if(filtered.length===0) continue;
 
-      const tyMax=Math.max(...filtered.map(p=>p.ty));
-      const tyMin=Math.min(...filtered.map(p=>p.ty));
+      let tyMax=Math.max(...filtered.map(p=>p.ty));
+      let tyMin=Math.min(...filtered.map(p=>p.ty));
+      if(userYMin!==null) tyMin=transformY(userYMin);
+      if(userYMax!==null) tyMax=transformY(userYMax);
       const tyRange=tyMax-tyMin||1;
       const yPx=ty=>plotBot-((ty-tyMin)/tyRange)*plotH;
 
@@ -726,25 +752,46 @@ function drawAxisLabel(ctx, text, cx, cy, fontSize, fontFam, color, isBold){
   ctx.fillText(sepAndUnit, startX+vw, cy);
 }
 
-// ===== ラベルから回折次数nを抽出 =====
-// ラベルは数値("1","2","3"等)で保存。(001)形式も後方互換で対応
-function extractDiffOrder(label){
-  if(!label) return null;
+// ===== シリーズ対応ラベルシステム =====
+// ラベル形式: "A1","A2","B1","B2" (シリーズ文字+次数) or 旧形式 "1","2" (シリーズなし)
+const SERIES_COLORS=['#2F5496','#CC0000','#228B22','#FF8C00','#8B008B','#008B8B','#B22222','#4169E1'];
+const SERIES_LETTERS='ABCDEFGH';
+
+function parseSeriesLabel(label){
+  if(!label) return {series:null, order:null};
   const s=label.trim();
-  // 純粋な数値
-  if(/^\d+$/.test(s)) return parseInt(s,10);
+  // "A1","B2" 形式
+  const m=s.match(/^([A-Z])(\d+)$/);
+  if(m) return {series:m[1], order:parseInt(m[2],10)};
+  // 純粋な数値 "1","2" (旧形式、シリーズAとみなす)
+  if(/^\d+$/.test(s)) return {series:null, order:parseInt(s,10)};
   // (001)形式（後方互換）
-  const m=s.match(/\(\s*0+\s*(\d+)\s*\)/);
-  return m?parseInt(m[1],10):null;
+  const m2=s.match(/\(\s*0+\s*(\d+)\s*\)/);
+  if(m2) return {series:null, order:parseInt(m2[1],10)};
+  return {series:null, order:null};
 }
-// ラベル数値 → グラフ表示用 (00n) 形式
+
+function extractDiffOrder(label){
+  return parseSeriesLabel(label).order;
+}
+
+// ラベル → グラフ表示用
 function formatPeakLabel(label){
-  const n=extractDiffOrder(label);
-  if(n!==null && n>0){
-    return '(00'+n+')';
+  const {series, order}=parseSeriesLabel(label);
+  if(order!==null && order>0){
+    return '(00'+order+')';
   }
   return label||'';
 }
+
+// シリーズ文字 → 表示色
+function getSeriesColor(label, fallbackColor){
+  const {series}=parseSeriesLabel(label);
+  if(!series) return fallbackColor;
+  const idx=SERIES_LETTERS.indexOf(series);
+  return idx>=0?SERIES_COLORS[idx%SERIES_COLORS.length]:fallbackColor;
+}
+
 // 層間距離計算: d = nλ/(2sinθ)
 function calcDspacing(twoTheta, label){
   const lambda=1.5418;
@@ -753,7 +800,6 @@ function calcDspacing(twoTheta, label){
   if(n && n>0){
     return n*lambda/(2*Math.sin(thetaRad));
   }
-  // ラベルなし: 通常のBragg式
   return lambda/(2*Math.sin(thetaRad));
 }
 
@@ -763,11 +809,13 @@ function drawPeakAnnotation(ctx, pk, peakPx, peakPy, color, fi, pi, showLabel, s
   const hasFWHM=showFWHM&&pk.fwhm;
   if(!hasLabel&&!hasFWHM) return;
 
+  // シリーズ固有の色を使用（シリーズラベルがある場合）
+  const labelColor=getSeriesColor(pk.label, color);
   const bg=document.getElementById('bgColor').value||'#fff';
 
-  // デフォルトオフセット（上固定、ドラッグで自由移動）
+  // デフォルトオフセット（ピーク頂点の真上に配置、ドラッグで自由移動）
   if(pk.offsetX===undefined||pk.offsetX===null){
-    pk.offsetX=0; pk.offsetY=-20;
+    pk.offsetX=0; pk.offsetY=-8;
   }
 
   const anchorX=peakPx+pk.offsetX;
@@ -791,19 +839,19 @@ function drawPeakAnnotation(ctx, pk, peakPx, peakPy, color, fi, pi, showLabel, s
   const boxW=maxW+12;
   const boxH=totalH+4;
 
-  // ボックス位置（中央揃え）
+  // ボックス位置（ピーク頂点の真上、中央揃え）
   const boxX=anchorX-boxW/2;
-  const boxY=anchorY-boxH+4;
+  const boxY=anchorY-boxH;
 
   // ボックス背景（枠線なし）
   ctx.fillStyle=transparent?'rgba(255,255,255,0.85)':bg+'dd';
   ctx.fillRect(boxX,boxY,boxW,boxH);
 
-  // テキスト描画
+  // テキスト描画（シリーズ色を使用）
   let curY=boxY+4;
   for(const ln of lines){
     ctx.font=(ln.bold?'bold ':'')+ln.size+'px '+fontFam;
-    ctx.fillStyle=color;
+    ctx.fillStyle=labelColor;
     ctx.textAlign='center';
     ctx.fillText(ln.text, boxX+boxW/2, curY+ln.size);
     curY+=ln.size+2;
@@ -913,10 +961,16 @@ function detectPeaks(){
         const prominence=sy[i]-Math.max(leftMin,rightMin);
         if(prominence<maxSy*0.03) continue;
 
-        if(peaks.length>0&&Math.abs(x[i]-peaks[peaks.length-1].x)<1.0){
-          if(sy[i]>peaks[peaks.length-1].y) peaks[peaks.length-1]={x:x[i],y:y[i],label:'',fwhm:null,_baseY:0};
+        // 検出位置周辺のraw dataから実際の最大値を探す
+        let bestJ=i, bestY=y[i];
+        for(let j=Math.max(0,i-win);j<=Math.min(nn-1,i+win);j++){
+          if(y[j]>bestY){bestY=y[j];bestJ=j;}
+        }
+
+        if(peaks.length>0&&Math.abs(x[bestJ]-peaks[peaks.length-1].x)<1.0){
+          if(bestY>peaks[peaks.length-1].y) peaks[peaks.length-1]={x:x[bestJ],y:bestY,label:'',fwhm:null,_baseY:0};
         } else {
-          peaks.push({x:x[i],y:y[i],label:'',fwhm:null,_baseY:0});
+          peaks.push({x:x[bestJ],y:bestY,label:'',fwhm:null,_baseY:0});
         }
       }
     }
@@ -931,6 +985,167 @@ function detectPeaks(){
   refreshPeakTables();
   document.getElementById('peakList').style.display='block';
   document.getElementById('chkPeakLabel').checked=true;
+  redraw();
+}
+
+// ===== (00l) 自動同定（複数シリーズ対応） =====
+// TMD層間距離測定に特化: Bragg則 2d sin(θ) = lλ より sin(θ_l) = l * sin(θ_1)
+// 複数の層間距離が混在する場合、シリーズA, B, C... として別々に同定
+function autoIdentify00l(){
+  if(fileList.length===0) return;
+
+  // まずピーク未検出なら自動検出
+  const needDetect=fileList.some(f=>!f.peaks||f.peaks.length===0);
+  if(needDetect) detectPeaks();
+
+  fileList.forEach(f=>{
+    if(!f.peaks||f.peaks.length<1) return;
+
+    // 2θ昇順でソート
+    f.peaks.sort((a,b)=>a.x-b.x);
+    // 既存ラベルをクリア
+    f.peaks.forEach(p=>p.label='');
+
+    // 未割り当てピークのインデックスを管理
+    const assigned=new Array(f.peaks.length).fill(false);
+    let seriesIdx=0; // A=0, B=1, C=2...
+
+    // 繰り返し: 未割り当てピークから(00l)シリーズを探す
+    while(seriesIdx<8){ // 最大8シリーズ
+      const unassigned=[];
+      for(let i=0;i<f.peaks.length;i++){
+        if(!assigned[i]) unassigned.push(i);
+      }
+      if(unassigned.length<2) break; // 残り1個以下なら終了
+
+      const peakSinTheta=f.peaks.map(p=>Math.sin(p.x*Math.PI/360));
+
+      let bestResult=null;
+      let bestScore=-1;
+
+      // 未割り当てピークの中から(001)候補を試す
+      for(const i of unassigned){
+        const sinTheta1=peakSinTheta[i];
+        if(sinTheta1<=0) continue;
+
+        const matches=[{idx:i, l:1}];
+
+        for(let l=2;l<=10;l++){
+          const targetSin=l*sinTheta1;
+          if(targetSin>=1) break;
+
+          const target2theta=2*Math.asin(targetSin)*180/Math.PI;
+
+          // 未割り当ての中から最も近いピークを探す
+          let bestMatch=-1, bestDiff=Infinity;
+          for(const j of unassigned){
+            if(j===i||matches.some(m=>m.idx===j)) continue;
+            const diff=Math.abs(f.peaks[j].x-target2theta);
+            if(diff<bestDiff){bestDiff=diff;bestMatch=j;}
+          }
+
+          if(bestMatch>=0&&bestDiff<0.8){
+            matches.push({idx:bestMatch, l:l});
+          }
+        }
+
+        // スコア: マッチ数が多いほど良い、低角側の(001)にボーナス
+        const score=matches.length*3+(f.peaks[i].x<25?1:0);
+
+        if(matches.length>=2&&score>bestScore){
+          bestScore=score;
+          bestResult=matches;
+        }
+      }
+
+      if(!bestResult) break; // もうシリーズが見つからない
+
+      // このシリーズのラベルを設定
+      const letter=SERIES_LETTERS[seriesIdx];
+      for(const m of bestResult){
+        f.peaks[m.idx].label=letter+String(m.l);
+        assigned[m.idx]=true;
+      }
+      seriesIdx++;
+    }
+
+    // ===== 欠番補完: 各シリーズの欠番次数の位置にあるraw dataの小さなピークを拾う =====
+    for(let si=0;si<seriesIdx;si++){
+      const letter=SERIES_LETTERS[si];
+      // このシリーズに割り当てられた次数を収集
+      const seriesPeaks=[];
+      f.peaks.forEach((p,idx)=>{
+        const {series, order}=parseSeriesLabel(p.label);
+        if(series===letter&&order) seriesPeaks.push({idx, order, x:p.x});
+      });
+      if(seriesPeaks.length<2) continue;
+
+      // (001)のsin(θ)を求める: 最小次数のピークから逆算
+      seriesPeaks.sort((a,b)=>a.order-b.order);
+      const base=seriesPeaks[0];
+      const sinTheta1=Math.sin(base.x*Math.PI/360)/base.order;
+
+      // 最大次数を決定
+      const maxL=Math.max(...seriesPeaks.map(p=>p.order));
+
+      for(let l=1;l<=maxL;l++){
+        // 既に割り当て済みならスキップ
+        if(seriesPeaks.some(p=>p.order===l)) continue;
+
+        const targetSin=l*sinTheta1;
+        if(targetSin>=1) continue;
+        const target2theta=2*Math.asin(targetSin)*180/Math.PI;
+
+        // raw dataからこの付近（±1.5°）の局所最大を探す
+        let bestJ=-1, bestY=-Infinity;
+        for(let j=0;j<f.x.length;j++){
+          if(Math.abs(f.x[j]-target2theta)<=1.5){
+            if(f.y[j]>bestY){bestY=f.y[j];bestJ=j;}
+          }
+        }
+        if(bestJ<0) continue;
+
+        // 周辺の平均値（ベースライン）と比較して少しでもピークがあるか判定
+        let baseSum=0, baseCnt=0;
+        for(let j=Math.max(0,bestJ-50);j<=Math.min(f.x.length-1,bestJ+50);j++){
+          if(Math.abs(j-bestJ)>10){baseSum+=f.y[j];baseCnt++;}
+        }
+        const baseline=baseCnt>0?baseSum/baseCnt:0;
+        const prominence=bestY-baseline;
+
+        // ベースラインより少しでも突出していれば追加（通常の検出閾値より緩い）
+        if(prominence>baseline*0.05&&prominence>0){
+          // 既存ピークと重複しないか確認
+          if(!f.peaks.some(p=>Math.abs(p.x-f.x[bestJ])<0.5)){
+            const newPk={x:f.x[bestJ], y:bestY, label:letter+String(l), fwhm:null, _baseY:0};
+            f.peaks.push(newPk);
+            const pi=f.peaks.length-1;
+            f.peaks[pi].fwhm=calcFWHM(f, pi);
+          }
+        }
+      }
+      // 再ソート
+      f.peaks.sort((a,b)=>a.x-b.x);
+    }
+
+    // シリーズが1つだけの場合、シリーズ文字を省略（シンプルに）
+    if(seriesIdx===1){
+      f.peaks.forEach(p=>{
+        const {series, order}=parseSeriesLabel(p.label);
+        if(series&&order) p.label=String(order);
+      });
+    }
+  });
+
+  // ラベル位置をリセットして頂点の上に配置
+  fileList.forEach(f=>{
+    if(!f.peaks) return;
+    f.peaks.forEach(p=>{p.offsetX=undefined;p.offsetY=undefined;});
+  });
+
+  // ピークラベル表示をON
+  document.getElementById('chkPeakLabel').checked=true;
+  refreshPeakTables();
   redraw();
 }
 
@@ -981,7 +1196,7 @@ function analyzePeaks(){
         <td class="num">${fwhmDeg?fwhmDeg.toFixed(4):'—'}</td>
         <td class="num">${fwhmRad>0?fwhmRad.toFixed(6):'—'}</td>
         <td class="num" style="font-weight:bold;color:#ff8c00">${corrLen>0?corrLen.toFixed(2):'—'}</td>
-        <td>${formatPeakLabel(p.label)||'—'}</td>
+        <td style="color:${getSeriesColor(p.label,f.color)};font-weight:bold">${formatPeakLabel(p.label)||'—'}</td>
       </tr>`;
     });
     html+='</tbody></table>';
@@ -1003,14 +1218,15 @@ function refreshPeakTables(){
   fileList.forEach((f, fi)=>{
     if(!f.peaks||f.peaks.length===0) return;
     let html=`<h4 style="color:${f.color};margin:12px 0 6px">${f.label} (${f.peaks.length}ピーク)</h4>`;
-    html+=`<table><thead><tr><th>#</th><th>2θ (°)</th><th>強度</th><th>d (Å)</th><th>FWHM (°)</th><th>n</th><th></th></tr></thead><tbody>`;
+    html+=`<table><thead><tr><th>#</th><th>2θ (°)</th><th>強度</th><th>d (Å)</th><th>FWHM (°)</th><th>ラベル</th><th></th></tr></thead><tbody>`;
     f.peaks.forEach((p,pi)=>{
       const d=calcDspacing(p.x, p.label);
       const n=extractDiffOrder(p.label);
+      const lc=getSeriesColor(p.label, f.color);
       html+=`<tr><td>${pi+1}</td><td>${p.x.toFixed(3)}</td><td>${p.y.toFixed(1)}</td>`;
       html+=`<td style="color:#58a6ff">${d.toFixed(4)}${n?' (n='+n+')':''}</td>`;
       html+=`<td>${p.fwhm?p.fwhm.toFixed(4):'—'}</td>`;
-      html+=`<td><input type="number" value="${p.label}" placeholder="n" min="1" style="width:40px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;color:#ddd;padding:2px 4px;font-size:.72rem;text-align:center" onchange="updatePeakLabel(${fi},${pi},this.value)"></td>`;
+      html+=`<td><input type="text" value="${p.label||''}" placeholder="A1,B1.." style="width:50px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;color:${lc};padding:2px 4px;font-size:.72rem;text-align:center;font-weight:bold" onchange="updatePeakLabel(${fi},${pi},this.value)"> <span style="font-size:.65rem;color:#888">${formatPeakLabel(p.label)}</span></td>`;
       html+=`<td><button class="btn" style="padding:1px 6px;font-size:.65rem;color:#f66;border-color:#f66" onclick="deletePeak(${fi},${pi})" title="削除">&times;</button></td></tr>`;
     });
     html+='</tbody></table>';
@@ -1178,6 +1394,20 @@ function exportPNG(){
 }
 
 window.addEventListener('resize',()=>{if(fileList.length>0)redraw();});
+
+// ===== リセットズーム =====
+function resetZoom(){
+  document.getElementById('yMin').value='';
+  document.getElementById('yMax').value='';
+  document.getElementById('zoomH').value='0';
+  document.getElementById('zoomW').value='0';
+  if(fileList.length>0){
+    const allX=fileList.flatMap(f=>f.x);
+    document.getElementById('xMin').value=Math.floor(Math.min(...allX));
+    document.getElementById('xMax').value=Math.ceil(Math.max(...allX));
+  }
+  redraw();
+}
 
 // ===== ピークラベル ドラッグ機能 =====
 (function(){
