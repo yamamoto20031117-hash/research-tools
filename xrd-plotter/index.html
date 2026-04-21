@@ -488,7 +488,7 @@ function redraw(){
   const zoomW=parseInt(document.getElementById('zoomW').value)||0;
   const customH=parseInt(document.getElementById('canvasH').value)||0;
 
-  const autoH=isOverlay?Math.round(containerW*0.76):Math.max(Math.round(containerW*0.76), fileList.length*250+100);
+  const autoH=isOverlay?Math.round(containerW*0.45):Math.max(Math.round(containerW*0.45), fileList.length*250+100);
   const h=zoomH>0?zoomH:(customH>0?customH:autoH);
   const w=zoomW>0?Math.max(zoomW, containerW):containerW;
 
