@@ -201,19 +201,10 @@
 <!-- チャート -->
 <div class="chart-section hidden" id="chartSection">
   <div class="chart-controls">
-    <label>Y軸:</label>
-    <select id="yAxis" onchange="redrawChart()">
-      <option value="R_nv">R_nv (ナノボルト抵抗)</option>
-      <option value="R_s">R_s (ソース抵抗)</option>
-      <option value="V_nv">V_nv</option>
-      <option value="V_s">V_s</option>
-    </select>
     <label>X軸:</label>
-    <select id="xAxis" onchange="redrawChart()">
-      <option value="sensor_B_(K)">sensor_B (K)</option>
-      <option value="T_VTI_(K)">T_VTI (K)</option>
-      <option value="Time">Time (s)</option>
-    </select>
+    <select id="xAxis" onchange="redrawChart()"></select>
+    <label>Y軸:</label>
+    <select id="yAxis" onchange="redrawChart()"></select>
     <button onclick="exportCSV()">CSV出力</button>
     <button onclick="exportPNG()">PNG保存</button>
   </div>
@@ -229,12 +220,8 @@
     <span style="font-size:.7rem;color:#555" id="tableCount">0 件</span>
   </div>
   <div class="table-wrap">
-    <table>
-      <thead><tr>
-        <th>sensor_B (K)</th><th>T_VTI (K)</th>
-        <th>R_nv (&Omega;)</th><th>R_s (&Omega;)</th>
-        <th>B (T)</th><th>I_s (A)</th>
-      </tr></thead>
+    <table id="dataTable">
+      <thead id="tableHead"><tr></tr></thead>
       <tbody id="tableBody"></tbody>
     </table>
   </div>
@@ -574,6 +561,7 @@ function updateUI(){
   document.getElementById('tableSection').classList.toggle('hidden', !hasData);
 
   if(hasData){
+    updateAxisOptions();
     updateSummary();
     redrawChart();
     updateTable();
@@ -586,6 +574,48 @@ function updateUI(){
       if(f) renderOnlineFileList(f);
     });
   }
+}
+
+// デフォルト軸設定: X=sensor_B_(K), Y=R_nv
+const DEFAULT_X = 'sensor_B_(K)';
+const DEFAULT_Y = 'R_nv';
+
+function updateAxisOptions(){
+  const data = allFiles[activeFileIdx].data;
+  if(!data || data.length === 0) return;
+
+  // データの全カラムを取得（数値カラムのみ）
+  const cols = [];
+  const sample = data[0];
+  for(const key in sample){
+    if(typeof sample[key] === 'number') cols.push(key);
+  }
+
+  const xSel = document.getElementById('xAxis');
+  const ySel = document.getElementById('yAxis');
+  const prevX = xSel.value;
+  const prevY = ySel.value;
+
+  // 選択肢を再構築（カラムが変わった場合のみ）
+  const currentOpts = Array.from(xSel.options).map(o => o.value).join(',');
+  const newOpts = cols.join(',');
+  if(currentOpts === newOpts) return;
+
+  xSel.innerHTML = '';
+  ySel.innerHTML = '';
+
+  for(const col of cols){
+    const label = col.replace(/_/g, ' ');
+    xSel.innerHTML += `<option value="${esc(col)}">${esc(label)}</option>`;
+    ySel.innerHTML += `<option value="${esc(col)}">${esc(label)}</option>`;
+  }
+
+  // デフォルトまたは前回の選択を復元
+  if(prevX && cols.includes(prevX)) xSel.value = prevX;
+  else if(cols.includes(DEFAULT_X)) xSel.value = DEFAULT_X;
+
+  if(prevY && cols.includes(prevY)) ySel.value = prevY;
+  else if(cols.includes(DEFAULT_Y)) ySel.value = DEFAULT_Y;
 }
 
 function updateSummary(){
@@ -739,18 +769,30 @@ function redrawChart(){
 function updateTable(){
   const data=allFiles[activeFileIdx].data;
   document.getElementById('tableCount').textContent=data.length.toLocaleString()+' 件';
+
+  // ヘッダーを動的に生成
+  const keys = data.length > 0 ? Object.keys(data[0]) : [];
+  document.getElementById('tableHead').innerHTML = '<tr>' + keys.map(k => `<th>${esc(k.replace(/_/g,' '))}</th>`).join('') + '</tr>';
+
   let display;
   if(data.length<=100) display=data;
   else display=[...data.slice(0,25),null,...data.slice(-25)];
 
   document.getElementById('tableBody').innerHTML=display.map(d=>{
-    if(d===null)return '<tr><td colspan="6" style="text-align:center;color:#555">... 中略 ...</td></tr>';
-    return `<tr>
-      <td>${fmt(d['sensor_B_(K)'],4)}</td><td>${fmt(d['T_VTI_(K)'],4)}</td>
-      <td>${fmt(d['R_nv'],6)}</td><td>${fmt(d['R_s'],4)}</td>
-      <td>${fmt(d['B_digital_(T)'],6)}</td>
-      <td>${d['I_s']!==undefined?parseFloat(d['I_s']).toExponential(3):'---'}</td>
-    </tr>`;
+    if(d===null)return `<tr><td colspan="${keys.length}" style="text-align:center;color:#555">... 中略 ...</td></tr>`;
+    return '<tr>' + keys.map(k => {
+      const v = d[k];
+      if(v === undefined) return '<td>---</td>';
+      if(typeof v === 'number'){
+        const a = Math.abs(v);
+        if(a === 0) return '<td>0</td>';
+        if(a < 0.001) return `<td>${v.toExponential(3)}</td>`;
+        if(a < 10) return `<td>${v.toFixed(6)}</td>`;
+        if(a < 1000) return `<td>${v.toFixed(4)}</td>`;
+        return `<td>${v.toFixed(2)}</td>`;
+      }
+      return `<td>${esc(String(v))}</td>`;
+    }).join('') + '</tr>';
   }).join('');
 }
 
@@ -797,6 +839,7 @@ if(firebaseReady){
     if(files) renderOnlineFileList(files);
   });
 }
+
 </script>
 </body>
 </html>
