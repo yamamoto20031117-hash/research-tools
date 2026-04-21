@@ -113,7 +113,6 @@
   <a href="/">&#8592; Research Tools</a>
   <h1>XRD データプロッター</h1>
   <button class="btn" onclick="toggleTable()">データ表示</button>
-  <button class="btn btn-primary" onclick="autoIdentify00l()" title="ピーク検出 + (00l)自動同定">&#9733; (00l) 自動同定</button>
   <button class="btn" onclick="analyzePeaks()">解析</button>
   <button class="btn" onclick="exportXLSX()">Excel出力</button>
   <button class="btn btn-primary" onclick="exportPNG()">PNG保存</button>
@@ -287,6 +286,7 @@ function readFile(file){
       const label=file.name.replace(/\.[^.]+$/,'');
       fileList.push({name:file.name, label, color:COLORS[idx%COLORS.length], x:data.x, y:data.y, peaks:[], yOffset:0, yScale:1});
       updateUI();
+      try{ autoIdentify00l(); }catch(e){ console.warn('auto-identify error',e); }
       return true;
     }
     return false;
@@ -1562,6 +1562,7 @@ function startLiveListening(){
       fileList.push({name:d.name||'live', label, color:COLORS[idx%COLORS.length], x:d.x, y:d.y, peaks:[], yOffset:0, yScale:1});
     }
     updateUI();
+    try{ autoIdentify00l(); }catch(e){ console.warn('auto-identify error',e); }
     document.getElementById('liveText').textContent='受信: '+label+' ('+d.x.length+'点) — '+new Date().toLocaleTimeString('ja-JP');
     // 受信後にFirebaseからデータを削除（一度きり）
     snap.ref.remove();
