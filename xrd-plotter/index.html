@@ -1105,16 +1105,17 @@ function autoIdentify00l(){
         }
         if(bestJ<0) continue;
 
-        // 周辺の平均値（ベースライン）と比較して少しでもピークがあるか判定
+        // 周辺の平均値（ベースライン）と比較してピークが目視で見えるレベルか判定
         let baseSum=0, baseCnt=0;
         for(let j=Math.max(0,bestJ-50);j<=Math.min(f.x.length-1,bestJ+50);j++){
           if(Math.abs(j-bestJ)>10){baseSum+=f.y[j];baseCnt++;}
         }
         const baseline=baseCnt>0?baseSum/baseCnt:0;
         const prominence=bestY-baseline;
+        const maxY=Math.max(...f.y);
 
-        // ベースラインより少しでも突出していれば追加（通常の検出閾値より緩い）
-        if(prominence>baseline*0.05&&prominence>0){
+        // 目で見てピークとわかるレベル: prominenceが全体最大の3%以上、かつベースラインの30%以上
+        if(prominence>maxY*0.03&&prominence>baseline*0.3){
           // 既存ピークと重複しないか確認
           if(!f.peaks.some(p=>Math.abs(p.x-f.x[bestJ])<0.5)){
             const newPk={x:f.x[bestJ], y:bestY, label:letter+String(l), fwhm:null, _baseY:0};
