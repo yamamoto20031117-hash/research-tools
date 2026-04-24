@@ -26,6 +26,7 @@
   .card p{font-size:.85rem;color:#999;line-height:1.6}
   .card .tags{margin-top:12px;display:flex;gap:6px;flex-wrap:wrap}
   .tag{font-size:.7rem;padding:2px 8px;border-radius:10px;background:rgba(88,166,255,0.1);color:#58a6ff}
+  .tag.wip{background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3)}
   .launch{display:inline-block;margin-top:12px;padding:6px 18px;background:#58a6ff;color:#0a0e17;
     border-radius:6px;font-size:.82rem;font-weight:bold;text-decoration:none;transition:.15s}
   .launch:hover{background:#7db8ff}
@@ -305,13 +306,69 @@
   </div>
 </div>
 
+<!-- ===== DMM リアルタイムモニター 2 ===== -->
+<div class="tool-section" data-tool="dmm-monitor-2">
+  <div class="card">
+    <div class="card-top">
+      <div class="icon">&#9889;</div>
+      <div>
+        <h2>DMM リアルタイムモニター 2 <span class="tag wip">作成中</span></h2>
+        <p>Keithley 2400 SourceMeter 用リアルタイムモニター（2台目）。このMacから直接接続・操作。電流・電圧のリアルタイム監視、データログ、CSV出力、アラート機能付き。</p>
+        <div class="tags">
+          <span class="tag">Firebase</span><span class="tag">リアルタイム</span><span class="tag">Python連携</span><span class="tag">Keithley 2400</span>
+        </div>
+        <a class="launch" href="/dmm-monitor-2/">モニターを開く &#8594;</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- スレッド板 -->
+  <div class="board" id="board-dmm-monitor-2">
+    <div class="board-header" onclick="toggleBoard('dmm-monitor-2')">
+      <h3>&#128172; スレッド板</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="count" id="count-dmm-monitor-2">0 スレッド</span>
+        <span class="toggle-arrow closed" id="arrow-dmm-monitor-2">&#9660;</span>
+      </div>
+    </div>
+    <div class="board-body collapsed" id="body-dmm-monitor-2">
+      <div class="thread-list" id="threads-dmm-monitor-2"></div>
+      <button class="new-thread-btn" id="ntbtn-dmm-monitor-2" onclick="showNewThread('dmm-monitor-2')">+ 新しいスレッドを立てる</button>
+      <div class="new-thread-form" id="newform-dmm-monitor-2">
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="nt-name-dmm-monitor-2" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <div class="pf-row"><input type="text" id="nt-title-dmm-monitor-2" placeholder="スレッドタイトル" maxlength="80"></div>
+          <textarea id="nt-body-dmm-monitor-2" placeholder="本文を入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button class="cancel-btn" onclick="hideNewThread('dmm-monitor-2')">キャンセル</button>
+            <button onclick="createThread('dmm-monitor-2')">スレッドを立てる</button>
+          </div>
+        </div>
+      </div>
+      <div class="thread-view" id="view-dmm-monitor-2">
+        <span class="tv-back" onclick="backToList('dmm-monitor-2')">&#8592; スレッド一覧に戻る</span>
+        <div class="tv-title" id="vtitle-dmm-monitor-2"></div>
+        <div id="replies-dmm-monitor-2"></div>
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="rp-name-dmm-monitor-2" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <textarea id="rp-body-dmm-monitor-2" placeholder="レスを入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button onclick="postReply('dmm-monitor-2')">書き込む</button>
+          </div>
+        </div>
+      </div>
+      <div class="auto-refresh" id="autorefresh-dmm-monitor-2"><div class="spinner"></div> リアルタイム更新中</div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== SQUID 磁化データプロッター ===== -->
 <div class="tool-section" data-tool="squid-plotter">
   <div class="card">
     <div class="card-top">
       <div class="icon">&#129532;</div>
       <div>
-        <h2>SQUID 磁化データプロッター</h2>
+        <h2>SQUID 磁化データプロッター <span class="tag wip">作成中</span></h2>
         <p>SQUID/PPMSの磁化測定データを自動でグラフ化。M-T、M-H、χ-T、1/χ-Tの各プロットモードに対応。Quantum Design .dat形式を自動認識。</p>
         <div class="tags">
           <span class="tag">SQUID</span><span class="tag">PPMS</span>
@@ -358,6 +415,7 @@
     </div>
   </div>
 </div>
+
 
 <!-- ===== CFMS 低温物性モニター ===== -->
 <div class="tool-section" data-tool="cfms-plotter">
@@ -741,6 +799,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadThreads('xrd-plotter');
   loadThreads('squid-plotter');
   loadThreads('dmm-monitor');
+  loadThreads('dmm-monitor-2');
   loadThreads('cfms-plotter');
 });
 </script>

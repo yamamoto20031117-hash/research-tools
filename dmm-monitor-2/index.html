@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>DMM Monitor — リアルタイム電流・電圧モニター</title>
+<title>DMM Monitor 2 — リアルタイム電流・電圧モニター</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo','Hiragino Sans',sans-serif;min-height:100vh}
@@ -38,25 +38,14 @@
 
   /* 制御パネル */
   .control-section{padding:0 24px 16px}
-  .control-panel{background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;max-width:680px}
+  .control-panel{background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px}
   .control-panel h2{font-size:.9rem;color:#fff;margin-bottom:14px;display:flex;align-items:center;gap:8px}
   .control-row{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
   .control-field{display:flex;flex-direction:column;gap:4px}
   .control-field label{font-size:.75rem;color:#888}
   .control-field select,.control-field input{background:#0e1220;border:1px solid #2a3040;border-radius:4px;
     color:#ddd;padding:6px 10px;font-size:.82rem;min-width:100px}
-  .input-with-unit{display:flex;align-items:stretch}
-  .input-with-unit input{border-radius:4px 0 0 4px;border-right:none;min-width:80px}
-  .input-with-unit select{border-radius:0 4px 4px 0;min-width:auto;border-left:1px solid #1a2030}
   .control-field input:focus,.control-field select:focus{outline:none;border-color:#58a6ff}
-  .mode-toggle{display:flex;gap:0;width:100%}
-  .mode-toggle button{flex:1;padding:10px 18px;font-size:.88rem;border:1px solid #2a3040;background:#0e1220;color:#888;
-    cursor:pointer;transition:.15s;font-weight:600}
-  .mode-toggle button:first-child{border-radius:8px 0 0 8px}
-  .mode-toggle button:last-child{border-radius:0 8px 8px 0;border-left:none}
-  .mode-toggle button.active{background:rgba(88,166,255,0.2);color:#58a6ff;border-color:#58a6ff}
-  .src-inputs{display:flex;gap:16px;flex-wrap:wrap}
-  .src-inputs .control-field{flex:1;min-width:140px}
   .btn-start{padding:8px 24px;background:#22c55e;color:#0a0e17;border:none;border-radius:6px;
     font-size:.9rem;font-weight:bold;cursor:pointer;transition:.15s}
   .btn-start:hover{background:#16a34a}
@@ -108,29 +97,6 @@
   .setting-row input,.setting-row select{flex:1;background:#0e1220;border:1px solid #2a3040;border-radius:4px;
     color:#ddd;padding:4px 8px;font-size:.78rem}
 
-  /* 測定ラン履歴 */
-  .runs-section{padding:0 24px 20px}
-  .runs-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-  .runs-header h2{font-size:.9rem;color:#fff}
-  .runs-list{display:flex;flex-direction:column;gap:6px;max-height:250px;overflow-y:auto;scrollbar-width:thin}
-  .run-card{background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.06);border-radius:8px;
-    padding:10px 14px;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .run-card:hover{border-color:rgba(88,166,255,0.3)}
-  .run-card.active{border-color:#58a6ff;background:rgba(88,166,255,0.1)}
-  .run-card.recording{border-color:#22c55e;background:rgba(34,197,94,0.08)}
-  .run-card .run-info{display:flex;flex-direction:column;gap:2px;min-width:0}
-  .run-card .run-title{font-size:.82rem;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .run-card .run-meta{font-size:.68rem;color:#888}
-  .run-card .run-badge{font-size:.65rem;padding:2px 8px;border-radius:10px;white-space:nowrap}
-  .run-card .run-badge.rec{background:rgba(34,197,94,0.2);color:#22c55e}
-  .run-card .run-badge.done{background:rgba(88,166,255,0.15);color:#58a6ff}
-  .run-card .run-actions{display:flex;gap:6px}
-  .run-card .run-del{color:#666;cursor:pointer;font-size:.9rem;padding:2px 4px}
-  .run-card .run-del:hover{color:#ef4444}
-  .run-card .run-csv{color:#666;cursor:pointer;font-size:.7rem;padding:2px 6px;border:1px solid #333;border-radius:4px}
-  .run-card .run-csv:hover{color:#58a6ff;border-color:#58a6ff}
-  .no-runs{text-align:center;color:#555;font-size:.8rem;padding:20px}
-
   footer{padding:16px 24px;color:#444;font-size:.7rem;text-align:center;border-top:1px solid rgba(255,255,255,0.04)}
 
   /* ===== スマホ対応 ===== */
@@ -166,7 +132,7 @@
 <header>
   <div>
     <a class="back-link" href="/">&#8592; Research Tools に戻る</a>
-    <h1><span class="icon">&#9889;</span> DMM リアルタイムモニター</h1>
+    <h1><span class="icon">&#9889;</span> DMM リアルタイムモニター 2</h1>
   </div>
   <div class="status-bar">
     <span class="status-dot offline" id="statusDot"></span>
@@ -196,45 +162,50 @@
 <div class="control-section">
   <div class="control-panel">
     <h2>&#9881; ソース制御</h2>
-    <input type="hidden" id="srcMode" value="CURR">
-    <div class="mode-toggle" style="margin-bottom:14px">
-      <button id="modeCC" class="active" onclick="setSrcMode('CURR')">定電流 CC</button>
-      <button id="modeCV" onclick="setSrcMode('VOLT')">定電圧 CV</button>
-    </div>
-    <div class="src-inputs" style="margin-bottom:14px">
+    <div class="control-row">
       <div class="control-field">
-        <label id="srcValueLabel">ソース電流</label>
-        <div class="input-with-unit">
-          <input type="number" id="srcValue" value="0" step="any" placeholder="0">
-          <select id="srcUnit">
-            <option value="1">A</option>
-            <option value="0.001" selected>mA</option>
-            <option value="0.000001">μA</option>
-          </select>
-        </div>
+        <label>ソースモード</label>
+        <select id="srcMode" onchange="updateModeUnits()">
+          <option value="CURR">定電流 (CC)</option>
+          <option value="VOLT">定電圧 (CV)</option>
+        </select>
       </div>
       <div class="control-field">
-        <label id="compLabel">コンプライアンス</label>
-        <div class="input-with-unit">
-          <input type="number" id="srcCompliance" value="21" step="any" placeholder="上限">
-          <select id="compUnit">
-            <option value="1">V</option>
-            <option value="0.001">mV</option>
-          </select>
-        </div>
+        <label id="srcValueLabel">ソース電流</label>
+        <input type="number" id="srcValue" value="0" step="any" placeholder="0">
+      </div>
+      <div class="control-field">
+        <label>&nbsp;</label>
+        <select id="srcUnit">
+          <option value="1">A</option>
+          <option value="0.001" selected>mA</option>
+          <option value="0.000001">μA</option>
+        </select>
+      </div>
+      <div class="control-field">
+        <label id="compLabel">コンプライアンス電圧</label>
+        <input type="number" id="srcCompliance" value="21" step="any" placeholder="上限">
+      </div>
+      <div class="control-field">
+        <label>&nbsp;</label>
+        <select id="compUnit">
+          <option value="1">V</option>
+          <option value="0.001">mV</option>
+        </select>
       </div>
     </div>
     <div class="control-row">
       <div class="control-field">
         <label>出力時間</label>
-        <div class="input-with-unit">
-          <input type="number" id="srcDuration" value="0" min="0" step="1" placeholder="0=無制限">
-          <select id="durUnit">
-            <option value="1">秒</option>
-            <option value="60">分</option>
-            <option value="3600">時間</option>
-          </select>
-        </div>
+        <input type="number" id="srcDuration" value="0" min="0" step="1" placeholder="秒（0=無制限）">
+      </div>
+      <div class="control-field">
+        <label>&nbsp;</label>
+        <select id="durUnit">
+          <option value="1">秒</option>
+          <option value="60">分</option>
+          <option value="3600">時間</option>
+        </select>
       </div>
       <div class="control-field">
         <label>測定間隔</label>
@@ -248,11 +219,11 @@
           <option value="10">10秒</option>
         </select>
       </div>
-      <div class="control-field">
+      <div class="control-field" style="flex:1 1 auto">
         <label>&nbsp;</label>
-        <div style="display:flex;gap:8px">
-          <button class="btn-start" id="btnStart" onclick="startSource()">&#9654; OUTPUT ON</button>
-          <button class="btn-stop" id="btnStop" onclick="emergencyStop()">&#9632; OUTPUT OFF</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-start" id="btnStart" onclick="startSource()" style="flex:1;min-width:120px">&#9654; OUTPUT ON</button>
+          <button class="btn-stop" id="btnStop" onclick="emergencyStop()" style="flex:1;min-width:120px">&#9632; OUTPUT OFF</button>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;width:100%;margin-top:4px">
@@ -291,17 +262,6 @@
   </div>
 </div>
 
-<!-- 測定ラン履歴 -->
-<div class="runs-section">
-  <div class="runs-header">
-    <h2>&#128202; 測定ラン履歴</h2>
-    <span style="font-size:.72rem;color:#58a6ff;cursor:pointer" onclick="backToLive()">&#9654; ライブに戻る</span>
-  </div>
-  <div class="runs-list" id="runsList">
-    <div class="no-runs" id="noRuns">測定を開始すると、ここにランが保存されます</div>
-  </div>
-</div>
-
 <!-- データログテーブル -->
 <div class="log-section">
   <div class="log-header">
@@ -329,7 +289,7 @@
     <div class="setting-group">
       <h3>Firebase 接続 (バックアップ)</h3>
       <div class="setting-row"><label>ステータス:</label><span id="fbStatus" style="color:#22c55e">確認中...</span></div>
-      <div class="setting-row"><label>データパス:</label><input id="fbPath" value="dmm/live" onchange="reconnect()"></div>
+      <div class="setting-row"><label>データパス:</label><input id="fbPath" value="dmm2/live" onchange="reconnect()"></div>
     </div>
     <div class="setting-group">
       <h3>表示設定</h3>
@@ -340,7 +300,7 @@
   </div>
 </div>
 
-<footer>DMM Monitor v1.1 — Keithley 2400 SourceMeter — Research Tools</footer>
+<footer>DMM Monitor 2 v1.0 — Keithley 2400 SourceMeter — Research Tools</footer>
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -373,11 +333,6 @@ let timerInterval=null;
 let timerEndTime=0;
 
 // ===== WebSocket 同期 (超低レイテンシ) =====
-// 測定ラン履歴
-let runs=[];           // {id, startTime, endTime, label, data:[], mode, value, compliance}
-let activeRunId=null;  // 現在記録中のラン
-let viewingRunId=null; // 表示中のラン（null=ライブ）
-
 let ws=null;
 let wsReconnectTimer=null;
 let wsReconnectDelay=1000;
@@ -508,7 +463,7 @@ function startListening(){
     document.getElementById('fbStatus').style.color='#ef4444';
     return;
   }
-  const path=document.getElementById('fbPath').value||'dmm/live';
+  const path=document.getElementById('fbPath').value||'dmm2/live';
   if(listener) listener();
 
   const ref=db.ref(path);
@@ -519,7 +474,7 @@ function startListening(){
   });
   listener=()=>ref.off('value');
 
-  db.ref('dmm/log').orderByKey().limitToLast(500).once('value').then(snap=>{
+  db.ref('dmm2/log').orderByKey().limitToLast(500).once('value').then(snap=>{
     const d=snap.val();
     if(d){
       const entries=Object.values(d).sort((a,b)=>a.time-b.time);
@@ -536,7 +491,7 @@ function startListening(){
     }
   });
 
-  db.ref('dmm/log').orderByKey().limitToLast(1).on('child_added',snap=>{
+  db.ref('dmm2/log').orderByKey().limitToLast(1).on('child_added',snap=>{
     const e=snap.val();
     if(e && e.time > lastUpdate) onNewData(e);
   });
@@ -561,14 +516,8 @@ function onNewData(d){
   dataLog.push({time:now, voltage:v, current:i});
   if(dataLog.length>10000) dataLog=dataLog.slice(-8000);
 
-  // アクティブランにデータを追加
-  if(activeRunId!==null){
-    const run=runs.find(r=>r.id===activeRunId);
-    if(run) run.data.push({time:now, voltage:v, current:i});
-  }
-
   updateCurrentValues(v, i, now);
-  if(viewingRunId===null){ updateStats();redrawChart();updateLogTable(); }
+  updateStats();redrawChart();updateLogTable();
   checkAlerts(v, i);
 }
 
@@ -645,11 +594,6 @@ function updateStats(){
 
 // ===== グラフ描画 =====
 function redrawChart(){
-  // ラン表示中はライブチャートを描画しない
-  if(viewingRunId!==null){
-    const run=runs.find(r=>r.id===viewingRunId);
-    if(run){redrawRunChart(run);return;}
-  }
   const canvas=document.getElementById('chartMain');
   const dpr=window.devicePixelRatio||1;
   const w=canvas.parentElement.clientWidth;
@@ -829,7 +773,7 @@ function checkAlerts(v, i){
 }
 
 function showAlert(msg){
-  if(Notification.permission==='granted') new Notification('DMM Monitor',{body:msg});
+  if(Notification.permission==='granted') new Notification('DMM Monitor 2',{body:msg});
   else if(Notification.permission!=='denied') Notification.requestPermission();
   console.warn(msg);
 }
@@ -856,8 +800,8 @@ function clearData(){
   redrawChart();updateLogTable();
   // Firebase ログも削除
   if(firebaseReady){
-    db.ref('dmm/log').remove();
-    db.ref('dmm/live').remove();
+    db.ref('dmm2/log').remove();
+    db.ref('dmm2/live').remove();
   }
 }
 
@@ -877,13 +821,6 @@ function exportCSV(){
 }
 
 // ===== モード切替で単位を更新 =====
-function setSrcMode(mode){
-  document.getElementById('srcMode').value=mode;
-  document.getElementById('modeCC').className=mode==='CURR'?'active':'';
-  document.getElementById('modeCV').className=mode==='VOLT'?'active':'';
-  updateModeUnits();
-}
-
 function updateModeUnits(){
   const mode=document.getElementById('srcMode').value;
   const srcUnit=document.getElementById('srcUnit');
@@ -894,15 +831,15 @@ function updateModeUnits(){
   if(mode==='CURR'){
     srcLabel.textContent='ソース電流';
     srcUnit.innerHTML='<option value="1">A</option><option value="0.001" selected>mA</option><option value="0.000001">μA</option>';
-    compLabel.textContent='コンプライアンス';
+    compLabel.textContent='コンプライアンス電圧';
     compUnit.innerHTML='<option value="1" selected>V</option><option value="0.001">mV</option>';
   } else {
     srcLabel.textContent='ソース電圧';
     srcUnit.innerHTML='<option value="1">V</option><option value="0.001" selected>mV</option><option value="0.000001">μV</option>';
-    compLabel.textContent='コンプライアンス';
+    compLabel.textContent='コンプライアンス電流';
     compUnit.innerHTML='<option value="1" selected>A</option><option value="0.001">mA</option><option value="0.000001">μA</option>';
   }
-  redrawChart();
+  redrawChart(); // グラフもモードに合わせて切替
 }
 
 // ===== 測定間隔変更 =====
@@ -912,21 +849,15 @@ function setInterval2(){
 }
 
 // ===== 機器制御 =====
-let lastCommandId=0;
 function sendCommand(cmd, params){
-  lastCommandId=Date.now();
   // WebSocket優先（低レイテンシ）、Firebase フォールバック
   const sent=sendWsCommand(cmd, params);
   if(!sent && firebaseReady){
-    // 前のコマンドを消してから新しいコマンドをセット
-    db.ref('dmm/command').remove().then(()=>{
-      db.ref('dmm/command').set({
-        action: cmd,
-        ...params,
-        time: lastCommandId,
-        id: lastCommandId,
-        from: 'web'
-      });
+    db.ref('dmm2/command').set({
+      action: cmd,
+      ...params,
+      time: Date.now(),
+      from: 'web'
     });
   }
 }
@@ -970,24 +901,6 @@ function startSource(){
 
   setOutputUI(true);
 
-  // 測定ラン開始
-  const runId=Date.now();
-  const modeStr=mode==='CURR'?'CC':'CV';
-  const run={
-    id: runId,
-    startTime: runId,
-    endTime: null,
-    label: modeStr+' '+dispVal,
-    data: [],
-    mode: mode,
-    value: value,
-    compliance: compliance
-  };
-  runs.push(run);
-  activeRunId=runId;
-  viewingRunId=null;
-  renderRuns();
-
   // タイマー開始
   if(durationSec>0){
     timerEndTime=Date.now()+durationSec*1000;
@@ -998,17 +911,12 @@ function startSource(){
 }
 
 function emergencyStop(){
-  // まずコマンドをクリアしてからOFFを送る
-  if(firebaseReady) db.ref('dmm/command').remove();
   sendCommand('OUTPUT_OFF',{});
   // ステータスも直接更新（Pythonの応答を待たない）
-  if(firebaseReady) db.ref('dmm/status').set({output:false, time:Date.now()});
+  if(firebaseReady) db.ref('dmm2/status').set({output:false, time:Date.now()});
   setOutputUI(false);
   stopTimer();
   document.getElementById('timerDisplay').textContent='--:--';
-
-  // 測定ラン終了
-  finalizeActiveRun();
 }
 
 function setOutputUI(on){
@@ -1041,8 +949,6 @@ function startTimer(){
       document.getElementById('timerDisplay').textContent='00:00';
       // Python側で自動停止されるのでUIも更新
       setTimeout(()=>setOutputUI(false),2000);
-      // 測定ラン終了
-      finalizeActiveRun();
       return;
     }
     updateTimerDisplay();
@@ -1061,214 +967,10 @@ function updateTimerDisplay(){
     (m>59?Math.floor(m/60)+':'+String(m%60).padStart(2,'0'):String(m).padStart(2,'0'))+':'+String(s).padStart(2,'0');
 }
 
-// ===== 測定ラン履歴 =====
-function finalizeActiveRun(){
-  if(activeRunId===null) return;
-  const run=runs.find(r=>r.id===activeRunId);
-  if(run){
-    run.endTime=Date.now();
-  }
-  activeRunId=null;
-  renderRuns();
-}
-
-function renderRuns(){
-  const list=document.getElementById('runsList');
-  const noRuns=document.getElementById('noRuns');
-  if(runs.length===0){
-    noRuns.style.display='block';
-    list.innerHTML='';
-    list.appendChild(noRuns);
-    return;
-  }
-  noRuns.style.display='none';
-  // 新しい順に表示
-  const sorted=[...runs].reverse();
-  list.innerHTML=sorted.map(r=>{
-    const isRecording=activeRunId===r.id;
-    const isViewing=viewingRunId===r.id;
-    const cls='run-card'+(isViewing?' active':'')+(isRecording?' recording':'');
-    const badge=isRecording?'<span class="run-badge rec">● REC</span>':'<span class="run-badge done">'+r.data.length+'点</span>';
-    const startStr=new Date(r.startTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    const endStr=r.endTime?new Date(r.endTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'...';
-    const duration=r.endTime?formatDuration(Math.round((r.endTime-r.startTime)/1000)):'記録中';
-    return `<div class="${cls}" onclick="viewRun(${r.id})">
-      <div class="run-info">
-        <div class="run-title">${r.label}</div>
-        <div class="run-meta">${startStr} → ${endStr}（${duration}）</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        ${badge}
-        <span class="run-csv" onclick="event.stopPropagation();exportRunCSV(${r.id})">CSV</span>
-        <span class="run-del" onclick="event.stopPropagation();deleteRun(${r.id})">&times;</span>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function viewRun(runId){
-  const run=runs.find(r=>r.id===runId);
-  if(!run||run.data.length<2) return;
-  viewingRunId=runId;
-  renderRuns();
-  // ランのデータでグラフを再描画
-  redrawRunChart(run);
-}
-
-function redrawRunChart(run){
-  const canvas=document.getElementById('chartMain');
-  const dpr=window.devicePixelRatio||1;
-  const w=canvas.parentElement.clientWidth;
-  const h=320;
-  canvas.width=w*dpr;canvas.height=h*dpr;
-  canvas.style.height=h+'px';
-  const ctx=canvas.getContext('2d');
-  ctx.scale(dpr,dpr);
-  ctx.clearRect(0,0,w,h);
-
-  const data=run.data;
-  const key=run.mode==='CURR'?'voltage':'current';
-  const unitBase=run.mode==='CURR'?'V':'A';
-  const color=run.mode==='CURR'?'#58a6ff':'#f97316';
-  const modeLabel=run.mode==='CURR'?'定電流':'定電圧';
-
-  const labelEl=document.getElementById('chartLabel');
-  labelEl.textContent='▶ '+run.label+' ('+modeLabel+'モード) — '+data.length+'点';
-  labelEl.style.color='#eab308';
-
-  if(data.length<2){
-    ctx.fillStyle='#555';ctx.font='13px sans-serif';ctx.textAlign='center';
-    ctx.fillText('データが不足しています',w/2,h/2);
-    return;
-  }
-
-  const margin={top:14,right:16,bottom:36,left:64};
-  const pw=w-margin.left-margin.right;
-  const ph=h-margin.top-margin.bottom;
-
-  let yDataMin=Infinity, yDataMax=-Infinity;
-  for(const d of data){
-    const v=d[key];
-    if(v<yDataMin) yDataMin=v;
-    if(v>yDataMax) yDataMax=v;
-  }
-
-  function niceNum(range,round){
-    const exp=Math.floor(Math.log10(range));
-    const frac=range/Math.pow(10,exp);
-    let nice;
-    if(round){nice=frac<1.5?1:frac<3?2:frac<7?5:10;}
-    else{nice=frac<=1?1:frac<=2?2:frac<=5?5:10;}
-    return nice*Math.pow(10,exp);
-  }
-
-  const yRange=yDataMax-yDataMin||((unitBase==='A')?0.001:0.1);
-  const nTicks=5;
-  const tickSpacing=niceNum(yRange/(nTicks-1),true);
-  let yMin=Math.floor(yDataMin/tickSpacing)*tickSpacing;
-  let yMax=Math.ceil(yDataMax/tickSpacing)*tickSpacing;
-  if(yMin===yMax){yMin-=tickSpacing;yMax+=tickSpacing;}
-
-  const tMinF=data[0].time, tMaxF=data[data.length-1].time;
-  const xPx=t=>margin.left+((t-tMinF)/(tMaxF-tMinF||1))*pw;
-  const yPx=v=>margin.top+ph-((v-yMin)/(yMax-yMin||1))*ph;
-
-  const yTicks=[];
-  for(let v=yMin;v<=yMax+tickSpacing*0.001;v+=tickSpacing) yTicks.push(v);
-
-  // グリッド
-  ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.5;
-  for(const tv of yTicks){
-    const y=yPx(tv);
-    ctx.beginPath();ctx.moveTo(margin.left,y);ctx.lineTo(w-margin.right,y);ctx.stroke();
-  }
-
-  // Y軸ラベル
-  const au=getAutoUnit(Math.max(Math.abs(yMin),Math.abs(yMax)),unitBase);
-  const scaledSpacing=tickSpacing*au.scale;
-  const decimals=scaledSpacing>=1?1:scaledSpacing>=0.1?2:scaledSpacing>=0.01?3:4;
-  ctx.fillStyle=color;ctx.font='11px sans-serif';ctx.textAlign='right';
-  for(const tv of yTicks){
-    const y=yPx(tv);
-    if(y>=margin.top-2&&y<=margin.top+ph+2){
-      ctx.fillText((tv*au.scale).toFixed(decimals),margin.left-6,y+4);
-    }
-  }
-  ctx.save();ctx.translate(14,margin.top+ph/2);ctx.rotate(-Math.PI/2);
-  ctx.fillStyle=color;ctx.textAlign='center';ctx.font='12px sans-serif';
-  ctx.fillText(au.prefix+unitBase,0,0);ctx.restore();
-
-  // X軸ラベル（経過時間表示）
-  ctx.fillStyle='#666';ctx.font='10px sans-serif';ctx.textAlign='center';
-  const totalSec=(tMaxF-tMinF)/1000;
-  const tickCount=Math.min(6,Math.floor(pw/90));
-  for(let j=0;j<=tickCount;j++){
-    const t=tMinF+(tMaxF-tMinF)*j/tickCount;
-    const elapsed=(t-tMinF)/1000;
-    let label;
-    if(totalSec<120) label=elapsed.toFixed(0)+'s';
-    else if(totalSec<7200) label=(elapsed/60).toFixed(1)+'m';
-    else label=(elapsed/3600).toFixed(1)+'h';
-    ctx.fillText(label,xPx(t),h-margin.bottom+16);
-    ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.beginPath();
-    ctx.moveTo(xPx(t),margin.top);ctx.lineTo(xPx(t),h-margin.bottom);ctx.stroke();
-  }
-
-  // データ描画
-  ctx.save();
-  ctx.beginPath();ctx.rect(margin.left,margin.top,pw,ph);ctx.clip();
-
-  ctx.strokeStyle=color;ctx.lineWidth=1.8;
-  ctx.beginPath();
-  ctx.moveTo(xPx(data[0].time),yPx(data[0][key]));
-  for(let i=1;i<data.length;i++){
-    ctx.lineTo(xPx(data[i].time),yPx(data[i][key]));
-  }
-  ctx.stroke();
-
-  ctx.fillStyle=color;
-  for(const d of data){
-    ctx.beginPath();ctx.arc(xPx(d.time),yPx(d[key]),2.5,0,Math.PI*2);ctx.fill();
-  }
-  ctx.restore();
-
-  ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=1;
-  ctx.strokeRect(margin.left,margin.top,pw,ph);
-}
-
-function backToLive(){
-  viewingRunId=null;
-  renderRuns();
-  updateStats();redrawChart();updateLogTable();
-}
-
-function deleteRun(runId){
-  if(runId===activeRunId) return; // 記録中は削除不可
-  runs=runs.filter(r=>r.id!==runId);
-  if(viewingRunId===runId) backToLive();
-  else renderRuns();
-}
-
-function exportRunCSV(runId){
-  const run=runs.find(r=>r.id===runId);
-  if(!run||run.data.length===0) return;
-  const lines=['Time,Elapsed(s),Voltage(V),Current(A)'];
-  const t0=run.data[0].time;
-  for(const d of run.data){
-    const elapsed=((d.time-t0)/1000).toFixed(3);
-    lines.push(new Date(d.time).toISOString()+','+elapsed+','+d.voltage.toExponential(6)+','+d.current.toExponential(6));
-  }
-  const blob=new Blob([lines.join('\n')],{type:'text/csv'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='run_'+run.label.replace(/\s+/g,'_')+'_'+new Date(run.startTime).toISOString().slice(0,19).replace(/[:-]/g,'')+'.csv';
-  a.click();
-}
-
 // OUTPUT状態の監視
 function watchOutputState(){
   if(!firebaseReady) return;
-  db.ref('dmm/status').on('value',snap=>{
+  db.ref('dmm2/status').on('value',snap=>{
     const d=snap.val();
     if(d && d.output!==undefined) setOutputUI(d.output);
   });
@@ -1292,43 +994,6 @@ window.addEventListener('load',()=>{
   },5000);
 });
 window.addEventListener('resize',()=>redrawChart());
-
-// バックグラウンド復帰時にデータを再取得・再描画
-document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden){
-    // タブが再びアクティブになったらデータ再取得
-    if(firebaseReady){
-      db.ref('dmm/log').orderByKey().limitToLast(500).once('value').then(snap=>{
-        const d=snap.val();
-        if(d){
-          const entries=Object.values(d).sort((a,b)=>a.time-b.time);
-          let added=false;
-          entries.forEach(e=>{
-            if(!dataLog.some(x=>x.time===e.time)){
-              let v=parseFloat(e.voltage)||0;
-              let i=parseFloat(e.current)||0;
-              if(Math.abs(v)>1e6) v=0;
-              if(Math.abs(i)>1e6) i=0;
-              dataLog.push({time:e.time, voltage:v, current:i});
-              added=true;
-            }
-          });
-          if(added){
-            dataLog.sort((a,b)=>a.time-b.time);
-            if(dataLog.length>10000) dataLog=dataLog.slice(-8000);
-            updateStats();redrawChart();updateLogTable();
-          }
-        }
-      });
-      // OUTPUT状態も再チェック
-      db.ref('dmm/status').once('value').then(snap=>{
-        const d=snap.val();
-        if(d && d.output!==undefined) setOutputUI(d.output);
-      });
-    }
-    redrawChart();
-  }
-});
 </script>
 
 </body>

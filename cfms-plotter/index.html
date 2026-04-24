@@ -110,7 +110,7 @@
     border-radius:4px;font-size:.78rem;cursor:pointer;transition:.15s}
   .chart-controls button:hover{background:rgba(88,166,255,0.25)}
 
-  .chart-wrap{background:rgba(15,18,28,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:8px;overflow:hidden}
+  .chart-wrap{background:#f8f9fa;border:1px solid #ddd;border-radius:8px;overflow:hidden}
   canvas{display:block;width:100%}
 
   /* テーブル */
@@ -706,38 +706,45 @@ function redrawChart(){
   const xPx=v=>margin.left+((v-xT.min)/(xT.max-xT.min||1))*pw;
   const yPx=v=>margin.top+ph-((v-yT.min)/(yT.max-yT.min||1))*ph;
 
-  // グリッド
-  ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.5;
+  // 白背景
+  ctx.fillStyle='#fff';
+  ctx.fillRect(margin.left,margin.top,pw,ph);
+
+  const lineColor='#1a56db';
+  const axisColor='#333';
+  const gridColor='#e0e0e0';
+
+  // グリッド（薄いグレー）
+  ctx.strokeStyle=gridColor;ctx.lineWidth=0.5;
   for(const v of yT.ticks){const y=yPx(v);ctx.beginPath();ctx.moveTo(margin.left,y);ctx.lineTo(w-margin.right,y);ctx.stroke();}
   for(const v of xT.ticks){const x=xPx(v);ctx.beginPath();ctx.moveTo(x,margin.top);ctx.lineTo(x,margin.top+ph);ctx.stroke();}
 
-  const yColor=yKey.includes('R')?'#22d3ee':'#58a6ff';
-  const xColor='#f97316';
-
-  // Y軸
+  // Y軸目盛り
   const yDec=yT.spacing>=10?0:yT.spacing>=1?1:yT.spacing>=0.1?2:yT.spacing>=0.01?3:yT.spacing>=0.001?4:6;
-  ctx.fillStyle=yColor;ctx.font='11px sans-serif';ctx.textAlign='right';
+  ctx.fillStyle=axisColor;ctx.font='11px sans-serif';ctx.textAlign='right';
   for(const v of yT.ticks){const y=yPx(v);if(y>=margin.top-2&&y<=margin.top+ph+2)ctx.fillText(v.toFixed(yDec),margin.left-8,y+4);}
 
-  // X軸
+  // X軸目盛り
   const xDec=xT.spacing>=10?0:xT.spacing>=1?1:xT.spacing>=0.1?2:4;
-  ctx.fillStyle=xColor;ctx.font='11px sans-serif';ctx.textAlign='center';
+  ctx.fillStyle=axisColor;ctx.font='11px sans-serif';ctx.textAlign='center';
   for(const v of xT.ticks){const x=xPx(v);if(x>=margin.left-10&&x<=w-margin.right+10)ctx.fillText(v.toFixed(xDec),x,margin.top+ph+18);}
 
-  // 軸タイトル
+  // Y軸タイトル
   const yLabel=yKey.replace(/_/g,' ');
   const xLabel=xKey==='Time'?'Time (s)':xKey.replace(/_/g,' ');
   ctx.save();ctx.translate(16,margin.top+ph/2);ctx.rotate(-Math.PI/2);
-  ctx.fillStyle=yColor;ctx.textAlign='center';ctx.font='bold 13px sans-serif';
+  ctx.fillStyle=axisColor;ctx.textAlign='center';ctx.font='italic bold 13px serif';
   ctx.fillText(yLabel,0,0);ctx.restore();
-  ctx.fillStyle=xColor;ctx.textAlign='center';ctx.font='bold 12px sans-serif';
+
+  // X軸タイトル
+  ctx.fillStyle=axisColor;ctx.textAlign='center';ctx.font='italic bold 13px serif';
   ctx.fillText(xLabel,margin.left+pw/2,h-6);
 
   // クリッピング
   ctx.save();ctx.beginPath();ctx.rect(margin.left,margin.top,pw,ph);ctx.clip();
 
   // データ線
-  ctx.strokeStyle=yColor;ctx.lineWidth=1.5;
+  ctx.strokeStyle=lineColor;ctx.lineWidth=1.2;
   ctx.beginPath();
   let first=true;
   for(const d of filtered){
@@ -745,22 +752,14 @@ function redrawChart(){
     if(first){ctx.moveTo(x,y);first=false;}else ctx.lineTo(x,y);
   }
   ctx.stroke();
-
-  // 点
-  const dotR=filtered.length>2000?1:filtered.length>500?1.5:2.5;
-  ctx.fillStyle=yColor;
-  for(const d of filtered){
-    const x=xPx(parseFloat(d[xKey])),y=yPx(parseFloat(d[yKey]));
-    ctx.beginPath();ctx.arc(x,y,dotR,0,Math.PI*2);ctx.fill();
-  }
   ctx.restore();
 
-  // 枠
-  ctx.strokeStyle='rgba(255,255,255,0.12)';ctx.lineWidth=1;
+  // 枠（黒い軸線）
+  ctx.strokeStyle='#333';ctx.lineWidth=1.2;
   ctx.strokeRect(margin.left,margin.top,pw,ph);
 
   // ファイル名
-  ctx.fillStyle='#555';ctx.font='10px sans-serif';ctx.textAlign='right';
+  ctx.fillStyle='#888';ctx.font='10px sans-serif';ctx.textAlign='right';
   ctx.fillText(allFiles[activeFileIdx].name+'  ('+filtered.length.toLocaleString()+' pts)',w-margin.right,margin.top-6);
 }
 
