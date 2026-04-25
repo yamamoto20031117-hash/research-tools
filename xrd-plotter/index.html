@@ -254,6 +254,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
 const COLORS=['#2F5496','#CC0000','#228B22','#FF8C00','#8B008B','#008B8B','#B22222','#4169E1'];
 let fileList=[]; // {name, label, color, x[], y[], peaks[], yOffset, yScale}
@@ -1395,29 +1396,44 @@ function addManualPeak(){
 // ===== Excel出力 =====
 async function exportXLSX(){
   if(fileList.length===0){alert('データを先に読み込んでください');return;}
-  const canvas=document.getElementById('xrdCanvas');
   const firstName=fileList[0].label;
   const lambda=1.5418;
 
   const wb=new ExcelJS.Workbook();
 
-  const wsChart=wb.addWorksheet('XRD Chart');
-  const imgBase64=canvas.toDataURL('image/png').split(',')[1];
-  const imgId=wb.addImage({base64:imgBase64, extension:'png'});
-  const cols=Math.min(14, Math.round(canvas.clientWidth/70));
-  const rows=Math.min(35, Math.round(canvas.clientHeight/20));
-  wsChart.addImage(imgId,{tl:{col:0,row:0},br:{col:cols,row:rows}});
+  // 1. 結合データシート（チャート参照用）
+  const wsData=wb.addWorksheet('XRD Data');
+  const hdrs=[];
+  for(const f of fileList){ hdrs.push('2θ (°)'); hdrs.push(f.label||'Intensity'); }
+  wsData.addRow(hdrs);
+  const hdrRow=wsData.getRow(1);
+  hdrRow.font={bold:true,color:{argb:'FFFFFFFF'}};
+  hdrRow.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
+  const maxLen=Math.max(...fileList.map(f=>f.x.length));
+  for(let r=0;r<maxLen;r++){
+    const row=[];
+    for(const f of fileList){
+      row.push(r<f.x.length?f.x[r]:null);
+      row.push(r<f.x.length?f.y[r]:null);
+    }
+    wsData.addRow(row);
+  }
+  for(let c=0;c<fileList.length*2;c++){
+    wsData.getColumn(c+1).width=c%2===0?12:16;
+  }
 
+  // 2. 個別データシート
   for(const f of fileList){
     const name=(f.label||'data').substring(0,28).replace(/[\\\/\*\?\[\]:]/g,'');
     const ws=wb.addWorksheet(name);
     ws.columns=[{header:'2θ (°)',key:'x',width:14},{header:'Intensity (cps)',key:'y',width:18}];
-    const headerRow=ws.getRow(1);
-    headerRow.font={bold:true,color:{argb:'FFFFFFFF'}};
-    headerRow.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
+    const hr=ws.getRow(1);
+    hr.font={bold:true,color:{argb:'FFFFFFFF'}};
+    hr.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
     for(let i=0;i<f.x.length;i++) ws.addRow({x:f.x[i],y:f.y[i]});
   }
 
+  // 3. ピーク解析シート
   const hasPeaks=fileList.some(f=>f.peaks&&f.peaks.length>0);
   if(hasPeaks){
     const wsP=wb.addWorksheet('Peak Analysis');
@@ -1428,9 +1444,9 @@ async function exportXLSX(){
       {header:'FWHM (rad)',key:'fwr',width:12},{header:'L (nm)',key:'l',width:12},
       {header:'Label',key:'lb',width:14}
     ];
-    const hdr=wsP.getRow(1);
-    hdr.font={bold:true,color:{argb:'FFFFFFFF'}};
-    hdr.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
+    const ph=wsP.getRow(1);
+    ph.font={bold:true,color:{argb:'FFFFFFFF'}};
+    ph.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
     for(const f of fileList){
       if(!f.peaks) continue;
       f.peaks.forEach((p,i)=>{
@@ -1443,10 +1459,153 @@ async function exportXLSX(){
     }
   }
 
+  // 4. ExcelJSバッファ生成
   const buf=await wb.xlsx.writeBuffer();
-  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+
+  // 5. JSZipでネイティブExcelチャートを注入
+  const zip=await JSZip.loadAsync(buf);
+
+  function colLetter(idx){
+    let s='',n=idx;
+    while(n>=0){ s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26)-1; }
+    return s;
+  }
+  function escXml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+  // チャートシリーズ構築
+  const chartColors=['4472C4','CC0000','228B22','FF8C00','8B008B','008B8B','B22222','4169E1','DAA520','2E8B57'];
+  let seriesXml='';
+  for(let si=0;si<fileList.length;si++){
+    const f=fileList[si];
+    const xCol=colLetter(si*2);
+    const yCol=colLetter(si*2+1);
+    const endRow=f.x.length+1;
+    const clr=chartColors[si%chartColors.length];
+    seriesXml+=`<c:ser>
+      <c:idx val="${si}"/><c:order val="${si}"/>
+      <c:tx><c:strRef><c:f>'XRD Data'!$${yCol}$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>${escXml(f.label||'Dataset '+(si+1))}</c:v></c:pt></c:strCache></c:strRef></c:tx>
+      <c:spPr><a:ln w="19050"><a:solidFill><a:srgbClr val="${clr}"/></a:solidFill></a:ln></c:spPr>
+      <c:marker><c:symbol val="none"/></c:marker>
+      <c:xVal><c:numRef><c:f>'XRD Data'!$${xCol}$2:$${xCol}$${endRow}</c:f></c:numRef></c:xVal>
+      <c:yVal><c:numRef><c:f>'XRD Data'!$${yCol}$2:$${yCol}$${endRow}</c:f></c:numRef></c:yVal>
+      <c:smooth val="0"/>
+    </c:ser>`;
+  }
+
+  // chart1.xml
+  const chartXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <c:chart>
+    <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1400" b="1"/></a:pPr>
+      <a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>XRD Pattern</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+    <c:autoTitleDeleted val="0"/>
+    <c:plotArea>
+      <c:layout/>
+      <c:scatterChart>
+        <c:scatterStyle val="lineMarker"/>
+        ${seriesXml}
+        <c:axId val="111111111"/><c:axId val="222222222"/>
+      </c:scatterChart>
+      <c:valAx>
+        <c:axId val="111111111"/>
+        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/><c:axPos val="b"/>
+        <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000"/></a:pPr>
+          <a:r><a:rPr lang="en-US" sz="1000"/><a:t>2&#x3B8; (°)</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+        <c:numFmt formatCode="General" sourceLinked="1"/>
+        <c:majorTickMark val="out"/><c:minorTickMark val="none"/>
+        <c:crossAx val="222222222"/>
+      </c:valAx>
+      <c:valAx>
+        <c:axId val="222222222"/>
+        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/><c:axPos val="l"/>
+        <c:title><c:tx><c:rich><a:bodyPr rot="-5400000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000"/></a:pPr>
+          <a:r><a:rPr lang="en-US" sz="1000"/><a:t>Intensity (cps)</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+        <c:numFmt formatCode="General" sourceLinked="1"/>
+        <c:majorTickMark val="out"/><c:minorTickMark val="none"/>
+        <c:crossAx val="111111111"/>
+      </c:valAx>
+    </c:plotArea>
+    <c:legend><c:legendPos val="r"/><c:overlay val="0"/></c:legend>
+    <c:plotVisOnly val="1"/>
+  </c:chart>
+</c:chartSpace>`;
+
+  // drawing1.xml — チャートをデータの右側に配置
+  const chartStartCol=fileList.length*2+1;
+  const drawingXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <xdr:twoCellAnchor>
+    <xdr:from><xdr:col>${chartStartCol}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+    <xdr:to><xdr:col>${chartStartCol+12}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>26</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
+    <xdr:graphicFrame macro="">
+      <xdr:nvGraphicFramePr>
+        <xdr:cNvPr id="2" name="Chart 1"/>
+        <xdr:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></xdr:cNvGraphicFramePr>
+      </xdr:nvGraphicFramePr>
+      <xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>
+      <a:graphic>
+        <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">
+          <c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rId1"/>
+        </a:graphicData>
+      </a:graphic>
+    </xdr:graphicFrame>
+    <xdr:clientData/>
+  </xdr:twoCellAnchor>
+</xdr:wsDr>`;
+
+  // drawing rels
+  const drawingRelsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/>
+</Relationships>`;
+
+  // ZIPにチャートファイルを追加
+  zip.file('xl/charts/chart1.xml', chartXml);
+  zip.file('xl/drawings/drawing1.xml', drawingXml);
+  zip.file('xl/drawings/_rels/drawing1.xml.rels', drawingRelsXml);
+
+  // sheet1.xml.rels — drawingへの参照を追加
+  const s1RelsPath='xl/worksheets/_rels/sheet1.xml.rels';
+  const s1Rels=zip.file(s1RelsPath);
+  if(s1Rels){
+    let rels=await s1Rels.async('string');
+    rels=rels.replace('</Relationships>',
+      '<Relationship Id="rIdDrw1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
+    zip.file(s1RelsPath, rels);
+  } else {
+    zip.file(s1RelsPath, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rIdDrw1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>
+</Relationships>`);
+  }
+
+  // sheet1.xml に <drawing> 要素を追加
+  const s1Path='xl/worksheets/sheet1.xml';
+  let s1Xml=await zip.file(s1Path).async('string');
+  if(!s1Xml.includes('xmlns:r=')){
+    s1Xml=s1Xml.replace('<worksheet ','<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
+  }
+  s1Xml=s1Xml.replace(/<\/worksheet>/,'<drawing r:id="rIdDrw1"/></worksheet>');
+  zip.file(s1Path, s1Xml);
+
+  // [Content_Types].xml を更新
+  let ct=await zip.file('[Content_Types].xml').async('string');
+  if(!ct.includes('drawingml.chart+xml')){
+    ct=ct.replace('</Types>',
+      '<Override PartName="/xl/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>'+
+      '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>'+
+      '</Types>');
+    zip.file('[Content_Types].xml', ct);
+  }
+
+  // 最終バッファ生成＆ダウンロード
+  const finalBlob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
+  a.href=URL.createObjectURL(finalBlob);
   a.download=firstName+'_XRD.xlsx';
   a.click();
   URL.revokeObjectURL(a.href);
