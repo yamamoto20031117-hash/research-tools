@@ -35,7 +35,16 @@ function processFile(file){
       [{name:'apple-touch-icon.png',sz:180},{name:'icon-192.png',sz:192},{name:'icon-32.png',sz:32}].forEach(s=>{
         const c=document.createElement('canvas');
         c.width=s.sz;c.height=s.sz;
-        c.getContext('2d').drawImage(img,0,0,s.sz,s.sz);
+        const cx=c.getContext('2d');
+        // 背景を塗りつぶし
+        cx.fillStyle='#0b1a3b';
+        cx.fillRect(0,0,s.sz,s.sz);
+        // 元画像の角丸+透明をはみ出させるため約12%拡大して中央配置
+        // → iOSが自動で角丸マスクをかけるのでぴったりになる
+        const scale=1.12;
+        const drawSz=s.sz*scale;
+        const offset=(s.sz-drawSz)/2;
+        cx.drawImage(img,offset,offset,drawSz,drawSz);
         c.toBlob(blob=>{
           const a=document.createElement('a');
           a.href=URL.createObjectURL(blob);
