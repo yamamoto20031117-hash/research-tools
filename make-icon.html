@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Icon Maker</title>
+<style>
+body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#1a1a2e;color:#fff}
+.drop{width:300px;height:300px;border:3px dashed #58a6ff;border-radius:20px;display:flex;align-items:center;justify-content:center;
+  text-align:center;color:#888;font-size:1.1rem;cursor:pointer;transition:.2s;margin:20px}
+.drop:hover,.drop.over{border-color:#22c55e;background:rgba(34,197,94,0.1)}
+.drop img{max-width:280px;max-height:280px;border-radius:12px}
+#result{display:none;text-align:center}
+.btn{display:inline-block;margin:8px;padding:12px 24px;background:#22c55e;color:#000;border:none;border-radius:8px;
+  font-size:1rem;font-weight:bold;cursor:pointer;text-decoration:none}
+.btn:hover{background:#16a34a}
+h1{margin-top:40px}
+p{color:#888;margin:8px}
+</style></head><body>
+<h1>App Icon Generator</h1>
+<p>アイコンにしたい画像をドロップまたはクリックして選択<br>(白背景は自動で透過されます)</p>
+<div class="drop" id="drop" onclick="document.getElementById('fileIn').click()">
+  画像をここにドロップ
+</div>
+<input type="file" id="fileIn" accept="image/*" style="display:none">
+<div id="result">
+  <p style="color:#22c55e;font-size:1.2rem;font-weight:bold">アイコン生成完了！</p>
+  <p>下のボタンで3つのファイルをダウンロードし、<br><code>~/Desktop/research-tools/</code> に保存してください</p>
+  <div id="buttons"></div>
+  <p style="margin-top:20px;color:#888;font-size:.85rem">保存後: <code>cd ~/Desktop/research-tools && git add -A && git commit -m "Add icons" && git push</code></p>
+</div>
+<script>
+const drop=document.getElementById('drop');
+const fileIn=document.getElementById('fileIn');
+
+['dragenter','dragover'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length)processFile(e.dataTransfer.files[0])});
+fileIn.addEventListener('change',e=>{if(e.target.files.length)processFile(e.target.files[0])});
+
+function processFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      drop.innerHTML='';
+      const preview=removeWhiteBG(img);
+      preview.style.maxWidth='280px';preview.style.maxHeight='280px';preview.style.borderRadius='12px';
+      drop.appendChild(preview);
+      drop.style.border='none';
+      generateIcons(img);
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeWhiteBG(img){
+  const c=document.createElement('canvas');
+  c.width=img.naturalWidth;c.height=img.naturalHeight;
+  const ctx=c.getContext('2d');
+  ctx.drawImage(img,0,0);
+  const id=ctx.getImageData(0,0,c.width,c.height);
+  const d=id.data;
+  // 四隅の色を取得して白背景か判定
+  const corners=[[0,0],[c.width-1,0],[0,c.height-1],[c.width-1,c.height-1]];
+  let whiteCorners=0;
+  for(const [x,y] of corners){
+    const i=(y*c.width+x)*4;
+    if(d[i]>240&&d[i+1]>240&&d[i+2]>240) whiteCorners++;
+  }
+  if(whiteCorners>=3){
+    // 白背景を透過
+    for(let i=0;i<d.length;i+=4){
+      const r=d[i],g=d[i+1],b=d[i+2];
+      if(r>240&&g>240&&b>240){
+        d[i+3]=0; // 完全に白→透明
+      } else if(r>220&&g>220&&b>220){
+        // 白に近い→半透明にフェード
+        const whiteness=Math.min(r,g,b);
+        d[i+3]=Math.round(255*(1-(whiteness-220)/35));
+      }
+    }
+    ctx.putImageData(id,0,0);
+  }
+  return c;
+}
+
+function generateIcons(img){
+  const sizes=[
+    {name:'apple-touch-icon.png',size:180},
+    {name:'icon-192.png',size:192},
+    {name:'icon-32.png',size:32}
+  ];
+  // まず白背景除去した高解像度キャンバスを作る
+  const srcCanvas=removeWhiteBG(img);
+
+  const btns=document.getElementById('buttons');
+  btns.innerHTML='';
+  sizes.forEach(s=>{
+    const canvas=document.createElement('canvas');
+    canvas.width=s.size;canvas.height=s.size;
+    const ctx=canvas.getContext('2d');
+    ctx.drawImage(srcCanvas,0,0,s.size,s.size);
+    canvas.toBlob(blob=>{
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;a.download=s.name;a.className='btn';
+      a.textContent=s.name+' ('+s.size+'x'+s.size+')';
+      btns.appendChild(a);
+    },'image/png');
+  });
+  document.getElementById('result').style.display='block';
+}
+</script></body></html>
