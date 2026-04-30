@@ -519,26 +519,34 @@ function startListening(){
   });
   listener=()=>ref.off('value');
 
-  db.ref('dmm/log').orderByKey().limitToLast(500).once('value').then(snap=>{
+  // 全ログデータを取得（ページ再訪問時も過去データを復元）
+  db.ref('dmm/log').once('value').then(snap=>{
     const d=snap.val();
     if(d){
       const entries=Object.values(d).sort((a,b)=>a.time-b.time);
+      let added=false;
       entries.forEach(e=>{
-        if(!dataLog.some(x=>x.time===e.time)){
-          let v=parseFloat(e.voltage)||0;
-          let i=parseFloat(e.current)||0;
-          if(Math.abs(v)>1e6) v=0;
-          if(Math.abs(i)>1e6) i=0;
-          dataLog.push({time:e.time, voltage:v, current:i});
+        let v=parseFloat(e.voltage)||0;
+        let i=parseFloat(e.current)||0;
+        if(Math.abs(v)>1e6) v=0;
+        if(Math.abs(i)>1e6) i=0;
+        const t=e.time||0;
+        if(t>0 && !dataLog.some(x=>x.time===t)){
+          dataLog.push({time:t, voltage:v, current:i});
+          added=true;
         }
       });
-      updateStats();redrawChart();updateLogTable();
+      if(added){
+        dataLog.sort((a,b)=>a.time-b.time);
+        if(dataLog.length>0) lastUpdate=dataLog[dataLog.length-1].time;
+        updateStats();redrawChart();updateLogTable();
+      }
     }
-  });
-
-  db.ref('dmm/log').orderByKey().limitToLast(1).on('child_added',snap=>{
-    const e=snap.val();
-    if(e && e.time > lastUpdate) onNewData(e);
+    // 全データ取得後にリアルタイム監視開始
+    db.ref('dmm/log').orderByKey().limitToLast(1).on('child_added',snap=>{
+      const e=snap.val();
+      if(e && e.time > lastUpdate) onNewData(e);
+    });
   });
 
   document.getElementById('fbStatus').textContent='接続中';
@@ -1298,7 +1306,7 @@ document.addEventListener('visibilitychange',()=>{
   if(!document.hidden){
     // タブが再びアクティブになったらデータ再取得
     if(firebaseReady){
-      db.ref('dmm/log').orderByKey().limitToLast(500).once('value').then(snap=>{
+      db.ref('dmm/log').once('value').then(snap=>{
         const d=snap.val();
         if(d){
           const entries=Object.values(d).sort((a,b)=>a.time-b.time);
