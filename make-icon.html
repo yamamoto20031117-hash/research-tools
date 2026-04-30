@@ -5,30 +5,19 @@ body{font-family:sans-serif;display:flex;flex-direction:column;align-items:cente
 .drop{width:300px;height:300px;border:3px dashed #58a6ff;border-radius:20px;display:flex;align-items:center;justify-content:center;
   text-align:center;color:#888;font-size:1.1rem;cursor:pointer;transition:.2s;margin:20px}
 .drop:hover,.drop.over{border-color:#22c55e;background:rgba(34,197,94,0.1)}
-.drop img{max-width:280px;max-height:280px;border-radius:12px}
-#result{display:none;text-align:center}
-.btn{display:inline-block;margin:8px;padding:12px 24px;background:#22c55e;color:#000;border:none;border-radius:8px;
-  font-size:1rem;font-weight:bold;cursor:pointer;text-decoration:none}
-.btn:hover{background:#16a34a}
-h1{margin-top:40px}
+.drop img,.drop canvas{max-width:280px;max-height:280px;border-radius:12px}
+.done{color:#22c55e;font-size:1.3rem;font-weight:bold;margin:16px}
 p{color:#888;margin:8px}
+code{background:#222;padding:2px 8px;border-radius:4px;font-size:.85rem}
 </style></head><body>
 <h1>App Icon Generator</h1>
-<p>アイコンにしたい画像をドロップまたはクリックして選択<br>(白背景は自動で透過されます)</p>
-<div class="drop" id="drop" onclick="document.getElementById('fileIn').click()">
-  画像をここにドロップ
-</div>
+<p>透過済みPNGをドロップ → 3サイズ自動ダウンロード</p>
+<div class="drop" id="drop" onclick="document.getElementById('fileIn').click()">画像をここにドロップ</div>
 <input type="file" id="fileIn" accept="image/*" style="display:none">
-<div id="result">
-  <p style="color:#22c55e;font-size:1.2rem;font-weight:bold">アイコン生成完了！</p>
-  <p>下のボタンで3つのファイルをダウンロードし、<br><code>~/Desktop/research-tools/</code> に保存してください</p>
-  <div id="buttons"></div>
-  <p style="margin-top:20px;color:#888;font-size:.85rem">保存後: <code>cd ~/Desktop/research-tools && git add -A && git commit -m "Add icons" && git push</code></p>
-</div>
+<div id="msg"></div>
 <script>
 const drop=document.getElementById('drop');
 const fileIn=document.getElementById('fileIn');
-
 ['dragenter','dragover'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
 ['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
 drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length)processFile(e.dataTransfer.files[0])});
@@ -40,134 +29,23 @@ function processFile(file){
     const img=new Image();
     img.onload=()=>{
       drop.innerHTML='';
-      const preview=removeWhiteBG(img);
-      preview.style.maxWidth='280px';preview.style.maxHeight='280px';preview.style.borderRadius='12px';
-      drop.appendChild(preview);
+      drop.appendChild(img);
       drop.style.border='none';
-      generateIcons(img);
+      // 3サイズ自動ダウンロード
+      [{name:'apple-touch-icon.png',sz:180},{name:'icon-192.png',sz:192},{name:'icon-32.png',sz:32}].forEach(s=>{
+        const c=document.createElement('canvas');
+        c.width=s.sz;c.height=s.sz;
+        c.getContext('2d').drawImage(img,0,0,s.sz,s.sz);
+        c.toBlob(blob=>{
+          const a=document.createElement('a');
+          a.href=URL.createObjectURL(blob);
+          a.download=s.name;a.click();
+        },'image/png');
+      });
+      document.getElementById('msg').innerHTML='<p class="done">3ファイルをダウンロードしました</p><p><code>~/Desktop/research-tools/</code> に移動してデプロイしてください</p>';
     };
     img.src=e.target.result;
   };
   reader.readAsDataURL(file);
-}
-
-function removeWhiteBG(img){
-  const c=document.createElement('canvas');
-  const w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
-  c.width=w;c.height=h;
-  const ctx=c.getContext('2d');
-  ctx.drawImage(img,0,0,w,h);
-  const id=ctx.getImageData(0,0,w,h);
-  const d=id.data;
-
-  // 四隅が白かチェック
-  const corners=[[0,0],[w-1,0],[0,h-1],[w-1,h-1]];
-  let whiteCorners=0;
-  for(const [x,y] of corners){
-    const i=(y*w+x)*4;
-    if(d[i]>235&&d[i+1]>235&&d[i+2]>235) whiteCorners++;
-  }
-  if(whiteCorners<3) return c; // 白背景でなければそのまま返す
-
-  // Flood-fill: 四隅から繋がっている白ピクセルだけを透明にする
-  const visited=new Uint8Array(w*h);
-  const queue=[];
-  const thresh=230; // この値以上をwhiteとみなす
-
-  function isWhite(idx){
-    return d[idx]>thresh && d[idx+1]>thresh && d[idx+2]>thresh;
-  }
-
-  // 四隅をシードにする
-  for(const [sx,sy] of corners){
-    const pi=sy*w+sx;
-    if(!visited[pi] && isWhite(pi*4)){
-      queue.push(pi);
-      visited[pi]=1;
-    }
-  }
-  // 四辺もシードに追加（角だけだと到達しない部分がある）
-  for(let x=0;x<w;x++){
-    for(const y of [0,h-1]){
-      const pi=y*w+x;
-      if(!visited[pi]&&isWhite(pi*4)){queue.push(pi);visited[pi]=1;}
-    }
-  }
-  for(let y=0;y<h;y++){
-    for(const x of [0,w-1]){
-      const pi=y*w+x;
-      if(!visited[pi]&&isWhite(pi*4)){queue.push(pi);visited[pi]=1;}
-    }
-  }
-
-  // BFS
-  while(queue.length>0){
-    const pi=queue.shift();
-    const x=pi%w, y=Math.floor(pi/w);
-    const neighbors=[[x-1,y],[x+1,y],[x,y-1],[x,y+1]];
-    for(const [nx,ny] of neighbors){
-      if(nx<0||nx>=w||ny<0||ny>=h) continue;
-      const ni=ny*w+nx;
-      if(visited[ni]) continue;
-      if(isWhite(ni*4)){
-        visited[ni]=1;
-        queue.push(ni);
-      }
-    }
-  }
-
-  // visited のピクセルを透明にする（境界はアンチエイリアス）
-  for(let i=0;i<w*h;i++){
-    if(visited[i]){
-      d[i*4+3]=0;
-    } else {
-      // 境界付近: 周囲にvisitedがあれば半透明に
-      const x=i%w, y=Math.floor(i/w);
-      let borderCount=0, totalNeighbors=0;
-      for(let dy=-1;dy<=1;dy++){
-        for(let dx=-1;dx<=1;dx++){
-          if(dx===0&&dy===0) continue;
-          const nx=x+dx, ny=y+dy;
-          if(nx>=0&&nx<w&&ny>=0&&ny<h){
-            totalNeighbors++;
-            if(visited[ny*w+nx]) borderCount++;
-          }
-        }
-      }
-      if(borderCount>0 && d[i*4]>200&&d[i*4+1]>200&&d[i*4+2]>200){
-        d[i*4+3]=Math.round(255*(1-borderCount/totalNeighbors));
-      }
-    }
-  }
-
-  ctx.putImageData(id,0,0);
-  return c;
-}
-
-function generateIcons(img){
-  const sizes=[
-    {name:'apple-touch-icon.png',size:180},
-    {name:'icon-192.png',size:192},
-    {name:'icon-32.png',size:32}
-  ];
-  // まず白背景除去した高解像度キャンバスを作る
-  const srcCanvas=removeWhiteBG(img);
-
-  const btns=document.getElementById('buttons');
-  btns.innerHTML='';
-  sizes.forEach(s=>{
-    const canvas=document.createElement('canvas');
-    canvas.width=s.size;canvas.height=s.size;
-    const ctx=canvas.getContext('2d');
-    ctx.drawImage(srcCanvas,0,0,s.size,s.size);
-    canvas.toBlob(blob=>{
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');
-      a.href=url;a.download=s.name;a.className='btn';
-      a.textContent=s.name+' ('+s.size+'x'+s.size+')';
-      btns.appendChild(a);
-    },'image/png');
-  });
-  document.getElementById('result').style.display='block';
 }
 </script></body></html>
