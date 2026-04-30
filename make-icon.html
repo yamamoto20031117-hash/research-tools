@@ -53,32 +53,94 @@ function processFile(file){
 
 function removeWhiteBG(img){
   const c=document.createElement('canvas');
-  c.width=img.naturalWidth;c.height=img.naturalHeight;
+  const w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+  c.width=w;c.height=h;
   const ctx=c.getContext('2d');
-  ctx.drawImage(img,0,0);
-  const id=ctx.getImageData(0,0,c.width,c.height);
+  ctx.drawImage(img,0,0,w,h);
+  const id=ctx.getImageData(0,0,w,h);
   const d=id.data;
-  // 四隅の色を取得して白背景か判定
-  const corners=[[0,0],[c.width-1,0],[0,c.height-1],[c.width-1,c.height-1]];
+
+  // 四隅が白かチェック
+  const corners=[[0,0],[w-1,0],[0,h-1],[w-1,h-1]];
   let whiteCorners=0;
   for(const [x,y] of corners){
-    const i=(y*c.width+x)*4;
-    if(d[i]>240&&d[i+1]>240&&d[i+2]>240) whiteCorners++;
+    const i=(y*w+x)*4;
+    if(d[i]>235&&d[i+1]>235&&d[i+2]>235) whiteCorners++;
   }
-  if(whiteCorners>=3){
-    // 白背景を透過
-    for(let i=0;i<d.length;i+=4){
-      const r=d[i],g=d[i+1],b=d[i+2];
-      if(r>240&&g>240&&b>240){
-        d[i+3]=0; // 完全に白→透明
-      } else if(r>220&&g>220&&b>220){
-        // 白に近い→半透明にフェード
-        const whiteness=Math.min(r,g,b);
-        d[i+3]=Math.round(255*(1-(whiteness-220)/35));
+  if(whiteCorners<3) return c; // 白背景でなければそのまま返す
+
+  // Flood-fill: 四隅から繋がっている白ピクセルだけを透明にする
+  const visited=new Uint8Array(w*h);
+  const queue=[];
+  const thresh=230; // この値以上をwhiteとみなす
+
+  function isWhite(idx){
+    return d[idx]>thresh && d[idx+1]>thresh && d[idx+2]>thresh;
+  }
+
+  // 四隅をシードにする
+  for(const [sx,sy] of corners){
+    const pi=sy*w+sx;
+    if(!visited[pi] && isWhite(pi*4)){
+      queue.push(pi);
+      visited[pi]=1;
+    }
+  }
+  // 四辺もシードに追加（角だけだと到達しない部分がある）
+  for(let x=0;x<w;x++){
+    for(const y of [0,h-1]){
+      const pi=y*w+x;
+      if(!visited[pi]&&isWhite(pi*4)){queue.push(pi);visited[pi]=1;}
+    }
+  }
+  for(let y=0;y<h;y++){
+    for(const x of [0,w-1]){
+      const pi=y*w+x;
+      if(!visited[pi]&&isWhite(pi*4)){queue.push(pi);visited[pi]=1;}
+    }
+  }
+
+  // BFS
+  while(queue.length>0){
+    const pi=queue.shift();
+    const x=pi%w, y=Math.floor(pi/w);
+    const neighbors=[[x-1,y],[x+1,y],[x,y-1],[x,y+1]];
+    for(const [nx,ny] of neighbors){
+      if(nx<0||nx>=w||ny<0||ny>=h) continue;
+      const ni=ny*w+nx;
+      if(visited[ni]) continue;
+      if(isWhite(ni*4)){
+        visited[ni]=1;
+        queue.push(ni);
       }
     }
-    ctx.putImageData(id,0,0);
   }
+
+  // visited のピクセルを透明にする（境界はアンチエイリアス）
+  for(let i=0;i<w*h;i++){
+    if(visited[i]){
+      d[i*4+3]=0;
+    } else {
+      // 境界付近: 周囲にvisitedがあれば半透明に
+      const x=i%w, y=Math.floor(i/w);
+      let borderCount=0, totalNeighbors=0;
+      for(let dy=-1;dy<=1;dy++){
+        for(let dx=-1;dx<=1;dx++){
+          if(dx===0&&dy===0) continue;
+          const nx=x+dx, ny=y+dy;
+          if(nx>=0&&nx<w&&ny>=0&&ny<h){
+            totalNeighbors++;
+            if(visited[ny*w+nx]) borderCount++;
+          }
+        }
+      }
+      if(borderCount>0 && d[i*4]>200&&d[i*4+1]>200&&d[i*4+2]>200){
+        d[i*4+3]=Math.round(255*(1-borderCount/totalNeighbors));
+      }
+    }
+  }
+
+  ctx.putImageData(id,0,0);
   return c;
 }
 
