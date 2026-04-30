@@ -780,8 +780,10 @@ function redrawChart(){
   ctx.clip();
 
   // データ線（ギャップがあれば線を切る）
-  const GAP_MS=3000; // 3秒以上空いたら別セグメント
-  ctx.strokeStyle=color;ctx.lineWidth=1.8;
+  // ギャップ閾値: 測定間隔の3倍 or 最低10秒
+  const avgGap=filtered.length>1?(filtered[filtered.length-1].time-filtered[0].time)/(filtered.length-1):1000;
+  const GAP_MS=Math.max(10000, avgGap*3);
+  ctx.strokeStyle=color;ctx.lineWidth=2;
   let prevTime=0;
   ctx.beginPath();
   for(const d of filtered){
@@ -797,13 +799,15 @@ function redrawChart(){
   }
   ctx.stroke();
 
-  // データポイント（小さい丸）
-  ctx.fillStyle=color;
-  for(const d of filtered){
-    const x=xPx(d.time), y=yPx(d[key]);
-    ctx.beginPath();
-    ctx.arc(x, y, 2.5, 0, Math.PI*2);
-    ctx.fill();
+  // データポイント（少ないときだけ丸を表示）
+  if(filtered.length<=200){
+    ctx.fillStyle=color;
+    for(const d of filtered){
+      const x=xPx(d.time), y=yPx(d[key]);
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5, 0, Math.PI*2);
+      ctx.fill();
+    }
   }
 
   ctx.restore(); // クリッピング解除

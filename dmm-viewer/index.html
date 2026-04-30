@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>DMM Data Viewer — 測定データ解析</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#fff;color:#333;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;min-height:100vh}
+
+  header{padding:16px 24px;border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  header h1{font-size:1.1rem;color:#333}
+  .back-link{color:#2F5496;text-decoration:none;font-size:.8rem}
+  .back-link:hover{text-decoration:underline}
+
+  .toolbar{padding:12px 24px;background:#f8f9fa;border-bottom:1px solid #eee;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .toolbar label{font-size:.78rem;color:#666}
+  .toolbar select,.toolbar input{border:1px solid #ccc;border-radius:4px;padding:4px 8px;font-size:.8rem;background:#fff}
+  .toolbar button{padding:5px 14px;background:#2F5496;color:#fff;border:none;border-radius:4px;font-size:.8rem;cursor:pointer}
+  .toolbar button:hover{background:#1d3a6b}
+  .toolbar button.secondary{background:#fff;color:#2F5496;border:1px solid #2F5496}
+  .toolbar button.secondary:hover{background:#e8eef6}
+  .toolbar button.danger{background:#dc3545;color:#fff}
+
+  .drop-zone{margin:20px 24px;padding:40px;border:3px dashed #ccc;border-radius:12px;text-align:center;color:#999;
+    font-size:1rem;cursor:pointer;transition:.2s}
+  .drop-zone:hover,.drop-zone.over{border-color:#2F5496;background:#f0f4fa}
+  .drop-zone.loaded{border:2px solid #22c55e;background:#f0fdf4;color:#333;padding:14px}
+
+  .chart-container{margin:0 24px 16px;position:relative}
+  canvas{display:block;width:100%;border:1px solid #ddd;border-radius:4px;cursor:crosshair}
+
+  .info-bar{display:flex;gap:20px;padding:4px 24px;font-size:.75rem;color:#888;flex-wrap:wrap}
+
+  .range-controls{padding:8px 24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .range-group{display:flex;align-items:center;gap:4px;font-size:.78rem}
+  .range-group label{color:#666;min-width:40px}
+  .range-group input{width:90px;border:1px solid #ccc;border-radius:4px;padding:3px 6px;font-size:.78rem}
+  .range-group button{padding:2px 8px;font-size:.72rem;background:#eee;border:1px solid #ccc;border-radius:3px;cursor:pointer}
+  .range-group button:hover{background:#ddd}
+
+  .fit-panel{margin:8px 24px;padding:12px 16px;background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;display:none}
+  .fit-panel.show{display:block}
+  .fit-panel h3{font-size:.85rem;color:#2F5496;margin-bottom:8px}
+  .fit-result{font-family:'Courier New',monospace;font-size:.82rem;line-height:1.6}
+  .fit-result .eq{font-size:1rem;font-weight:bold;color:#333}
+
+  .data-table-wrap{margin:12px 24px 24px;max-height:300px;overflow-y:auto;border:1px solid #ddd;border-radius:4px}
+  table{width:100%;border-collapse:collapse;font-size:.75rem}
+  th{background:#f0f0f0;font-weight:600;position:sticky;top:0;z-index:1}
+  th,td{padding:4px 10px;text-align:right;border-bottom:1px solid #eee}
+  td:first-child,th:first-child{text-align:left}
+  tr.selected{background:#e8f0fe}
+  tr.in-range{background:#fff3cd}
+
+  footer{padding:12px 24px;color:#999;font-size:.7rem;text-align:center;border-top:1px solid #eee}
+
+  @media(max-width:600px){
+    .toolbar{padding:8px 14px;gap:6px}
+    .range-controls{padding:8px 14px;gap:8px}
+    .chart-container{margin:0 8px 12px}
+    .drop-zone{margin:12px 8px;padding:24px}
+    .fit-panel{margin:8px}
+    .data-table-wrap{margin:8px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <a class="back-link" href="/">&#8592; Research Tools に戻る</a>
+    <h1>DMM Data Viewer — 測定データ解析</h1>
+  </div>
+</header>
+
+<!-- ファイル選択 -->
+<div class="drop-zone" id="dropZone" onclick="document.getElementById('fileIn').click()">
+  CSVファイルをドロップ、またはクリックして選択
+</div>
+<input type="file" id="fileIn" accept=".csv,.txt" style="display:none" multiple>
+
+<!-- ツールバー -->
+<div class="toolbar" id="toolbar" style="display:none">
+  <label>Y軸:</label>
+  <select id="yAxis" onchange="redraw()">
+    <option value="voltage">電圧 (V)</option>
+    <option value="current">電流 (A)</option>
+  </select>
+  <label>X軸:</label>
+  <select id="xAxis" onchange="redraw()">
+    <option value="elapsed">経過時間</option>
+    <option value="absolute">実時刻</option>
+  </select>
+  <button class="secondary" onclick="resetRange()">範囲リセット</button>
+  <button id="fitBtn" onclick="toggleFitMode()">線形フィット</button>
+  <button class="secondary" onclick="exportPNG()">PNG保存</button>
+</div>
+
+<!-- 軸範囲 -->
+<div class="range-controls" id="rangeCtrl" style="display:none">
+  <div class="range-group">
+    <label>X min:</label><input type="number" id="xMinR" step="any" oninput="redraw()">
+    <label>X max:</label><input type="number" id="xMaxR" step="any" oninput="redraw()">
+  </div>
+  <div class="range-group">
+    <label>Y min:</label><input type="number" id="yMinR" step="any" oninput="redraw()">
+    <label>Y max:</label><input type="number" id="yMaxR" step="any" oninput="redraw()">
+  </div>
+</div>
+
+<!-- グラフ -->
+<div class="chart-container" id="chartContainer" style="display:none">
+  <canvas id="chart" height="450"></canvas>
+</div>
+
+<!-- 情報バー -->
+<div class="info-bar" id="infoBar" style="display:none">
+  <span id="infoFile">ファイル: ---</span>
+  <span id="infoPoints">データ数: ---</span>
+  <span id="infoDuration">測定時間: ---</span>
+  <span id="infoCursor" style="color:#2F5496;font-weight:600"></span>
+</div>
+
+<!-- フィット結果 -->
+<div class="fit-panel" id="fitPanel">
+  <h3>線形フィット結果</h3>
+  <div class="fit-result" id="fitResult"></div>
+  <div style="margin-top:8px;font-size:.75rem;color:#888" id="fitRange"></div>
+</div>
+
+<!-- データテーブル -->
+<div class="data-table-wrap" id="tableWrap" style="display:none">
+  <table>
+    <thead><tr><th>時刻</th><th>経過(s)</th><th>電圧 (V)</th><th>電流 (A)</th></tr></thead>
+    <tbody id="tBody"></tbody>
+  </table>
+</div>
+
+<footer>DMM Data Viewer — Research Tools</footer>
+
+<script>
+// ===== 状態 =====
+let rawData=[];       // {time, voltage, current}
+let fileName='';
+let fitMode=false;
+let fitStart=null, fitEnd=null;  // フィット範囲（xの値）
+let dragStart=null;   // ドラッグ開始位置
+
+const canvas=document.getElementById('chart');
+const ctx=canvas.getContext('2d');
+
+// ===== ファイル読み込み =====
+const dropZone=document.getElementById('dropZone');
+const fileIn=document.getElementById('fileIn');
+['dragenter','dragover'].forEach(e=>dropZone.addEventListener(e,ev=>{ev.preventDefault();dropZone.classList.add('over')}));
+['dragleave','drop'].forEach(e=>dropZone.addEventListener(e,ev=>{ev.preventDefault();dropZone.classList.remove('over')}));
+dropZone.addEventListener('drop',e=>{if(e.dataTransfer.files.length)loadFile(e.dataTransfer.files[0])});
+fileIn.addEventListener('change',e=>{if(e.target.files.length)loadFile(e.target.files[0])});
+
+function loadFile(file){
+  fileName=file.name;
+  const reader=new FileReader();
+  reader.onload=e=>parseCSV(e.target.result);
+  reader.readAsText(file);
+}
+
+function parseCSV(text){
+  rawData=[];
+  const lines=text.trim().split('\n');
+  // ヘッダーをスキップ
+  const start=lines[0].match(/time|voltage|current|datetime/i)?1:0;
+  for(let i=start;i<lines.length;i++){
+    const cols=lines[i].split(',');
+    if(cols.length<3) continue;
+    // time_ms, datetime, voltage, current
+    let timeMs, voltage, current;
+    if(cols.length>=4){
+      timeMs=parseFloat(cols[0]);
+      voltage=parseFloat(cols[2]);
+      current=parseFloat(cols[3]);
+    } else {
+      timeMs=parseFloat(cols[0]);
+      voltage=parseFloat(cols[1]);
+      current=parseFloat(cols[2]);
+    }
+    if(isNaN(timeMs)||isNaN(voltage)||isNaN(current)) continue;
+    if(Math.abs(voltage)>1e6) voltage=0;
+    if(Math.abs(current)>1e6) current=0;
+    rawData.push({time:timeMs, voltage, current});
+  }
+  rawData.sort((a,b)=>a.time-b.time);
+
+  if(rawData.length===0){alert('有効なデータが見つかりません');return;}
+
+  // UI表示
+  dropZone.className='drop-zone loaded';
+  dropZone.textContent=fileName+' ('+rawData.length+'点)';
+  dropZone.onclick=()=>fileIn.click();
+  ['toolbar','rangeCtrl','chartContainer','infoBar','tableWrap'].forEach(id=>
+    document.getElementById(id).style.display='');
+
+  // 情報更新
+  document.getElementById('infoFile').textContent='ファイル: '+fileName;
+  document.getElementById('infoPoints').textContent='データ数: '+rawData.length+'点';
+  const durSec=(rawData[rawData.length-1].time-rawData[0].time)/1000;
+  document.getElementById('infoDuration').textContent='測定時間: '+formatDuration(durSec);
+
+  fitStart=null;fitEnd=null;fitMode=false;
+  document.getElementById('fitPanel').className='fit-panel';
+  resetRange();
+  buildTable();
+}
+
+function formatDuration(sec){
+  if(sec<60) return sec.toFixed(1)+'秒';
+  if(sec<3600) return Math.floor(sec/60)+'分'+Math.round(sec%60)+'秒';
+  const h=Math.floor(sec/3600);const m=Math.floor((sec%3600)/60);
+  return h+'時間'+m+'分';
+}
+
+// ===== 軸範囲 =====
+function resetRange(){
+  document.getElementById('xMinR').value='';
+  document.getElementById('xMaxR').value='';
+  document.getElementById('yMinR').value='';
+  document.getElementById('yMaxR').value='';
+  redraw();
+}
+
+function getXVal(d){
+  const mode=document.getElementById('xAxis').value;
+  if(mode==='elapsed') return (d.time-rawData[0].time)/1000;
+  return d.time;
+}
+
+function getYVal(d){
+  return d[document.getElementById('yAxis').value];
+}
+
+// ===== 描画 =====
+function redraw(){
+  if(rawData.length===0) return;
+  const dpr=window.devicePixelRatio||1;
+  const w=canvas.parentElement.clientWidth;
+  const h=450;
+  canvas.width=w*dpr;canvas.height=h*dpr;
+  canvas.style.height=h+'px';
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+
+  const yKey=document.getElementById('yAxis').value;
+  const xMode=document.getElementById('xAxis').value;
+  const data=rawData;
+
+  // データ範囲計算
+  let xAll=data.map(d=>getXVal(d));
+  let yAll=data.map(d=>getYVal(d));
+  let xDataMin=Math.min(...xAll), xDataMax=Math.max(...xAll);
+  let yDataMin=Math.min(...yAll), yDataMax=Math.max(...yAll);
+
+  // ユーザー指定範囲
+  const uxMin=parseFloat(document.getElementById('xMinR').value);
+  const uxMax=parseFloat(document.getElementById('xMaxR').value);
+  const uyMin=parseFloat(document.getElementById('yMinR').value);
+  const uyMax=parseFloat(document.getElementById('yMaxR').value);
+
+  // Nice axis
+  function niceNum(range,round){
+    if(range<=0) return 1;
+    const exp=Math.floor(Math.log10(range));
+    const frac=range/Math.pow(10,exp);
+    let nice;
+    if(round){nice=frac<1.5?1:frac<3?2:frac<7?5:10;}
+    else{nice=frac<=1?1:frac<=2?2:frac<=5?5:10;}
+    return nice*Math.pow(10,exp);
+  }
+
+  const yRange=yDataMax-yDataMin||1;
+  const yTick=niceNum(yRange/5,true);
+  let yMin=isNaN(uyMin)?Math.floor(yDataMin/yTick)*yTick:uyMin;
+  let yMax=isNaN(uyMax)?Math.ceil(yDataMax/yTick)*yTick:uyMax;
+  if(yMin>=yMax){yMin=yDataMin-Math.abs(yDataMin)*0.1;yMax=yDataMax+Math.abs(yDataMax)*0.1;}
+  let xMin=isNaN(uxMin)?xDataMin:uxMin;
+  let xMax=isNaN(uxMax)?xDataMax:uxMax;
+  if(xMin>=xMax){xMin=xDataMin;xMax=xDataMax;}
+
+  const margin={top:20,right:20,bottom:44,left:72};
+  const pw=w-margin.left-margin.right;
+  const ph=h-margin.top-margin.bottom;
+
+  const xPx=v=>margin.left+((v-xMin)/(xMax-xMin||1))*pw;
+  const yPx=v=>margin.top+ph-((v-yMin)/(yMax-yMin||1))*ph;
+  const pxToX=px=>(px-margin.left)/pw*(xMax-xMin)+xMin;
+  const pxToY=py=>(margin.top+ph-py)/ph*(yMax-yMin)+yMin;
+
+  // グリッド
+  ctx.strokeStyle='#e8e8e8';ctx.lineWidth=0.5;
+  const yTicks=[];
+  const yStep=niceNum((yMax-yMin)/5,true);
+  for(let v=Math.ceil(yMin/yStep)*yStep;v<=yMax+yStep*0.001;v+=yStep){
+    yTicks.push(v);
+    const y=yPx(v);
+    ctx.beginPath();ctx.moveTo(margin.left,y);ctx.lineTo(w-margin.right,y);ctx.stroke();
+  }
+
+  // X軸グリッド
+  const xStep=niceNum((xMax-xMin)/6,true);
+  const xTicks=[];
+  for(let v=Math.ceil(xMin/xStep)*xStep;v<=xMax+xStep*0.001;v+=xStep){
+    xTicks.push(v);
+    const x=xPx(v);
+    ctx.strokeStyle='#e8e8e8';ctx.beginPath();ctx.moveTo(x,margin.top);ctx.lineTo(x,margin.top+ph);ctx.stroke();
+  }
+
+  // フィット範囲ハイライト
+  if(fitStart!==null && fitEnd!==null){
+    const fx1=xPx(Math.min(fitStart,fitEnd));
+    const fx2=xPx(Math.max(fitStart,fitEnd));
+    ctx.fillStyle='rgba(47,84,150,0.08)';
+    ctx.fillRect(fx1,margin.top,fx2-fx1,ph);
+  }
+
+  // ドラッグ中のハイライト
+  if(dragStart!==null && fitMode){
+    // dragStartからの範囲を描画（mousemoveで更新）
+  }
+
+  // クリッピング
+  ctx.save();
+  ctx.beginPath();ctx.rect(margin.left,margin.top,pw,ph);ctx.clip();
+
+  // データ描画（折れ線）
+  const filtered=data.filter(d=>{
+    const x=getXVal(d);
+    return x>=xMin && x<=xMax;
+  });
+  if(filtered.length>0){
+    ctx.strokeStyle='#2F5496';ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(xPx(getXVal(filtered[0])),yPx(getYVal(filtered[0])));
+    for(let i=1;i<filtered.length;i++){
+      ctx.lineTo(xPx(getXVal(filtered[i])),yPx(getYVal(filtered[i])));
+    }
+    ctx.stroke();
+
+    // 少ないときだけドット表示
+    if(filtered.length<=300){
+      ctx.fillStyle='#2F5496';
+      for(const d of filtered){
+        ctx.beginPath();
+        ctx.arc(xPx(getXVal(d)),yPx(getYVal(d)),2.5,0,Math.PI*2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // 線形フィットライン
+  if(fitStart!==null && fitEnd!==null){
+    const fs=Math.min(fitStart,fitEnd), fe=Math.max(fitStart,fitEnd);
+    const fitData=data.filter(d=>{const x=getXVal(d);return x>=fs&&x<=fe;});
+    if(fitData.length>=2){
+      const fit=linearFit(fitData.map(d=>getXVal(d)),fitData.map(d=>getYVal(d)));
+      // フィットライン
+      const lx1=Math.max(xMin,fs), lx2=Math.min(xMax,fe);
+      ctx.strokeStyle='#dc3545';ctx.lineWidth=2;ctx.setLineDash([6,4]);
+      ctx.beginPath();
+      ctx.moveTo(xPx(lx1),yPx(fit.slope*lx1+fit.intercept));
+      ctx.lineTo(xPx(lx2),yPx(fit.slope*lx2+fit.intercept));
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 結果表示
+      showFitResult(fit,fitData.length,fs,fe);
+    }
+  }
+
+  ctx.restore();
+
+  // 枠
+  ctx.strokeStyle='#333';ctx.lineWidth=1;
+  ctx.strokeRect(margin.left,margin.top,pw,ph);
+
+  // Y軸ラベル
+  ctx.fillStyle='#333';ctx.font='11px sans-serif';ctx.textAlign='right';
+  const yUnit=yKey==='voltage'?'V':'A';
+  for(const v of yTicks){
+    const y=yPx(v);
+    if(y>=margin.top-2&&y<=margin.top+ph+2){
+      ctx.fillText(formatAxisVal(v,yUnit),margin.left-6,y+4);
+    }
+  }
+  // Y軸タイトル
+  ctx.save();ctx.translate(14,margin.top+ph/2);ctx.rotate(-Math.PI/2);
+  ctx.fillStyle='#333';ctx.textAlign='center';ctx.font='bold 12px sans-serif';
+  ctx.fillText(yKey==='voltage'?'Voltage (V)':'Current (A)',0,0);ctx.restore();
+
+  // X軸ラベル
+  ctx.fillStyle='#666';ctx.font='10px sans-serif';ctx.textAlign='center';
+  for(const v of xTicks){
+    const x=xPx(v);
+    let label;
+    if(xMode==='elapsed'){
+      if(xMax-xMin<120) label=v.toFixed(1)+'s';
+      else if(xMax-xMin<7200) label=(v/60).toFixed(1)+'m';
+      else label=(v/3600).toFixed(1)+'h';
+    } else {
+      const d=new Date(v);
+      label=d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    }
+    ctx.fillText(label,x,h-margin.bottom+16);
+  }
+  // X軸タイトル
+  ctx.fillStyle='#333';ctx.font='bold 12px sans-serif';
+  ctx.fillText(xMode==='elapsed'?'Time':'Clock Time',margin.left+pw/2,h-4);
+
+  // フィットモード表示
+  if(fitMode){
+    ctx.fillStyle='rgba(220,53,69,0.12)';
+    ctx.fillRect(margin.left,margin.top,pw,24);
+    ctx.fillStyle='#dc3545';ctx.font='bold 12px sans-serif';ctx.textAlign='left';
+    ctx.fillText('フィットモード: グラフ上をドラッグして範囲選択',margin.left+8,margin.top+16);
+  }
+
+  // キャンバスの座標変換を保存
+  canvas._xPx=xPx;canvas._yPx=yPx;canvas._pxToX=pxToX;canvas._pxToY=pxToY;
+  canvas._xMin=xMin;canvas._xMax=xMax;canvas._yMin=yMin;canvas._yMax=yMax;
+  canvas._margin=margin;canvas._pw=pw;canvas._ph=ph;
+}
+
+function formatAxisVal(v,unit){
+  const abs=Math.abs(v);
+  if(unit==='A'){
+    if(abs===0) return '0';
+    if(abs<1e-6) return (v*1e9).toFixed(2)+'n';
+    if(abs<1e-3) return (v*1e6).toFixed(2)+'μ';
+    if(abs<1) return (v*1e3).toFixed(3)+'m';
+    return v.toFixed(4);
+  }
+  if(abs===0) return '0';
+  if(abs<0.001) return (v*1e3).toFixed(3)+'m';
+  return v.toFixed(4);
+}
+
+// ===== 線形フィット =====
+function linearFit(xs,ys){
+  const n=xs.length;
+  let sx=0,sy=0,sxy=0,sxx=0,syy=0;
+  for(let i=0;i<n;i++){
+    sx+=xs[i];sy+=ys[i];
+    sxy+=xs[i]*ys[i];
+    sxx+=xs[i]*xs[i];
+    syy+=ys[i]*ys[i];
+  }
+  const slope=(n*sxy-sx*sy)/(n*sxx-sx*sx);
+  const intercept=(sy-slope*sx)/n;
+  // R²
+  const yMean=sy/n;
+  let ssTot=0,ssRes=0;
+  for(let i=0;i<n;i++){
+    ssTot+=(ys[i]-yMean)**2;
+    ssRes+=(ys[i]-(slope*xs[i]+intercept))**2;
+  }
+  const r2=ssTot>0?1-ssRes/ssTot:1;
+  return {slope, intercept, r2};
+}
+
+function showFitResult(fit,count,xs,xe){
+  const yKey=document.getElementById('yAxis').value;
+  const yUnit=yKey==='voltage'?'V':'A';
+  const xMode=document.getElementById('xAxis').value;
+  const xUnit=xMode==='elapsed'?'s':'ms';
+
+  let slopeStr, intStr;
+  if(xMode==='elapsed'){
+    slopeStr=fit.slope.toExponential(4)+' '+yUnit+'/s';
+    intStr=fit.intercept.toExponential(4)+' '+yUnit;
+  } else {
+    slopeStr=fit.slope.toExponential(4)+' '+yUnit+'/ms';
+    intStr=fit.intercept.toExponential(4)+' '+yUnit;
+  }
+
+  document.getElementById('fitResult').innerHTML=
+    '<div class="eq">y = '+fit.slope.toExponential(6)+' x + '+fit.intercept.toExponential(6)+'</div>'+
+    '傾き: '+slopeStr+'<br>'+
+    '切片: '+intStr+'<br>'+
+    'R² = '+fit.r2.toFixed(8)+'<br>'+
+    'データ点数: '+count;
+
+  const rangeLabel=xMode==='elapsed'?
+    xs.toFixed(1)+'s ～ '+xe.toFixed(1)+'s':
+    new Date(xs).toLocaleTimeString()+'～'+new Date(xe).toLocaleTimeString();
+  document.getElementById('fitRange').textContent='範囲: '+rangeLabel;
+  document.getElementById('fitPanel').className='fit-panel show';
+}
+
+// ===== フィットモード =====
+function toggleFitMode(){
+  fitMode=!fitMode;
+  const btn=document.getElementById('fitBtn');
+  if(fitMode){
+    btn.textContent='フィット解除';
+    btn.className='danger';
+  } else {
+    btn.textContent='線形フィット';
+    btn.className='';
+    fitStart=null;fitEnd=null;
+    document.getElementById('fitPanel').className='fit-panel';
+  }
+  redraw();
+}
+
+// ===== マウスイベント（ドラッグで範囲選択 / カーソル情報） =====
+let isDragging=false;
+let dragStartPx=0;
+
+canvas.addEventListener('mousedown',e=>{
+  if(!fitMode) return;
+  const rect=canvas.getBoundingClientRect();
+  const dpr=window.devicePixelRatio||1;
+  const px=(e.clientX-rect.left);
+  const m=canvas._margin;
+  if(px<m.left||px>m.left+canvas._pw) return;
+  isDragging=true;
+  dragStartPx=px;
+  fitStart=canvas._pxToX(px);
+  fitEnd=null;
+});
+
+canvas.addEventListener('mousemove',e=>{
+  const rect=canvas.getBoundingClientRect();
+  const px=e.clientX-rect.left;
+  const py=e.clientY-rect.top;
+
+  // カーソル情報表示
+  if(canvas._pxToX && rawData.length>0){
+    const m=canvas._margin;
+    if(px>=m.left&&px<=m.left+canvas._pw&&py>=m.top&&py<=m.top+canvas._ph){
+      const xVal=canvas._pxToX(px);
+      const yVal=canvas._pxToY(py);
+      const xMode=document.getElementById('xAxis').value;
+      const xLabel=xMode==='elapsed'?xVal.toFixed(2)+'s':new Date(xVal).toLocaleTimeString();
+      document.getElementById('infoCursor').textContent='X: '+xLabel+'  Y: '+yVal.toExponential(4);
+    }
+  }
+
+  if(!isDragging) return;
+  fitEnd=canvas._pxToX(px);
+  redraw();
+});
+
+canvas.addEventListener('mouseup',e=>{
+  if(!isDragging) return;
+  isDragging=false;
+  const rect=canvas.getBoundingClientRect();
+  const px=e.clientX-rect.left;
+  fitEnd=canvas._pxToX(px);
+  if(Math.abs(fitEnd-fitStart)<0.001){fitStart=null;fitEnd=null;}
+  redraw();
+});
+
+// タッチ対応
+canvas.addEventListener('touchstart',e=>{
+  if(!fitMode||e.touches.length!==1) return;
+  e.preventDefault();
+  const rect=canvas.getBoundingClientRect();
+  const px=e.touches[0].clientX-rect.left;
+  const m=canvas._margin;
+  if(px<m.left||px>m.left+canvas._pw) return;
+  isDragging=true;
+  fitStart=canvas._pxToX(px);
+  fitEnd=null;
+},{passive:false});
+
+canvas.addEventListener('touchmove',e=>{
+  if(!isDragging) return;
+  e.preventDefault();
+  const rect=canvas.getBoundingClientRect();
+  const px=e.touches[0].clientX-rect.left;
+  fitEnd=canvas._pxToX(px);
+  redraw();
+},{passive:false});
+
+canvas.addEventListener('touchend',e=>{
+  if(!isDragging) return;
+  isDragging=false;
+  if(fitEnd!==null&&Math.abs(fitEnd-fitStart)<0.001){fitStart=null;fitEnd=null;}
+  redraw();
+});
+
+// ===== テーブル =====
+function buildTable(){
+  const tbody=document.getElementById('tBody');
+  const t0=rawData[0].time;
+  const rows=rawData.slice(0,500); // 最初500行
+  tbody.innerHTML=rows.map(d=>{
+    const dt=new Date(d.time);
+    const ts=dt.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+'.'+String(dt.getMilliseconds()).padStart(3,'0');
+    const elapsed=((d.time-t0)/1000).toFixed(2);
+    return '<tr><td>'+ts+'</td><td>'+elapsed+'</td><td>'+d.voltage.toExponential(6)+'</td><td>'+d.current.toExponential(6)+'</td></tr>';
+  }).join('');
+}
+
+// ===== PNG保存 =====
+function exportPNG(){
+  const a=document.createElement('a');
+  a.download=(fileName||'dmm_data')+'.png';
+  a.href=canvas.toDataURL('image/png');
+  a.click();
+}
+
+// ===== リサイズ =====
+window.addEventListener('resize',()=>{if(rawData.length>0)redraw()});
+</script>
+</body>
+</html>
