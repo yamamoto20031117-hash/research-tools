@@ -26,6 +26,7 @@ import time
 import json
 import signal
 import sys
+import os
 import threading
 import queue
 import struct
@@ -59,8 +60,8 @@ auto_stop_time = 0         # 0 = 無制限
 running = True
 output_on = False          # OUTPUT状態
 command_queue = queue.Queue()   # コマンド受信キュー（command_thread → main）
-data_queue = queue.Queue(maxsize=100)  # データ送信キュー（main → sender_thread）
-ws_data_queue = queue.Queue(maxsize=200)  # WebSocket送信キュー
+data_queue = queue.Queue(maxsize=5000)  # データ送信キュー（main → sender_thread）
+ws_data_queue = queue.Queue(maxsize=5000)  # WebSocket送信キュー
 smu_lock = threading.Lock()    # Keithleyシリアル通信の排他制御
 last_source_config = {}        # 前回のソース設定（再設定スキップ用）
 ws_connection = None           # WebSocket接続オブジェクト
@@ -245,22 +246,80 @@ def ws_command_listener_thread():
             continue
 
 
+# ===== ローカルCSVバックアップ =====
+local_csv_path = None
+
+def init_local_csv():
+    """測定開始時にローカルCSVファイルを作成"""
+    global local_csv_path
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    local_csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"dmm_log_{ts}.csv")
+    with open(local_csv_path, 'w') as f:
+        f.write("time_ms,datetime,voltage,current\n")
+    print(f"  [CSV] ローカルバックアップ: {local_csv_path}")
+
+def append_local_csv(data):
+    """データをローカルCSVに追記（Firebaseに依存しない確実な保存）"""
+    if local_csv_path is None:
+        return
+    try:
+        ts = datetime.fromtimestamp(data["time"]/1000).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        with open(local_csv_path, 'a') as f:
+            f.write(f"{data['time']},{ts},{data['voltage']},{data['current']}\n")
+    except Exception:
+        pass
+
 # ===== Firebase データ送信スレッド =====
 def firebase_sender_thread():
-    """データキューからFirebaseへ非同期送信"""
+    """データキューからFirebaseへ非同期送信（バッチ対応）"""
+    batch = []
+    BATCH_SIZE = 10
+    BATCH_TIMEOUT = 2.0
+
     while running:
         try:
-            data = data_queue.get(timeout=1)
+            data = data_queue.get(timeout=BATCH_TIMEOUT)
             if data is None:
+                # 残りのバッチを送信
+                if batch:
+                    _send_batch(batch)
                 break
-            # PUT と PUSH を順次実行（別スレッドなのでメイン測定をブロックしない）
-            firebase_put(FIREBASE_PATH_LIVE, data)
-            firebase_push(FIREBASE_PATH_LOG, data)
+            batch.append(data)
+            # ローカルCSVにも保存（確実なバックアップ）
+            append_local_csv(data)
             data_queue.task_done()
+
+            if len(batch) >= BATCH_SIZE:
+                _send_batch(batch)
+                batch = []
         except queue.Empty:
-            continue
+            # タイムアウト: 溜まったバッチを送信
+            if batch:
+                _send_batch(batch)
+                batch = []
         except Exception as e:
             print(f"  [Firebase] 送信エラー: {e}")
+
+def _send_batch(batch):
+    """バッチデータをFirebaseに送信"""
+    if not batch:
+        return
+    # 最新値をliveに送信
+    firebase_put(FIREBASE_PATH_LIVE, batch[-1])
+    # ログはバッチでまとめてPATCH
+    patch_data = {}
+    for d in batch:
+        key = str(d["time"])
+        patch_data[key] = d
+    try:
+        url = f"{FIREBASE_URL}/{FIREBASE_PATH_LOG}.json"
+        req = urllib.request.Request(
+            url, data=json.dumps(patch_data).encode('utf-8'),
+            method='PATCH', headers={'Content-Type': 'application/json'}
+        )
+        urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        print(f"  [Firebase] バッチ送信エラー ({len(batch)}件): {e}")
 
 
 # ===== Firebase コマンド監視スレッド =====
@@ -615,6 +674,7 @@ def main():
                         print("\n  OUTPUT OFF -- 測定停止")
                     elif cmd_msg == "ON":
                         output_on = True
+                        init_local_csv()
                         print("\n  OUTPUT ON -- 測定開始")
                     elif cmd_msg == "WS_CMD":
                         # WebSocket経由のコマンド処理

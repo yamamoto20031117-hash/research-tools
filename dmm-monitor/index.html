@@ -519,8 +519,8 @@ function startListening(){
   });
   listener=()=>ref.off('value');
 
-  // 全ログデータを取得（ページ再訪問時も過去データを復元）
-  db.ref('dmm/log').once('value').then(snap=>{
+  // 直近のログデータを取得（ページ再訪問時も過去データを復元、上限5000件でフリーズ防止）
+  db.ref('dmm/log').orderByKey().limitToLast(5000).once('value').then(snap=>{
     const d=snap.val();
     if(d){
       const entries=Object.values(d).sort((a,b)=>a.time-b.time);
@@ -1306,7 +1306,7 @@ document.addEventListener('visibilitychange',()=>{
   if(!document.hidden){
     // タブが再びアクティブになったらデータ再取得
     if(firebaseReady){
-      db.ref('dmm/log').once('value').then(snap=>{
+      db.ref('dmm/log').orderByKey().limitToLast(5000).once('value').then(snap=>{
         const d=snap.val();
         if(d){
           const entries=Object.values(d).sort((a,b)=>a.time-b.time);
