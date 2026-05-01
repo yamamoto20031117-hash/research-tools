@@ -1022,6 +1022,12 @@ function startSource(){
   runs=[run]; // 前回のランもクリア
   activeRunId=runId;
   viewingRunId=null;
+  // Firebaseにアクティブラン情報を保存（ページを閉じても復元できるように）
+  if(firebaseReady){
+    db.ref('dmm/activeRun').set({
+      id:runId, startTime:runId, label:run.label, mode:run.mode
+    });
+  }
   renderRuns();
 
   // タイマー開始
@@ -1111,6 +1117,8 @@ function finalizeActiveRun(){
         id:run.id, startTime:run.startTime, endTime:run.endTime,
         label:run.label, mode:run.mode, dataCount:run.data.length
       });
+      // アクティブラン情報をクリア
+      db.ref('dmm/activeRun').remove();
     }
   }
   activeRunId=null;
@@ -1356,6 +1364,75 @@ function watchOutputState(){
   });
 }
 
+// ===== 測定完了復元（ページを閉じていた場合） =====
+function checkCompletedRun(){
+  if(!firebaseReady) return;
+  // Firebaseにアクティブランが残っているか確認
+  db.ref('dmm/activeRun').once('value').then(snap=>{
+    const ar=snap.val();
+    if(!ar) return; // アクティブランなし → 何もしない
+
+    // OUTPUT状態を確認
+    return db.ref('dmm/status').once('value').then(statusSnap=>{
+      const st=statusSnap.val();
+      // OUTPUTがOFF → 測定が完了している
+      if(st && st.output===false && st.time>ar.startTime){
+        console.log('測定完了を検出: ラン復元中...');
+        // Firebase logからラン期間のデータを取得
+        return db.ref('dmm/log').orderByKey()
+          .startAt(String(ar.startTime))
+          .once('value').then(logSnap=>{
+            const logData=logSnap.val();
+            const runData=[];
+            if(logData){
+              Object.values(logData).sort((a,b)=>a.time-b.time).forEach(e=>{
+                let v=parseFloat(e.voltage)||0;
+                let i=parseFloat(e.current)||0;
+                if(Math.abs(v)>1e6) v=0;
+                if(Math.abs(i)>1e6) i=0;
+                if(e.time>=ar.startTime){
+                  runData.push({time:e.time, voltage:v, current:i});
+                }
+              });
+            }
+
+            // ランを復元
+            const endTime=st.time;
+            const run={
+              id:ar.id, startTime:ar.startTime, endTime:endTime,
+              label:ar.label, mode:ar.mode, data:runData,
+              dataCount:runData.length
+            };
+
+            // 既存のランに追加（重複回避）
+            if(!runs.find(r=>r.id===ar.id)) runs.push(run);
+            else{
+              const existing=runs.find(r=>r.id===ar.id);
+              existing.data=runData;existing.endTime=endTime;existing.dataCount=runData.length;
+            }
+
+            // Firebaseにラン情報を保存
+            db.ref('dmm/runs/'+run.id).set({
+              id:run.id, startTime:run.startTime, endTime:endTime,
+              label:run.label, mode:run.mode, dataCount:runData.length
+            });
+            // アクティブラン情報をクリア
+            db.ref('dmm/activeRun').remove();
+
+            // グラフ表示 + CSV自動ダウンロード
+            renderRuns();
+            if(runData.length>0){
+              viewRun(run.id);
+              exportRunCSV(run.id);
+            }
+
+            console.log(`ラン復元完了: ${runData.length}点, CSV自動ダウンロード`);
+          });
+      }
+    });
+  });
+}
+
 // ===== グラフズーム操作 =====
 const chartMargin={top:14,right:16,bottom:36,left:64};
 
@@ -1510,6 +1587,8 @@ window.addEventListener('load',()=>{
   startListening();
   watchOutputState();
   loadRunsFromFirebase();
+  // 測定完了の復元（ページを閉じていた間に測定が終わった場合）
+  setTimeout(()=>checkCompletedRun(), 2000); // データ読み込み後に実行
   initChartInteraction();
   redrawChart();
 
