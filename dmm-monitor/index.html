@@ -296,7 +296,7 @@
 <div class="runs-section">
   <div class="runs-header">
     <h2>&#128202; 測定ラン履歴</h2>
-    <span style="font-size:.72rem;color:#58a6ff;cursor:pointer" onclick="backToLive()">&#9654; ライブに戻る</span>
+    <span style="font-size:.72rem;color:#58a6ff;cursor:pointer;display:none" id="btnBackToLive" onclick="backToLive()">&#9654; ライブに戻る</span>
   </div>
   <div class="runs-list" id="runsList">
     <div class="no-runs" id="noRuns">測定を開始すると、ここにランが保存されます</div>
@@ -1156,6 +1156,7 @@ function viewRun(runId){
   const run=runs.find(r=>r.id===runId);
   if(!run||run.data.length<2) return;
   viewingRunId=runId;
+  document.getElementById('btnBackToLive').style.display='';
   renderRuns();
   // ランのデータでグラフを再描画
   redrawRunChart(run);
@@ -1292,6 +1293,7 @@ function redrawRunChart(run){
 
 function backToLive(){
   viewingRunId=null;
+  document.getElementById('btnBackToLive').style.display='none';
   renderRuns();
   updateStats();redrawChart();updateLogTable();
 }
