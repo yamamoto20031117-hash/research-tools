@@ -1,2 +1,5 @@
+User-agent: Vercelbot
+Allow: /
+
 User-agent: *
 Disallow: /
