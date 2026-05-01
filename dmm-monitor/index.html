@@ -761,13 +761,18 @@ function redrawChart(){
   ctx.fillStyle=color;ctx.textAlign='center';ctx.font='12px sans-serif';
   ctx.fillText(au.prefix+unitBase,0,0);ctx.restore();
 
-  // X軸ラベル
+  // X軸ラベル（経過時間表示）
   ctx.fillStyle='#666';ctx.font='10px sans-serif';ctx.textAlign='center';
   const tickCount=Math.min(6,Math.floor(pw/90));
+  const t0=dataLog.length>0?dataLog[0].time:tMinF; // 測定開始時刻
+  const totalSec=(tMaxF-t0)/1000;
   for(let j=0;j<=tickCount;j++){
     const t=tMinF+(tMaxF-tMinF)*j/tickCount;
-    const d=new Date(t);
-    const label=d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const elapsed=(t-t0)/1000;
+    let label;
+    if(totalSec<120) label=elapsed.toFixed(0)+'s';
+    else if(totalSec<7200){const m=Math.floor(elapsed/60);const s=Math.round(elapsed%60);label=m+':'+String(s).padStart(2,'0');}
+    else {const hh=Math.floor(elapsed/3600);const mm=Math.floor((elapsed%3600)/60);label=hh+'h'+String(mm).padStart(2,'0')+'m';}
     ctx.fillText(label,xPx(t),h-margin.bottom+16);
     ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.beginPath();
     ctx.moveTo(xPx(t),margin.top);ctx.lineTo(xPx(t),h-margin.bottom);ctx.stroke();
@@ -982,6 +987,11 @@ function startSource(){
 
   setOutputUI(true);
 
+  // 前回のデータをクリアして新規測定開始
+  dataLog=[];
+  vMin=Infinity;vMax=-Infinity;iMin=Infinity;iMax=-Infinity;
+  updateLogTable();
+
   // 測定ラン開始
   const runId=Date.now();
   const modeStr=mode==='CURR'?'CC':'CV';
@@ -995,7 +1005,7 @@ function startSource(){
     value: value,
     compliance: compliance
   };
-  runs.push(run);
+  runs=[run]; // 前回のランもクリア
   activeRunId=runId;
   viewingRunId=null;
   renderRuns();
@@ -1079,6 +1089,15 @@ function finalizeActiveRun(){
   const run=runs.find(r=>r.id===activeRunId);
   if(run){
     run.endTime=Date.now();
+    // 測定終了時にCSVを自動ダウンロード
+    if(run.data.length>0) exportRunCSV(run.id);
+    // Firebaseにラン情報を保存（データ本体は大きいので概要のみ）
+    if(firebaseReady){
+      db.ref('dmm/runs/'+run.id).set({
+        id:run.id, startTime:run.startTime, endTime:run.endTime,
+        label:run.label, mode:run.mode, dataCount:run.data.length
+      });
+    }
   }
   activeRunId=null;
   renderRuns();
@@ -1100,7 +1119,8 @@ function renderRuns(){
     const isRecording=activeRunId===r.id;
     const isViewing=viewingRunId===r.id;
     const cls='run-card'+(isViewing?' active':'')+(isRecording?' recording':'');
-    const badge=isRecording?'<span class="run-badge rec">● REC</span>':'<span class="run-badge done">'+r.data.length+'点</span>';
+    const pts=r.data.length||r.dataCount||0;
+    const badge=isRecording?'<span class="run-badge rec">● REC</span>':'<span class="run-badge done">'+pts+'点</span>';
     const startStr=new Date(r.startTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
     const endStr=r.endTime?new Date(r.endTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'...';
     const duration=r.endTime?formatDuration(Math.round((r.endTime-r.startTime)/1000)):'記録中';
@@ -1277,6 +1297,27 @@ function exportRunCSV(runId){
   a.click();
 }
 
+// Firebaseからラン履歴を復元
+function loadRunsFromFirebase(){
+  if(!firebaseReady) return;
+  db.ref('dmm/runs').orderByKey().limitToLast(10).once('value').then(snap=>{
+    const d=snap.val();
+    if(!d) return;
+    const loaded=Object.values(d).sort((a,b)=>b.startTime-a.startTime);
+    // 既にメモリにあるランと重複しないように
+    for(const r of loaded){
+      if(!runs.find(x=>x.id===r.id)){
+        runs.push({
+          id:r.id, startTime:r.startTime, endTime:r.endTime,
+          label:r.label, mode:r.mode, data:[], // データ本体はFirebase logから取得
+          dataCount:r.dataCount||0
+        });
+      }
+    }
+    renderRuns();
+  });
+}
+
 // OUTPUT状態の監視
 function watchOutputState(){
   if(!firebaseReady) return;
@@ -1294,6 +1335,7 @@ window.addEventListener('load',()=>{
   // Firebase (バックアップ / ログ取得)
   startListening();
   watchOutputState();
+  loadRunsFromFirebase();
   redrawChart();
 
   setInterval(()=>{
