@@ -1299,6 +1299,8 @@ function backToLive(){
 function deleteRun(runId){
   if(runId===activeRunId) return; // 記録中は削除不可
   runs=runs.filter(r=>r.id!==runId);
+  // Firebaseからも削除
+  if(firebaseReady) db.ref('dmm/runs/'+runId).remove();
   if(viewingRunId===runId) backToLive();
   else renderRuns();
 }
