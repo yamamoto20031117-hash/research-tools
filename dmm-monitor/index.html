@@ -1004,6 +1004,8 @@ function startSource(){
   // 前回のデータをクリアして新規測定開始
   dataLog=[];
   vMin=Infinity;vMax=-Infinity;iMin=Infinity;iMax=-Infinity;
+  document.getElementById('timeRange').value='0'; // 全データ表示
+  zoomXMin=null;zoomXMax=null;
   updateLogTable();
 
   // 測定ラン開始
@@ -1419,10 +1421,16 @@ function checkCompletedRun(){
             // アクティブラン情報をクリア
             db.ref('dmm/activeRun').remove();
 
-            // グラフ表示 + CSV自動ダウンロード
+            // 全データをdataLogにも反映してグラフ表示
+            dataLog=runData.slice();
+            updateStats();
+            // 時間幅を「全データ」に設定
+            document.getElementById('timeRange').value='0';
+            zoomXMin=null;zoomXMax=null;
             renderRuns();
+            redrawChart();
+            updateLogTable();
             if(runData.length>0){
-              viewRun(run.id);
               exportRunCSV(run.id);
             }
 
