@@ -273,7 +273,7 @@
 <div class="chart-section">
   <div class="chart-controls">
     <label>時間幅:</label>
-    <select id="timeRange" onchange="redrawChart()">
+    <select id="timeRange" onchange="zoomXMin=null;zoomXMax=null;redrawChart()">
       <option value="60">1分</option>
       <option value="300">5分</option>
       <option value="600" selected>10分</option>
@@ -281,6 +281,7 @@
       <option value="3600">1時間</option>
       <option value="0">全データ</option>
     </select>
+    <button onclick="resetZoom()" id="btnResetZoom" style="display:none">ズームリセット</button>
     <button onclick="clearChart()">グラフクリア</button>
     <button onclick="clearData()">全データクリア</button>
     <button onclick="exportCSV()">CSV出力</button>
@@ -377,6 +378,9 @@ let timerEndTime=0;
 let runs=[];           // {id, startTime, endTime, label, data:[], mode, value, compliance}
 let activeRunId=null;  // 現在記録中のラン
 let viewingRunId=null; // 表示中のラン（null=ライブ）
+
+// ズーム状態
+let zoomXMin=null, zoomXMax=null; // null=自動（ライブデータに追従）
 
 let ws=null;
 let wsReconnectTimer=null;
@@ -686,11 +690,21 @@ function redrawChart(){
     return;
   }
 
-  const rangeSec=parseInt(document.getElementById('timeRange').value)||600;
-  const now=dataLog[dataLog.length-1].time;
-  const tMin=rangeSec>0?now-rangeSec*1000:dataLog[0].time;
-  const filtered=dataLog.filter(d=>d.time>=tMin);
-  if(filtered.length<2) return;
+  let tMin,tMax;
+  if(zoomXMin!==null&&zoomXMax!==null){
+    tMin=zoomXMin;tMax=zoomXMax;
+    document.getElementById('btnResetZoom').style.display='';
+  }else{
+    const rangeSec=parseInt(document.getElementById('timeRange').value)||600;
+    tMax=dataLog[dataLog.length-1].time;
+    tMin=rangeSec>0?tMax-rangeSec*1000:dataLog[0].time;
+    document.getElementById('btnResetZoom').style.display='none';
+  }
+  const filtered=dataLog.filter(d=>d.time>=tMin&&d.time<=tMax);
+  if(filtered.length<2){
+    ctx.fillStyle='#555';ctx.font='13px sans-serif';ctx.textAlign='center';
+    ctx.fillText('この範囲にデータがありません',w/2,h/2);return;
+  }
 
   const margin={top:14,right:16,bottom:36,left:64};
   const pw=w-margin.left-margin.right;
@@ -730,7 +744,7 @@ function redrawChart(){
   let yMax=Math.ceil(yDataMax/tickSpacing)*tickSpacing;
   if(yMin===yMax){ yMin-=tickSpacing; yMax+=tickSpacing; }
 
-  const tMinF=filtered[0].time, tMaxF=filtered[filtered.length-1].time;
+  const tMinF=zoomXMin!==null?tMin:filtered[0].time, tMaxF=zoomXMax!==null?tMax:filtered[filtered.length-1].time;
   const xPx=t=>margin.left+((t-tMinF)/(tMaxF-tMinF||1))*pw;
   const yPx=v=>margin.top+ph-((v-yMin)/(yMax-yMin||1))*ph;
 
@@ -1158,19 +1172,27 @@ function redrawRunChart(run){
   ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,w,h);
 
-  const data=run.data;
+  const allData=run.data;
+  let data;
+  if(zoomXMin!==null&&zoomXMax!==null){
+    data=allData.filter(d=>d.time>=zoomXMin&&d.time<=zoomXMax);
+    document.getElementById('btnResetZoom').style.display='';
+  }else{
+    data=allData;
+    document.getElementById('btnResetZoom').style.display='none';
+  }
   const key=run.mode==='CURR'?'voltage':'current';
   const unitBase=run.mode==='CURR'?'V':'A';
   const color=run.mode==='CURR'?'#58a6ff':'#f97316';
   const modeLabel=run.mode==='CURR'?'定電流':'定電圧';
 
   const labelEl=document.getElementById('chartLabel');
-  labelEl.textContent='▶ '+run.label+' ('+modeLabel+'モード) — '+data.length+'点';
+  labelEl.textContent='▶ '+run.label+' ('+modeLabel+'モード) — '+allData.length+'点';
   labelEl.style.color='#eab308';
 
   if(data.length<2){
     ctx.fillStyle='#555';ctx.font='13px sans-serif';ctx.textAlign='center';
-    ctx.fillText('データが不足しています',w/2,h/2);
+    ctx.fillText('この範囲にデータがありません',w/2,h/2);
     return;
   }
 
@@ -1201,7 +1223,7 @@ function redrawRunChart(run){
   let yMax=Math.ceil(yDataMax/tickSpacing)*tickSpacing;
   if(yMin===yMax){yMin-=tickSpacing;yMax+=tickSpacing;}
 
-  const tMinF=data[0].time, tMaxF=data[data.length-1].time;
+  const tMinF=zoomXMin!==null?zoomXMin:data[0].time, tMaxF=zoomXMax!==null?zoomXMax:data[data.length-1].time;
   const xPx=t=>margin.left+((t-tMinF)/(tMaxF-tMinF||1))*pw;
   const yPx=v=>margin.top+ph-((v-yMin)/(yMax-yMin||1))*ph;
 
@@ -1327,6 +1349,151 @@ function watchOutputState(){
   });
 }
 
+// ===== グラフズーム操作 =====
+const chartMargin={top:14,right:16,bottom:36,left:64};
+
+function resetZoom(){
+  zoomXMin=null;zoomXMax=null;
+  redrawChart();
+}
+
+function initChartInteraction(){
+  const canvas=document.getElementById('chartMain');
+
+  function getDataSource(){
+    if(viewingRunId!==null){
+      const run=runs.find(r=>r.id===viewingRunId);
+      return run?run.data:[];
+    }
+    return dataLog;
+  }
+
+  function getCurrentRange(){
+    if(zoomXMin!==null&&zoomXMax!==null) return {min:zoomXMin,max:zoomXMax};
+    const src=getDataSource();
+    if(src.length<2) return null;
+    if(viewingRunId!==null) return {min:src[0].time,max:src[src.length-1].time};
+    const rangeSec=parseInt(document.getElementById('timeRange').value)||600;
+    const tMax=src[src.length-1].time;
+    return {min:rangeSec>0?tMax-rangeSec*1000:src[0].time, max:tMax};
+  }
+
+  function canvasXToRatio(clientX){
+    const rect=canvas.getBoundingClientRect();
+    const pw=rect.width-chartMargin.left-chartMargin.right;
+    return pw>0?(clientX-rect.left-chartMargin.left)/pw:0.5;
+  }
+
+  // マウスホイールでズーム
+  canvas.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const range=getCurrentRange();
+    if(!range) return;
+    const ratio=Math.max(0,Math.min(1,canvasXToRatio(e.clientX)));
+    const span=range.max-range.min;
+    const factor=e.deltaY>0?1.3:1/1.3;
+    const src=getDataSource();
+    if(src.length<2) return;
+    const maxSpan=src[src.length-1].time-src[0].time+1000;
+    const newSpan=Math.max(2000,Math.min(maxSpan,span*factor));
+    const anchor=range.min+span*ratio;
+    zoomXMin=anchor-newSpan*ratio;
+    zoomXMax=anchor+newSpan*(1-ratio);
+    redrawChart();
+  },{passive:false});
+
+  // マウスドラッグでパン
+  let isDragging=false,dragStartX=0,dragXMin=0,dragXMax=0;
+
+  canvas.addEventListener('mousedown',e=>{
+    if(e.button!==0) return;
+    isDragging=true;
+    dragStartX=e.clientX;
+    const range=getCurrentRange();
+    if(range){dragXMin=range.min;dragXMax=range.max;}
+    canvas.style.cursor='grabbing';
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove',e=>{
+    if(!isDragging) return;
+    const rect=canvas.getBoundingClientRect();
+    const pw=rect.width-chartMargin.left-chartMargin.right;
+    if(pw<=0) return;
+    const dx=e.clientX-dragStartX;
+    const timeSpan=dragXMax-dragXMin;
+    const dt=-(dx/pw)*timeSpan;
+    zoomXMin=dragXMin+dt;
+    zoomXMax=dragXMax+dt;
+    redrawChart();
+  });
+
+  window.addEventListener('mouseup',()=>{
+    if(isDragging){isDragging=false;canvas.style.cursor='grab';}
+  });
+
+  // ダブルクリックでズームリセット
+  canvas.addEventListener('dblclick',()=>resetZoom());
+
+  // タッチ: 1本指パン、2本指ピンチズーム
+  let isTouchPan=false,touchStartX=0,touchXMin=0,touchXMax=0;
+  let lastPinchDist=0,pinchXMin=0,pinchXMax=0;
+
+  canvas.addEventListener('touchstart',e=>{
+    if(e.touches.length===1){
+      isTouchPan=true;
+      touchStartX=e.touches[0].clientX;
+      const range=getCurrentRange();
+      if(range){touchXMin=range.min;touchXMax=range.max;}
+    }else if(e.touches.length===2){
+      isTouchPan=false;
+      lastPinchDist=Math.hypot(
+        e.touches[0].clientX-e.touches[1].clientX,
+        e.touches[0].clientY-e.touches[1].clientY);
+      const range=getCurrentRange();
+      if(range){pinchXMin=range.min;pinchXMax=range.max;}
+    }
+  },{passive:true});
+
+  canvas.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    const rect=canvas.getBoundingClientRect();
+    const pw=rect.width-chartMargin.left-chartMargin.right;
+    if(pw<=0) return;
+
+    if(e.touches.length===1&&isTouchPan){
+      const dx=e.touches[0].clientX-touchStartX;
+      const timeSpan=touchXMax-touchXMin;
+      const dt=-(dx/pw)*timeSpan;
+      zoomXMin=touchXMin+dt;
+      zoomXMax=touchXMax+dt;
+      redrawChart();
+    }else if(e.touches.length===2){
+      isTouchPan=false;
+      const dist=Math.hypot(
+        e.touches[0].clientX-e.touches[1].clientX,
+        e.touches[0].clientY-e.touches[1].clientY);
+      if(lastPinchDist>0){
+        const scale=lastPinchDist/dist;
+        const center=(pinchXMin+pinchXMax)/2;
+        const halfSpan=(pinchXMax-pinchXMin)/2*scale;
+        const src=getDataSource();
+        if(src.length>=2){
+          const maxHalf=(src[src.length-1].time-src[0].time+1000)/2;
+          const ch=Math.max(1000,Math.min(maxHalf,halfSpan));
+          zoomXMin=center-ch;
+          zoomXMax=center+ch;
+          redrawChart();
+        }
+      }
+    }
+  },{passive:false});
+
+  canvas.addEventListener('touchend',()=>{isTouchPan=false;lastPinchDist=0;});
+
+  canvas.style.cursor='grab';
+}
+
 // ===== 初期化 =====
 window.addEventListener('load',()=>{
   // WebSocket同期 (最速パス)
@@ -1336,6 +1503,7 @@ window.addEventListener('load',()=>{
   startListening();
   watchOutputState();
   loadRunsFromFirebase();
+  initChartInteraction();
   redrawChart();
 
   setInterval(()=>{
@@ -1371,6 +1539,14 @@ document.addEventListener('visibilitychange',()=>{
             dataLog.sort((a,b)=>a.time-b.time);
             if(dataLog.length>10000) dataLog=dataLog.slice(-8000);
             updateStats();redrawChart();updateLogTable();
+          }
+          // アクティブランのデータを復元（ページを離れていた間のデータも含める）
+          if(activeRunId!==null){
+            const run=runs.find(r=>r.id===activeRunId);
+            if(run){
+              run.data=dataLog.filter(d=>d.time>=run.startTime);
+              renderRuns();
+            }
           }
         }
       });
