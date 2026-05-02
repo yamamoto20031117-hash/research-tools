@@ -545,17 +545,20 @@ function exportCIF(){
         atomList.push({el:info.x, fx:xx/cellA, fy:(yC-d_xm)/cellC, fz:xz/cellB});
       }
 
-      // インターカラント
+      // インターカラント (bounding-box中心を使用 — 3Dビューアと一致)
       if(interKey!=='none'&&l<numLayers-1){
         const yInter=yC+d_xm+expandedGap/2;
         const sp=inter.spacing;
+        // dy方向のbounding box中心を計算 (重心ではなく幾何中心)
+        const dyVals=inter.atoms.map(at=>at.dy);
+        const dyBBCenter=(Math.min(...dyVals)+Math.max(...dyVals))/2;
         if(i%sp===0&&j%sp===0){
           const[bx,bz]=fracToXZ(i+0.5,j+0.5,a);
           inter.atoms.forEach(at=>{
             atomList.push({
               el:at.el,
               fx:(bx+at.dx)/cellA,
-              fy:(yInter+at.dy)/cellC,
+              fy:(yInter+(at.dy-dyBBCenter))/cellC,
               fz:(bz+at.dz)/cellB
             });
           });
@@ -1661,7 +1664,10 @@ function parseCIF(text, fileName) {
   const dyMin=Math.min(...atoms.map(a=>a.y)), dyMax=Math.max(...atoms.map(a=>a.y));
   const molHeight=dyMax-dyMin;
   const dxMax2=Math.max(...atoms.map(a=>Math.sqrt(a.x*a.x+a.z*a.z)));
-  const estMinGap = Math.max(1.5, (molHeight+1.5)/2.5);
+  // 分子が層間に確実に収まるよう、vdWバッファ(3Å)込みで計算
+  // TMDの典型的なnormalGapは2.5-3.5Å → それに対する拡大率
+  const normalGapEst=3.0;
+  const estMinGap = Math.max(1.5, (molHeight+3.0)/normalGapEst);
   const estSpacing = Math.max(1, Math.ceil((dxMax2*2+1.0)/3.5));
 
   // 6) INTER エントリを構築
@@ -1731,7 +1737,7 @@ function parseXYZ(text, fileName){
       r:EL_RAD[a.el]||EL_RAD.default,
       dx:a.x, dy:a.y, dz:a.z
     })),
-    minGap:Math.round(Math.max(1.5,(molH+1.5)/2.5)*10)/10,
+    minGap:Math.round(Math.max(1.5,(molH+3.0)/3.0)*10)/10,
     spacing:Math.max(1,Math.ceil((dxMax2*2+1.0)/3.5)),
     bonds
   };
