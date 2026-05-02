@@ -941,9 +941,10 @@ function buildStructure() {
       }
     }
 
-    // 圧縮後の重心をy=0に再センタリング
-    const cyVals=compCoords.map(v=>v.y);
-    const compCenterY=(Math.min(...cyVals)+Math.max(...cyVals))/2;
+    // 圧縮後のVISUAL bounding boxでセンタリング (原子半径を考慮)
+    const visualYmin=Math.min(...compCoords.map((v,idx)=>v.y-(inter.atoms[idx].r||0.25)));
+    const visualYmax=Math.max(...compCoords.map((v,idx)=>v.y+(inter.atoms[idx].r||0.25)));
+    const compCenterY=(visualYmin+visualYmax)/2;
     compCoords.forEach(v=>v.y-=compCenterY);
 
     // 情報パネル用に圧縮率を保存
@@ -970,8 +971,42 @@ function buildStructure() {
       return da-db;
     });
 
+    // デバッグ: 圧縮後の分子サイズを出力
+    const dbgYmin=Math.min(...compCoords.map(v=>v.y));
+    const dbgYmax=Math.max(...compCoords.map(v=>v.y));
+    console.log('[intercalant debug]',
+      'molExtent:', (dbgYmax-dbgYmin).toFixed(3)+'Å',
+      'compF:', compF.toFixed(3),
+      'expandedGap:', expandedGap.toFixed(3)+'Å',
+      'sandwich:', sandwich.toFixed(3)+'Å',
+      'centerOffset:', compCenterY.toFixed(3)+'Å',
+      'bbAfter:', dbgYmin.toFixed(3), '~', dbgYmax.toFixed(3));
+
     for(let l=0;l<numLayers-1;l++){
-      const gapCenterY = l*layerStep + d_xm + d_xm + expandedGap/2;
+      // ギャップ中心 = 層lの上部カルコゲン + expandedGap/2
+      const topOfLayerL = l*layerStep + sandwich;    // 層lの上部X原子
+      const botOfLayerU = (l+1)*layerStep;            // 層l+1の下部X原子
+      const gapCenterY = (topOfLayerL + botOfLayerU) / 2;
+
+      console.log('[gap debug] l='+l,
+        'topX:', (topOfLayerL+off.y).toFixed(3),
+        'botX:', (botOfLayerU+off.y).toFixed(3),
+        'center:', (gapCenterY+off.y).toFixed(3));
+
+      // デバッグ: ギャップ境界 (赤) と中心 (緑) にマーカーを表示
+      {
+        const dbgR=0.12;
+        const dbgGeo=new THREE.SphereGeometry(dbgR,8,8);
+        const mkTop=new THREE.Mesh(dbgGeo,new THREE.MeshBasicMaterial({color:0xff4444}));
+        mkTop.position.set(off.x, topOfLayerL+off.y, off.z);
+        structGroup.add(mkTop);
+        const mkBot=new THREE.Mesh(dbgGeo,new THREE.MeshBasicMaterial({color:0xff4444}));
+        mkBot.position.set(off.x, botOfLayerU+off.y, off.z);
+        structGroup.add(mkBot);
+        const mkCtr=new THREE.Mesh(dbgGeo,new THREE.MeshBasicMaterial({color:0x44ff44}));
+        mkCtr.position.set(off.x, gapCenterY+off.y, off.z);
+        structGroup.add(mkCtr);
+      }
 
       for(let pi=0;pi<placePts.length;pi++){
         const{bx,bz}=placePts[pi];
