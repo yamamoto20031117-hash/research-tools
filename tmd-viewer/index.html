@@ -559,6 +559,51 @@ function exportCIF(){
   const cellB=a*Nb;
   const cellC=numLayers*layerStep;
 
+  // インターカラントの回転・圧縮座標を事前計算 (画面と一致)
+  let cifCompCoords=[];
+  if(interKey!=='none'){
+    // 1) 回転
+    const rA=parseFloat(document.getElementById('sl-rot-a').value)*Math.PI/180;
+    const rB=parseFloat(document.getElementById('sl-rot-b').value)*Math.PI/180;
+    const rC=parseFloat(document.getElementById('sl-rot-c').value)*Math.PI/180;
+    const rotMat=new THREE.Matrix4().makeRotationY(rC)
+      .multiply(new THREE.Matrix4().makeRotationZ(rB))
+      .multiply(new THREE.Matrix4().makeRotationX(rA));
+    const rotCoords=inter.atoms.map(at=>
+      new THREE.Vector3(at.dx,at.dy,at.dz).applyMatrix4(rotMat));
+    // 2) 圧縮
+    const yVals=rotCoords.map(v=>v.y);
+    const molH=Math.max(...yVals)-Math.min(...yVals);
+    const availGap=Math.max(0.5, expandedGap-1.5);
+    const compF=molH>0.1?Math.min(1.0, availGap/molH):1.0;
+    cifCompCoords=rotCoords.map(v=>new THREE.Vector3(v.x, v.y*compF, v.z));
+    // 3) 結合長保存
+    if(compF<0.999 && inter.bonds && inter.bonds.length>0){
+      const origL=inter.bonds.map(([ai,bi])=>rotCoords[ai].distanceTo(rotCoords[bi]));
+      for(let iter=0;iter<5;iter++){
+        inter.bonds.forEach(([ai,bi],bIdx)=>{
+          const L=origL[bIdx];
+          const pa=cifCompCoords[ai], pb=cifCompCoords[bi];
+          const dx=pb.x-pa.x, dy=pb.y-pa.y, dz=pb.z-pa.z;
+          const curL=Math.sqrt(dx*dx+dy*dy+dz*dz);
+          if(curL<0.01) return;
+          const cx2=(pa.x+pb.x)/2, cy2=(pa.y+pb.y)/2, cz2=(pa.z+pb.z)/2;
+          const latSq=dx*dx+dz*dz;
+          const needLatSq=L*L-dy*dy;
+          if(needLatSq>0&&latSq>0.001){
+            const ls=Math.sqrt(needLatSq/latSq);
+            pa.x=cx2-dx*ls/2; pa.z=cz2-dz*ls/2;
+            pb.x=cx2+dx*ls/2; pb.z=cz2+dz*ls/2;
+            pa.y=cy2-dy/2; pb.y=cy2+dy/2;
+          }
+        });
+      }
+    }
+    // 4) Y重心センタリング
+    const ccY=cifCompCoords.reduce((s,v)=>s+v.y,0)/cifCompCoords.length;
+    cifCompCoords.forEach(v=>v.y-=ccY);
+  }
+
   // 全原子をfractional coordinatesで収集
   const atomList=[]; // {el, fx, fy, fz}
 
@@ -583,7 +628,7 @@ function exportCIF(){
 
     }
 
-    // インターカラント (重心ベース — 3Dビューアと一致、中心対称配置)
+    // インターカラント (画面と同じ回転・圧縮・オフセットを適用)
     if(interKey!=='none'&&l<numLayers-1){
       const yInter=yC+d_xm+expandedGap/2;
       const sp=inter.spacing;
@@ -592,12 +637,12 @@ function exportCIF(){
       for(let ni=0;ni<cnI;ni++) for(let nj=0;nj<cnJ;nj++){
         const fi=coI+ni*sp, fj=coJ+nj*sp;
         const[bx,bz]=fracToXZ(fi,fj,a);
-        inter.atoms.forEach(at=>{
+        cifCompCoords.forEach((rv,idx)=>{
           atomList.push({
-            el:at.el,
-            fx:(bx+at.dx)/cellA,
-            fy:(yInter+at.dy)/cellC,
-            fz:(bz+at.dz)/cellB
+            el:inter.atoms[idx].el,
+            fx:(bx+rv.x+interOffset.dx)/cellA,
+            fy:(yInter+rv.y)/cellC,
+            fz:(bz+rv.z+interOffset.dz)/cellB
           });
         });
       }
