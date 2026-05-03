@@ -545,20 +545,17 @@ function exportCIF(){
         atomList.push({el:info.x, fx:xx/cellA, fy:(yC-d_xm)/cellC, fz:xz/cellB});
       }
 
-      // インターカラント (bounding-box中心を使用 — 3Dビューアと一致)
+      // インターカラント (重心ベース — 3Dビューアと一致)
       if(interKey!=='none'&&l<numLayers-1){
         const yInter=yC+d_xm+expandedGap/2;
         const sp=inter.spacing;
-        // dy方向のbounding box中心を計算 (重心ではなく幾何中心)
-        const dyVals=inter.atoms.map(at=>at.dy);
-        const dyBBCenter=(Math.min(...dyVals)+Math.max(...dyVals))/2;
         if(i%sp===0&&j%sp===0){
           const[bx,bz]=fracToXZ(i+0.5,j+0.5,a);
           inter.atoms.forEach(at=>{
             atomList.push({
               el:at.el,
               fx:(bx+at.dx)/cellA,
-              fy:(yInter+(at.dy-dyBBCenter))/cellC,
+              fy:(yInter+at.dy)/cellC,
               fz:(bz+at.dz)/cellB
             });
           });
@@ -941,10 +938,10 @@ function buildStructure() {
       }
     }
 
-    // 圧縮後のVISUAL bounding boxでセンタリング (原子半径を考慮)
-    const visualYmin=Math.min(...compCoords.map((v,idx)=>v.y-(inter.atoms[idx].r||0.25)));
-    const visualYmax=Math.max(...compCoords.map((v,idx)=>v.y+(inter.atoms[idx].r||0.25)));
-    const compCenterY=(visualYmin+visualYmax)/2;
+    // 圧縮後の重心 (centroid) でセンタリング
+    // parseCIFで重心=0に設定済み → 回転・圧縮で保存されるが、
+    // 結合長保存の反復で微小ドリフトする可能性があるため再計算
+    const compCenterY=compCoords.reduce((s,v)=>s+v.y,0)/compCoords.length;
     compCoords.forEach(v=>v.y-=compCenterY);
 
     // 情報パネル用に圧縮率を保存
@@ -971,42 +968,11 @@ function buildStructure() {
       return da-db;
     });
 
-    // デバッグ: 圧縮後の分子サイズを出力
-    const dbgYmin=Math.min(...compCoords.map(v=>v.y));
-    const dbgYmax=Math.max(...compCoords.map(v=>v.y));
-    console.log('[intercalant debug]',
-      'molExtent:', (dbgYmax-dbgYmin).toFixed(3)+'Å',
-      'compF:', compF.toFixed(3),
-      'expandedGap:', expandedGap.toFixed(3)+'Å',
-      'sandwich:', sandwich.toFixed(3)+'Å',
-      'centerOffset:', compCenterY.toFixed(3)+'Å',
-      'bbAfter:', dbgYmin.toFixed(3), '~', dbgYmax.toFixed(3));
-
     for(let l=0;l<numLayers-1;l++){
-      // ギャップ中心 = 層lの上部カルコゲン + expandedGap/2
-      const topOfLayerL = l*layerStep + sandwich;    // 層lの上部X原子
-      const botOfLayerU = (l+1)*layerStep;            // 層l+1の下部X原子
+      // ギャップ中心 = 層lの上部カルコゲンと層l+1の下部カルコゲンの中間
+      const topOfLayerL = l*layerStep + sandwich;
+      const botOfLayerU = (l+1)*layerStep;
       const gapCenterY = (topOfLayerL + botOfLayerU) / 2;
-
-      console.log('[gap debug] l='+l,
-        'topX:', (topOfLayerL+off.y).toFixed(3),
-        'botX:', (botOfLayerU+off.y).toFixed(3),
-        'center:', (gapCenterY+off.y).toFixed(3));
-
-      // デバッグ: ギャップ境界 (赤) と中心 (緑) にマーカーを表示
-      {
-        const dbgR=0.12;
-        const dbgGeo=new THREE.SphereGeometry(dbgR,8,8);
-        const mkTop=new THREE.Mesh(dbgGeo,new THREE.MeshBasicMaterial({color:0xff4444}));
-        mkTop.position.set(off.x, topOfLayerL+off.y, off.z);
-        structGroup.add(mkTop);
-        const mkBot=new THREE.Mesh(dbgGeo,new THREE.MeshBasicMaterial({color:0xff4444}));
-        mkBot.position.set(off.x, botOfLayerU+off.y, off.z);
-        structGroup.add(mkBot);
-        const mkCtr=new THREE.Mesh(dbgGeo,new THREE.MeshBasicMaterial({color:0x44ff44}));
-        mkCtr.position.set(off.x, gapCenterY+off.y, off.z);
-        structGroup.add(mkCtr);
-      }
 
       for(let pi=0;pi<placePts.length;pi++){
         const{bx,bz}=placePts[pi];
@@ -2195,8 +2161,9 @@ function runOptimize(){
   const dt=((performance.now()-t0)).toFixed(0);
   log.innerHTML+=`精密探索: a=${bestA}° b=${bestB}° c=${bestC}° → 高さ${bestH.toFixed(3)}Å<br>`;
 
-  // Calculate optimal gap = molecule height + vdW buffer (1.0Å)
-  const optGap=bestH+1.0;
+  // Calculate optimal gap = molecule height + vdW buffer (2.0Å)
+  // bestH は VDW半径込み → 追加バッファは控えめでOK
+  const optGap=bestH+2.0;
   const optRatio=Math.max(1.0, optGap/normalGap);
   const cr=Math.min(5.0,optRatio);
 
