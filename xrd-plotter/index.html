@@ -1400,7 +1400,9 @@ async function exportXLSX(){
   const lambda=1.5418;
 
   const wb=new ExcelJS.Workbook();
-  const ws=wb.addWorksheet(firstName);
+  // シート名に使えない文字を除去 (Excel制限: \/*?:[])
+  const safeSheetName=(firstName||'XRD').substring(0,28).replace(/[\\\/\*\?\[\]:~]/g,'_');
+  const ws=wb.addWorksheet(safeSheetName);
 
   // --- ヘッダースタイル ---
   const hdrStyle={font:{bold:true,color:{argb:'FFFFFFFF'},size:10},
@@ -1461,42 +1463,72 @@ async function exportXLSX(){
     const peakHeaders=['Dataset','#','2θ (°)','d (Å)','Intensity','FWHM (°)','FWHM (rad)','L (nm)','Label'];
     const peakWidths=[20,5,10,10,14,10,10,10,14];
 
-    // ピーク解析ヘッダー
-    const pr1=ws.getRow(1);
-    pr1.getCell(peakStartCol).value='Peak Analysis';
-    pr1.getCell(peakStartCol).style=hdrStyle;
-    for(let i=1;i<peakHeaders.length;i++){
-      pr1.getCell(peakStartCol+i).value='';
-      pr1.getCell(peakStartCol+i).style=hdrStyle;
-    }
-    ws.mergeCells(1,peakStartCol,1,peakStartCol+peakHeaders.length-1);
-
-    const pr2=ws.getRow(2);
-    peakHeaders.forEach((h,i)=>{
-      pr2.getCell(peakStartCol+i).value=h;
-      pr2.getCell(peakStartCol+i).style=subHdrStyle;
-      ws.getColumn(peakStartCol+i).width=peakWidths[i];
-    });
-
-    let pRow=3;
+    // ピークをシリーズ別にグループ化
+    const seriesGroups={}; // {seriesKey: [{file, peak, idx}]}
     for(const f of fileList){
       if(!f.peaks) continue;
       f.peaks.forEach((p,i)=>{
+        const {series}=parseSeriesLabel(p.label);
+        const key=series||'_default';
+        if(!seriesGroups[key]) seriesGroups[key]=[];
+        seriesGroups[key].push({file:f, peak:p, idx:i});
+      });
+    }
+
+    const seriesKeys=Object.keys(seriesGroups).sort();
+    const peakTableHeaders=['(00l)','2θ (°)','d (Å)','Intensity','FWHM (°)','L (nm)'];
+    const peakTableWidths=[8,10,10,12,10,10];
+
+    let pRow=1;
+    for(const sKey of seriesKeys){
+      const peaks=seriesGroups[sKey];
+      // シリーズのd_001を計算 (最初のピークの1次回折から)
+      const firstPeak=peaks.find(p=>{const o=parseSeriesLabel(p.peak.label).order;return o===1;});
+      const d001=firstPeak?calcDspacing(firstPeak.peak.x, firstPeak.peak.label):null;
+      const seriesLabel=sKey==='_default'?'':`シリーズ ${sKey}`;
+      const titleText=d001?`${seriesLabel} (d = ${Math.round(d001*100)/100} Å)`.trim():(seriesLabel||'Peak Analysis');
+
+      // シリーズヘッダー行
+      const hRow=ws.getRow(pRow);
+      hRow.getCell(peakStartCol).value=titleText;
+      hRow.getCell(peakStartCol).style=hdrStyle;
+      for(let i=1;i<peakTableHeaders.length;i++){
+        hRow.getCell(peakStartCol+i).value='';
+        hRow.getCell(peakStartCol+i).style=hdrStyle;
+      }
+      ws.mergeCells(pRow,peakStartCol,pRow,peakStartCol+peakTableHeaders.length-1);
+      pRow++;
+
+      // サブヘッダー
+      const sRow=ws.getRow(pRow);
+      peakTableHeaders.forEach((h,i)=>{
+        sRow.getCell(peakStartCol+i).value=h;
+        sRow.getCell(peakStartCol+i).style=subHdrStyle;
+        ws.getColumn(peakStartCol+i).width=peakTableWidths[i];
+      });
+      pRow++;
+
+      // ピークデータ (次数順)
+      peaks.sort((a,b)=>{
+        const oa=parseSeriesLabel(a.peak.label).order||0;
+        const ob=parseSeriesLabel(b.peak.label).order||0;
+        return oa-ob;
+      });
+      for(const {peak:p} of peaks){
         const thetaRad=p.x*Math.PI/360;
         const d=calcDspacing(p.x, p.label);
         const fwhmRad=(p.fwhm||0)*Math.PI/180;
         const corrLen=fwhmRad>0?(0.9*lambda)/(fwhmRad*Math.cos(thetaRad))/10:0;
         const row=ws.getRow(pRow++);
-        row.getCell(peakStartCol).value=f.label;
-        row.getCell(peakStartCol+1).value=i+1;
-        row.getCell(peakStartCol+2).value=Math.round(p.x*1000)/1000;
-        row.getCell(peakStartCol+3).value=Math.round(d*1000)/1000;
-        row.getCell(peakStartCol+4).value=Math.round(p.y);
-        row.getCell(peakStartCol+5).value=p.fwhm?Math.round(p.fwhm*1000)/1000:'';
-        row.getCell(peakStartCol+6).value=fwhmRad?Math.round(fwhmRad*100000)/100000:'';
-        row.getCell(peakStartCol+7).value=corrLen?Math.round(corrLen*100)/100:'';
-        row.getCell(peakStartCol+8).value=p.label||'';
-      });
+        const order=parseSeriesLabel(p.label).order;
+        row.getCell(peakStartCol).value=order?'(00'+order+')':'';
+        row.getCell(peakStartCol+1).value=Math.round(p.x*1000)/1000;
+        row.getCell(peakStartCol+2).value=Math.round(d*100)/100;
+        row.getCell(peakStartCol+3).value=Math.round(p.y);
+        row.getCell(peakStartCol+4).value=p.fwhm?Math.round(p.fwhm*1000)/1000:'';
+        row.getCell(peakStartCol+5).value=corrLen?Math.round(corrLen*100)/100:'';
+      }
+      pRow++; // シリーズ間に空行
     }
   }
 
@@ -1522,11 +1554,11 @@ async function exportXLSX(){
     const clr=chartColors[si%chartColors.length];
     seriesXml+=`<c:ser>
       <c:idx val="${si}"/><c:order val="${si}"/>
-      <c:tx><c:strRef><c:f>'${escXml(firstName)}'!$${colLetter(si*2)}$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>${escXml(f.label||'Dataset '+(si+1))}</c:v></c:pt></c:strCache></c:strRef></c:tx>
+      <c:tx><c:strRef><c:f>'${escXml(safeSheetName)}'!$${colLetter(si*2)}$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>${escXml(f.label||'Dataset '+(si+1))}</c:v></c:pt></c:strCache></c:strRef></c:tx>
       <c:spPr><a:ln w="12700"><a:solidFill><a:srgbClr val="${clr}"/></a:solidFill></a:ln></c:spPr>
       <c:marker><c:symbol val="none"/></c:marker>
-      <c:xVal><c:numRef><c:f>'${escXml(firstName)}'!$${xCol}$3:$${xCol}$${endRow}</c:f></c:numRef></c:xVal>
-      <c:yVal><c:numRef><c:f>'${escXml(firstName)}'!$${yCol}$3:$${yCol}$${endRow}</c:f></c:numRef></c:yVal>
+      <c:xVal><c:numRef><c:f>'${escXml(safeSheetName)}'!$${xCol}$3:$${xCol}$${endRow}</c:f></c:numRef></c:xVal>
+      <c:yVal><c:numRef><c:f>'${escXml(safeSheetName)}'!$${yCol}$3:$${yCol}$${endRow}</c:f></c:numRef></c:yVal>
       <c:smooth val="0"/>
     </c:ser>`;
   }
@@ -1577,14 +1609,14 @@ async function exportXLSX(){
   </c:chart>
 </c:chartSpace>`;
 
-  // drawing1.xml — チャートをピーク解析の下に大きく配置
+  // drawing1.xml — データ列の右側、行2から配置
   const drawingXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
   xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
   xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <xdr:twoCellAnchor>
-    <xdr:from><xdr:col>${dataCols+1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${hasPeaks?Math.max(maxLen+3,20):2}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
-    <xdr:to><xdr:col>${dataCols+1+14}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${(hasPeaks?Math.max(maxLen+3,20):2)+20}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
+    <xdr:from><xdr:col>${dataCols+1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+    <xdr:to><xdr:col>${dataCols+1+10}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>25</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
     <xdr:graphicFrame macro="">
       <xdr:nvGraphicFramePr>
         <xdr:cNvPr id="2" name="Chart 1"/>
