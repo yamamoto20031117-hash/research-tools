@@ -491,8 +491,8 @@ renderer.setClearColor(0x080b12, 1);
 
 const scene = new THREE.Scene();
 const asp0 = window.innerWidth/window.innerHeight;
-const perspCamera = new THREE.PerspectiveCamera(45, asp0, 0.1, 300);
-const orthoCamera = new THREE.OrthographicCamera(-12*asp0,12*asp0,12,-12,0.1,300);
+const perspCamera = new THREE.PerspectiveCamera(45, asp0, 0.1, 500);
+const orthoCamera = new THREE.OrthographicCamera(-12*asp0,12*asp0,12,-12,0.1,500);
 let camera = orthoCamera;
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
@@ -1086,6 +1086,14 @@ function buildStructure() {
 
   updateInfo(info,phase,c_layer,d_xm,normalGap,bond,interKey,effExpansion);
   updateLegend(info,interKey);
+
+  // カメラを構造全体が収まるように自動調整
+  const structW=(dXMax-dXMin), structH=numLayers*layerStep, structD=(dZMax-dZMin);
+  const fitRadius=Math.max(structW, structH, structD)*0.85+5;
+  if(Math.abs(sph.radius-fitRadius)>2){
+    sph.radius=Math.max(8,Math.min(80,fitRadius));
+    updateCam();
+  }
 }
 
 // =====================================================
@@ -1181,7 +1189,7 @@ window.addEventListener('pointermove',e=>{
   sph.phi=Math.max(0.1,Math.min(Math.PI-0.1,sph.phi+(e.clientY-prev.y)*0.007));
   prev={x:e.clientX,y:e.clientY};updateCam();
 });
-canvas.addEventListener('wheel',e=>{e.preventDefault();sph.radius=Math.max(5,Math.min(45,sph.radius+e.deltaY*0.015));updateCam();},{passive:false});
+canvas.addEventListener('wheel',e=>{e.preventDefault();sph.radius=Math.max(5,Math.min(80,sph.radius+e.deltaY*0.015));updateCam();},{passive:false});
 
 let tDist=0;
 canvas.addEventListener('touchstart',e=>{
