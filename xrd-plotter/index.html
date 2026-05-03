@@ -1400,53 +1400,85 @@ async function exportXLSX(){
   const lambda=1.5418;
 
   const wb=new ExcelJS.Workbook();
+  const ws=wb.addWorksheet(firstName);
 
-  // 1. 結合データシート（チャート参照用）
-  const wsData=wb.addWorksheet('XRD Data');
-  const hdrs=[];
-  for(const f of fileList){ hdrs.push('2θ (°)'); hdrs.push(f.label||'Intensity'); }
-  wsData.addRow(hdrs);
-  const hdrRow=wsData.getRow(1);
-  hdrRow.font={bold:true,color:{argb:'FFFFFFFF'}};
-  hdrRow.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
+  // --- ヘッダースタイル ---
+  const hdrStyle={font:{bold:true,color:{argb:'FFFFFFFF'},size:10},
+    fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FF2B4C7E'}},
+    alignment:{horizontal:'center',vertical:'middle'},
+    border:{bottom:{style:'thin',color:{argb:'FF000000'}}}};
+  const subHdrStyle={font:{bold:true,size:10},
+    fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFD6E4F0'}},
+    alignment:{horizontal:'center',vertical:'middle'}};
+
+  // ===== 左側: XRDデータ列 =====
+  // 各ファイルに 2θ, Intensity の2列
+  const nFiles=fileList.length;
+  const dataCols=nFiles*2;
+
+  // ヘッダー行1: ファイル名 (結合セル)
+  const r1=ws.getRow(1);
+  for(let si=0;si<nFiles;si++){
+    const c=si*2+1;
+    r1.getCell(c).value=fileList[si].label||('Dataset '+(si+1));
+    r1.getCell(c).style=hdrStyle;
+    r1.getCell(c+1).value='';
+    r1.getCell(c+1).style=hdrStyle;
+    ws.mergeCells(1,c,1,c+1);
+  }
+
+  // ヘッダー行2: 2θ / Intensity
+  const r2=ws.getRow(2);
+  for(let si=0;si<nFiles;si++){
+    r2.getCell(si*2+1).value='2θ (°)';
+    r2.getCell(si*2+1).style=subHdrStyle;
+    r2.getCell(si*2+2).value='Intensity / a.u.';
+    r2.getCell(si*2+2).style=subHdrStyle;
+  }
+
+  // データ行
   const maxLen=Math.max(...fileList.map(f=>f.x.length));
   for(let r=0;r<maxLen;r++){
-    const row=[];
-    for(const f of fileList){
-      row.push(r<f.x.length?f.x[r]:null);
-      row.push(r<f.x.length?f.y[r]:null);
+    const row=ws.getRow(r+3);
+    for(let si=0;si<nFiles;si++){
+      const f=fileList[si];
+      if(r<f.x.length){
+        row.getCell(si*2+1).value=f.x[r];
+        row.getCell(si*2+2).value=f.y[r];
+      }
     }
-    wsData.addRow(row);
-  }
-  for(let c=0;c<fileList.length*2;c++){
-    wsData.getColumn(c+1).width=c%2===0?12:16;
   }
 
-  // 2. 個別データシート
-  for(const f of fileList){
-    const name=(f.label||'data').substring(0,28).replace(/[\\\/\*\?\[\]:]/g,'');
-    const ws=wb.addWorksheet(name);
-    ws.columns=[{header:'2θ (°)',key:'x',width:14},{header:'Intensity (cps)',key:'y',width:18}];
-    const hr=ws.getRow(1);
-    hr.font={bold:true,color:{argb:'FFFFFFFF'}};
-    hr.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
-    for(let i=0;i<f.x.length;i++) ws.addRow({x:f.x[i],y:f.y[i]});
+  // 列幅
+  for(let c=0;c<dataCols;c++){
+    ws.getColumn(c+1).width=c%2===0?10:14;
   }
 
-  // 3. ピーク解析シート
+  // ===== 右側: ピーク解析テーブル =====
+  const peakStartCol=dataCols+2; // 1列空けて
   const hasPeaks=fileList.some(f=>f.peaks&&f.peaks.length>0);
   if(hasPeaks){
-    const wsP=wb.addWorksheet('Peak Analysis');
-    wsP.columns=[
-      {header:'Dataset',key:'ds',width:22},{header:'#',key:'n',width:5},
-      {header:'2θ (°)',key:'x',width:12},{header:'Intensity',key:'y',width:14},
-      {header:'d (Å)',key:'d',width:12},{header:'FWHM (°)',key:'fw',width:12},
-      {header:'FWHM (rad)',key:'fwr',width:12},{header:'L (nm)',key:'l',width:12},
-      {header:'Label',key:'lb',width:14}
-    ];
-    const ph=wsP.getRow(1);
-    ph.font={bold:true,color:{argb:'FFFFFFFF'}};
-    ph.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
+    const peakHeaders=['Dataset','#','2θ (°)','d (Å)','Intensity','FWHM (°)','FWHM (rad)','L (nm)','Label'];
+    const peakWidths=[20,5,10,10,14,10,10,10,14];
+
+    // ピーク解析ヘッダー
+    const pr1=ws.getRow(1);
+    pr1.getCell(peakStartCol).value='Peak Analysis';
+    pr1.getCell(peakStartCol).style=hdrStyle;
+    for(let i=1;i<peakHeaders.length;i++){
+      pr1.getCell(peakStartCol+i).value='';
+      pr1.getCell(peakStartCol+i).style=hdrStyle;
+    }
+    ws.mergeCells(1,peakStartCol,1,peakStartCol+peakHeaders.length-1);
+
+    const pr2=ws.getRow(2);
+    peakHeaders.forEach((h,i)=>{
+      pr2.getCell(peakStartCol+i).value=h;
+      pr2.getCell(peakStartCol+i).style=subHdrStyle;
+      ws.getColumn(peakStartCol+i).width=peakWidths[i];
+    });
+
+    let pRow=3;
     for(const f of fileList){
       if(!f.peaks) continue;
       f.peaks.forEach((p,i)=>{
@@ -1454,15 +1486,22 @@ async function exportXLSX(){
         const d=calcDspacing(p.x, p.label);
         const fwhmRad=(p.fwhm||0)*Math.PI/180;
         const corrLen=fwhmRad>0?(0.9*lambda)/(fwhmRad*Math.cos(thetaRad))/10:0;
-        wsP.addRow({ds:f.label,n:i+1,x:p.x,y:p.y,d:d,fw:p.fwhm||'',fwr:fwhmRad||'',l:corrLen||'',lb:p.label||''});
+        const row=ws.getRow(pRow++);
+        row.getCell(peakStartCol).value=f.label;
+        row.getCell(peakStartCol+1).value=i+1;
+        row.getCell(peakStartCol+2).value=Math.round(p.x*1000)/1000;
+        row.getCell(peakStartCol+3).value=Math.round(d*1000)/1000;
+        row.getCell(peakStartCol+4).value=Math.round(p.y);
+        row.getCell(peakStartCol+5).value=p.fwhm?Math.round(p.fwhm*1000)/1000:'';
+        row.getCell(peakStartCol+6).value=fwhmRad?Math.round(fwhmRad*100000)/100000:'';
+        row.getCell(peakStartCol+7).value=corrLen?Math.round(corrLen*100)/100:'';
+        row.getCell(peakStartCol+8).value=p.label||'';
       });
     }
   }
 
-  // 4. ExcelJSバッファ生成
+  // ===== ExcelJSバッファ → JSZipでチャート注入 =====
   const buf=await wb.xlsx.writeBuffer();
-
-  // 5. JSZipでネイティブExcelチャートを注入
   const zip=await JSZip.loadAsync(buf);
 
   function colLetter(idx){
@@ -1470,34 +1509,38 @@ async function exportXLSX(){
     while(n>=0){ s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26)-1; }
     return s;
   }
-  function escXml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function escXml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
   // チャートシリーズ構築
-  const chartColors=['4472C4','CC0000','228B22','FF8C00','8B008B','008B8B','B22222','4169E1','DAA520','2E8B57'];
+  const chartColors=['1F4E79','CC0000','228B22','FF8C00','8B008B','008B8B','B22222','4169E1','DAA520','2E8B57'];
   let seriesXml='';
-  for(let si=0;si<fileList.length;si++){
+  for(let si=0;si<nFiles;si++){
     const f=fileList[si];
     const xCol=colLetter(si*2);
     const yCol=colLetter(si*2+1);
-    const endRow=f.x.length+1;
+    const endRow=f.x.length+2; // データは行3から
     const clr=chartColors[si%chartColors.length];
     seriesXml+=`<c:ser>
       <c:idx val="${si}"/><c:order val="${si}"/>
-      <c:tx><c:strRef><c:f>'XRD Data'!$${yCol}$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>${escXml(f.label||'Dataset '+(si+1))}</c:v></c:pt></c:strCache></c:strRef></c:tx>
-      <c:spPr><a:ln w="19050"><a:solidFill><a:srgbClr val="${clr}"/></a:solidFill></a:ln></c:spPr>
+      <c:tx><c:strRef><c:f>'${escXml(firstName)}'!$${colLetter(si*2)}$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>${escXml(f.label||'Dataset '+(si+1))}</c:v></c:pt></c:strCache></c:strRef></c:tx>
+      <c:spPr><a:ln w="12700"><a:solidFill><a:srgbClr val="${clr}"/></a:solidFill></a:ln></c:spPr>
       <c:marker><c:symbol val="none"/></c:marker>
-      <c:xVal><c:numRef><c:f>'XRD Data'!$${xCol}$2:$${xCol}$${endRow}</c:f></c:numRef></c:xVal>
-      <c:yVal><c:numRef><c:f>'XRD Data'!$${yCol}$2:$${yCol}$${endRow}</c:f></c:numRef></c:yVal>
+      <c:xVal><c:numRef><c:f>'${escXml(firstName)}'!$${xCol}$3:$${xCol}$${endRow}</c:f></c:numRef></c:xVal>
+      <c:yVal><c:numRef><c:f>'${escXml(firstName)}'!$${yCol}$3:$${yCol}$${endRow}</c:f></c:numRef></c:yVal>
       <c:smooth val="0"/>
     </c:ser>`;
   }
 
-  // chart1.xml
+  // タイトル: 単一ファイルならファイル名、複数なら "XRD Pattern"
+  const chartTitle=nFiles===1?escXml(firstName):'XRD Pattern';
+  // 凡例: 単一ファイルなら非表示
+  const legendXml=nFiles>1?'<c:legend><c:legendPos val="r"/><c:overlay val="0"/></c:legend>':'';
+
   const chartXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <c:chart>
-    <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1400" b="1"/></a:pPr>
-      <a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>XRD Pattern</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+    <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="ctr"><a:defRPr sz="1400" b="1"/></a:pPr>
+      <a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>${chartTitle}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
     <c:autoTitleDeleted val="0"/>
     <c:plotArea>
       <c:layout/>
@@ -1511,8 +1554,9 @@ async function exportXLSX(){
         <c:scaling><c:orientation val="minMax"/></c:scaling>
         <c:delete val="0"/><c:axPos val="b"/>
         <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000"/></a:pPr>
-          <a:r><a:rPr lang="en-US" sz="1000"/><a:t>2&#x3B8; (°)</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
-        <c:numFmt formatCode="General" sourceLinked="1"/>
+          <a:r><a:rPr lang="en-US" sz="1000" i="1"/><a:t>2&#x3B8;</a:t></a:r>
+          <a:r><a:rPr lang="en-US" sz="1000"/><a:t> / deg</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+        <c:numFmt formatCode="0" sourceLinked="0"/>
         <c:majorTickMark val="out"/><c:minorTickMark val="none"/>
         <c:crossAx val="222222222"/>
       </c:valAx>
@@ -1521,26 +1565,26 @@ async function exportXLSX(){
         <c:scaling><c:orientation val="minMax"/></c:scaling>
         <c:delete val="0"/><c:axPos val="l"/>
         <c:title><c:tx><c:rich><a:bodyPr rot="-5400000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000"/></a:pPr>
-          <a:r><a:rPr lang="en-US" sz="1000"/><a:t>Intensity (cps)</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+          <a:r><a:rPr lang="en-US" sz="1000" i="1"/><a:t>Intensity</a:t></a:r>
+          <a:r><a:rPr lang="en-US" sz="1000"/><a:t> / a.u.</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
         <c:numFmt formatCode="General" sourceLinked="1"/>
         <c:majorTickMark val="out"/><c:minorTickMark val="none"/>
         <c:crossAx val="111111111"/>
       </c:valAx>
     </c:plotArea>
-    <c:legend><c:legendPos val="r"/><c:overlay val="0"/></c:legend>
+    ${legendXml}
     <c:plotVisOnly val="1"/>
   </c:chart>
 </c:chartSpace>`;
 
-  // drawing1.xml — チャートをデータの右側に配置
-  const chartStartCol=fileList.length*2+1;
+  // drawing1.xml — チャートをピーク解析の下に大きく配置
   const drawingXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
   xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
   xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <xdr:twoCellAnchor>
-    <xdr:from><xdr:col>${chartStartCol}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
-    <xdr:to><xdr:col>${chartStartCol+12}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>26</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
+    <xdr:from><xdr:col>${dataCols+1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${hasPeaks?Math.max(maxLen+3,20):2}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+    <xdr:to><xdr:col>${dataCols+1+14}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${(hasPeaks?Math.max(maxLen+3,20):2)+20}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
     <xdr:graphicFrame macro="">
       <xdr:nvGraphicFramePr>
         <xdr:cNvPr id="2" name="Chart 1"/>
@@ -1557,18 +1601,15 @@ async function exportXLSX(){
   </xdr:twoCellAnchor>
 </xdr:wsDr>`;
 
-  // drawing rels
   const drawingRelsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/>
 </Relationships>`;
 
-  // ZIPにチャートファイルを追加
   zip.file('xl/charts/chart1.xml', chartXml);
   zip.file('xl/drawings/drawing1.xml', drawingXml);
   zip.file('xl/drawings/_rels/drawing1.xml.rels', drawingRelsXml);
 
-  // sheet1.xml.rels — drawingへの参照を追加
   const s1RelsPath='xl/worksheets/_rels/sheet1.xml.rels';
   const s1Rels=zip.file(s1RelsPath);
   if(s1Rels){
@@ -1583,7 +1624,6 @@ async function exportXLSX(){
 </Relationships>`);
   }
 
-  // sheet1.xml に <drawing> 要素を追加
   const s1Path='xl/worksheets/sheet1.xml';
   let s1Xml=await zip.file(s1Path).async('string');
   if(!s1Xml.includes('xmlns:r=')){
@@ -1592,7 +1632,6 @@ async function exportXLSX(){
   s1Xml=s1Xml.replace(/<\/worksheet>/,'<drawing r:id="rIdDrw1"/></worksheet>');
   zip.file(s1Path, s1Xml);
 
-  // [Content_Types].xml を更新
   let ct=await zip.file('[Content_Types].xml').async('string');
   if(!ct.includes('drawingml.chart+xml')){
     ct=ct.replace('</Types>',
@@ -1602,7 +1641,6 @@ async function exportXLSX(){
     zip.file('[Content_Types].xml', ct);
   }
 
-  // 最終バッファ生成＆ダウンロード
   const finalBlob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(finalBlob);
