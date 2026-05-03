@@ -1661,6 +1661,7 @@ async function exportXLSX(){
 
   const chartXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <c:roundedCorners val="0"/>
   <c:chart>
     <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="ctr"><a:defRPr sz="1400" b="1">${arialFont}</a:defRPr></a:pPr>
       <a:r><a:rPr lang="en-US" sz="1400" b="1">${arialFont}</a:rPr><a:t>${chartTitle}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
