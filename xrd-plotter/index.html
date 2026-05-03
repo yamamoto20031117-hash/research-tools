@@ -1532,6 +1532,7 @@ async function exportXLSX(){
 
   // ===== 右側: ピーク解析テーブル =====
   const peakStartCol=dataCols+2; // 1列空けて
+  const peakTableCols=6; // (00l), 2θ, d, Intensity, FWHM, L
   const hasPeaks=fileList.some(f=>f.peaks&&f.peaks.length>0);
   if(hasPeaks){
     const peakHeaders=['Dataset','#','2θ (°)','d (Å)','Intensity','FWHM (°)','FWHM (rad)','L (nm)','Label'];
@@ -1787,8 +1788,8 @@ async function exportXLSX(){
   xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
   xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <xdr:twoCellAnchor>
-    <xdr:from><xdr:col>${dataCols+1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
-    <xdr:to><xdr:col>${dataCols+1+10}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>25</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
+    <xdr:from><xdr:col>${hasPeaks?peakStartCol+peakTableCols+1:dataCols+1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+    <xdr:to><xdr:col>${(hasPeaks?peakStartCol+peakTableCols+1:dataCols+1)+12}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>28</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
     <xdr:graphicFrame macro="">
       <xdr:nvGraphicFramePr>
         <xdr:cNvPr id="2" name="Chart 1"/>
