@@ -218,6 +218,7 @@
       </optgroup>
       <optgroup label="分子">
         <option value="EMIm">EMIm⁺</option>
+        <option value="TBMA">TBMA⁺</option>
         <option value="TBA">TBA⁺</option>
         <option value="helicene">ヘリセン</option>
       </optgroup>
@@ -422,6 +423,33 @@ const INTER = {
     {el:'H',color:0xffffff,r:0.15,dx:-2.526,dy:-0.89,dz:1.722}
   ], minGap:3.0, spacing:3,
   bonds:[[0,1],[1,2],[2,3],[3,4],[4,0],[1,5],[3,6],[4,7],[2,8],[8,9],[8,10],[8,11],[0,12],[12,13],[12,14],[12,15],[15,16],[15,17],[15,18]] },
+
+  // --- TBMA⁺ (トリブチルメチルアンモニウム) N(CH₃)(C₄H₉)₃⁺ ---
+  // TBA⁺と同構造だが腕4をメチル(C1個)に置換
+  TBMA: { name:'TBMA⁺', color:0xdd8833, atoms:[
+    {el:'N',color:0x4488ff,r:0.30, dx:0.00,  dy:0.00,  dz:0.00 },
+    // 腕1: (+,+,+)/√3 方向 ブチル鎖
+    {el:'C',color:0xdd8833,r:0.20, dx:0.72,  dy:1.31,  dz:0.12 },
+    {el:'C',color:0xdd8833,r:0.20, dx:1.46,  dy:1.44,  dz:1.47 },
+    {el:'C',color:0xdd8833,r:0.20, dx:2.19,  dy:2.79,  dz:1.60 },
+    {el:'C',color:0xdd8833,r:0.20, dx:2.93,  dy:2.91,  dz:2.95 },
+    // 腕2: (+,-,-)/√3 方向 ブチル鎖
+    {el:'C',color:0xdd8833,r:0.20, dx:0.72,  dy:-1.31, dz:-0.12},
+    {el:'C',color:0xdd8833,r:0.20, dx:1.46,  dy:-1.44, dz:-1.47},
+    {el:'C',color:0xdd8833,r:0.20, dx:2.19,  dy:-2.79, dz:-1.60},
+    {el:'C',color:0xdd8833,r:0.20, dx:2.93,  dy:-2.91, dz:-2.95},
+    // 腕3: (-,+,-)/√3 方向 ブチル鎖
+    {el:'C',color:0xdd8833,r:0.20, dx:-0.72, dy:0.12,  dz:-1.31},
+    {el:'C',color:0xdd8833,r:0.20, dx:-1.46, dy:1.47,  dz:-1.44},
+    {el:'C',color:0xdd8833,r:0.20, dx:-2.19, dy:1.60,  dz:-2.79},
+    {el:'C',color:0xdd8833,r:0.20, dx:-2.93, dy:2.95,  dz:-2.91},
+    // 腕4: (-,-,+)/√3 方向 メチル(C1個のみ)
+    {el:'C',color:0xdd8833,r:0.20, dx:-0.72, dy:-0.12, dz:1.31 }
+  ], minGap:4.5, spacing:4,
+  bonds:[[0,1],[1,2],[2,3],[3,4],
+         [0,5],[5,6],[6,7],[7,8],
+         [0,9],[9,10],[10,11],[11,12],
+         [0,13]] },
 
   // --- TBA⁺ (テトラブチルアンモニウム) N(C₄H₉)₄⁺ ---
   // 中心Nから正四面体方向に4本のブチル鎖 (各4C)
