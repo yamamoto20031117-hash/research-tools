@@ -178,8 +178,8 @@
           <div class="sg-item"><label>グラフタイトル（空欄で非表示）</label>
             <div style="display:flex;gap:4px;align-items:center">
               <input type="text" id="plotTitle" placeholder="ファイル名が自動入力  例: VSe_{2}" oninput="this.dataset.edited='1';redraw()" style="flex:1">
-              <button type="button" onclick="insertTitleMarkup('sub')" title="下付き文字 _{}" style="padding:2px 6px;font-size:12px;cursor:pointer">x₂</button>
-              <button type="button" onclick="insertTitleMarkup('sup')" title="上付き文字 ^{}" style="padding:2px 6px;font-size:12px;cursor:pointer">x²</button>
+              <button type="button" onclick="insertTitleMarkup('sub')" title="下付き文字 _{}" style="padding:2px 6px;font-size:13px;cursor:pointer">X<sub style="font-size:9px">2</sub></button>
+              <button type="button" onclick="insertTitleMarkup('sup')" title="上付き文字 ^{}" style="padding:2px 6px;font-size:13px;cursor:pointer">X<sup style="font-size:9px">2</sup></button>
             </div>
           </div>
           <div class="sg-item"><label>X軸ラベル</label><input type="text" id="xLabel" value="2θ / deg" oninput="redraw()"></div>
