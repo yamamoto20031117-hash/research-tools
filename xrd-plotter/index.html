@@ -1545,7 +1545,10 @@ async function exportXLSX(){
 
   // チャートシリーズ構築
   const chartColors=['1F4E79','CC0000','228B22','FF8C00','8B008B','008B8B','B22222','4169E1','DAA520','2E8B57'];
+  // SERIES_COLORSのhex(#なし)版
+  const seriesHexColors=['2F5496','CC0000','228B22','FF8C00','8B008B','008B8B','B22222','4169E1'];
   let seriesXml='';
+  let seriesCount=0;
   for(let si=0;si<nFiles;si++){
     const f=fileList[si];
     const xCol=colLetter(si*2);
@@ -1553,7 +1556,7 @@ async function exportXLSX(){
     const endRow=f.x.length+2; // データは行3から
     const clr=chartColors[si%chartColors.length];
     seriesXml+=`<c:ser>
-      <c:idx val="${si}"/><c:order val="${si}"/>
+      <c:idx val="${seriesCount}"/><c:order val="${seriesCount}"/>
       <c:tx><c:strRef><c:f>'${escXml(safeSheetName)}'!$${colLetter(si*2)}$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>${escXml(f.label||'Dataset '+(si+1))}</c:v></c:pt></c:strCache></c:strRef></c:tx>
       <c:spPr><a:ln w="12700"><a:solidFill><a:srgbClr val="${clr}"/></a:solidFill></a:ln></c:spPr>
       <c:marker><c:symbol val="none"/></c:marker>
@@ -1561,18 +1564,100 @@ async function exportXLSX(){
       <c:yVal><c:numRef><c:f>'${escXml(safeSheetName)}'!$${yCol}$3:$${yCol}$${endRow}</c:f></c:numRef></c:yVal>
       <c:smooth val="0"/>
     </c:ser>`;
+    seriesCount++;
+  }
+
+  // ピークラベル用の追加シリーズ（各ピークを散布点+データラベルとして描画）
+  // ファイルごとにラベル付きピークを集め、シリーズ色で分ける
+  for(let si=0;si<nFiles;si++){
+    const f=fileList[si];
+    if(!f.peaks) continue;
+    const labeledPeaks=f.peaks.filter(p=>p.label);
+    if(labeledPeaks.length===0) continue;
+
+    // シリーズ文字ごとにグループ化して色分け
+    const groups={};
+    for(const p of labeledPeaks){
+      const {series}=parseSeriesLabel(p.label);
+      const key=series||'_';
+      if(!groups[key]) groups[key]=[];
+      groups[key].push(p);
+    }
+
+    for(const [sKey, peaks] of Object.entries(groups)){
+      // シリーズ色を決定
+      const sIdx=sKey!=='_'?'ABCDEFGH'.indexOf(sKey):-1;
+      const peakClr=sIdx>=0?seriesHexColors[sIdx%seriesHexColors.length]:chartColors[si%chartColors.length];
+
+      // xVal, yVal キャッシュ
+      const xPts=peaks.map((p,i)=>`<c:pt idx="${i}"><c:v>${p.x}</c:v></c:pt>`).join('');
+      const yPts=peaks.map((p,i)=>`<c:pt idx="${i}"><c:v>${p.y}</c:v></c:pt>`).join('');
+
+      // 個別データラベル（各点に(00n)テキスト）
+      let dLblEntries='';
+      peaks.forEach((p,i)=>{
+        const dispLabel=formatPeakLabel(p.label);
+        dLblEntries+=`<c:dLbl>
+          <c:idx val="${i}"/>
+          <c:layout/>
+          <c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p>
+            <a:pPr><a:defRPr sz="900" b="1"><a:solidFill><a:srgbClr val="${peakClr}"/></a:solidFill><a:latin typeface="Arial"/></a:defRPr></a:pPr>
+            <a:r><a:rPr lang="en-US" sz="900" b="1"><a:solidFill><a:srgbClr val="${peakClr}"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>${escXml(dispLabel)}</a:t></a:r>
+          </a:p></c:rich></c:tx>
+          <c:dLblPos val="t"/>
+          <c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/>
+        </c:dLbl>`;
+      });
+
+      seriesXml+=`<c:ser>
+        <c:idx val="${seriesCount}"/><c:order val="${seriesCount}"/>
+        <c:tx><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>_peak_${sKey}_${si}</c:v></c:pt></c:strCache></c:tx>
+        <c:spPr><a:ln><a:noFill/></a:ln></c:spPr>
+        <c:marker><c:symbol val="none"/></c:marker>
+        <c:dLbls>${dLblEntries}
+          <c:dLblPos val="t"/>
+          <c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/>
+        </c:dLbls>
+        <c:xVal><c:numRef><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${peaks.length}"/>${xPts}</c:numCache></c:numRef></c:xVal>
+        <c:yVal><c:numRef><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${peaks.length}"/>${yPts}</c:numCache></c:numRef></c:yVal>
+        <c:smooth val="0"/>
+      </c:ser>`;
+      seriesCount++;
+    }
   }
 
   // タイトル: 単一ファイルならファイル名、複数なら "XRD Pattern"
   const chartTitle=nFiles===1?escXml(firstName):'XRD Pattern';
-  // 凡例: 単一ファイルなら非表示
-  const legendXml=nFiles>1?'<c:legend><c:legendPos val="r"/><c:overlay val="0"/></c:legend>':'';
+  // 凡例: ピークラベルシリーズを除外するため、データシリーズのみ表示
+  // 単一ファイルなら凡例なし、複数なら凡例あり（ピークラベルシリーズは非表示）
+  let legendXml='';
+  if(nFiles>1){
+    let legendEntries='';
+    for(let si=0;si<nFiles;si++){
+      legendEntries+=`<c:legendEntry><c:idx val="${si}"/></c:legendEntry>`;
+    }
+    // ピークラベルシリーズを凡例から除外
+    for(let si=nFiles;si<seriesCount;si++){
+      legendEntries+=`<c:legendEntry><c:idx val="${si}"/><c:delete val="1"/></c:legendEntry>`;
+    }
+    legendXml=`<c:legend><c:legendPos val="r"/>${legendEntries}<c:overlay val="0"/></c:legend>`;
+  } else if(seriesCount>nFiles){
+    // 単一ファイルでもピークラベルシリーズがある場合、凡例からすべて非表示
+    let legendEntries=`<c:legendEntry><c:idx val="0"/><c:delete val="1"/></c:legendEntry>`;
+    for(let si=nFiles;si<seriesCount;si++){
+      legendEntries+=`<c:legendEntry><c:idx val="${si}"/><c:delete val="1"/></c:legendEntry>`;
+    }
+    legendXml=`<c:legend>${legendEntries}<c:overlay val="0"/></c:legend>`;
+  }
+
+  // Arial フォント定義
+  const arialFont='<a:latin typeface="Arial"/><a:cs typeface="Arial"/>';
 
   const chartXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <c:chart>
-    <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="ctr"><a:defRPr sz="1400" b="1"/></a:pPr>
-      <a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>${chartTitle}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+    <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="ctr"><a:defRPr sz="1400" b="1">${arialFont}</a:defRPr></a:pPr>
+      <a:r><a:rPr lang="en-US" sz="1400" b="1">${arialFont}</a:rPr><a:t>${chartTitle}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
     <c:autoTitleDeleted val="0"/>
     <c:plotArea>
       <c:layout/>
@@ -1585,22 +1670,24 @@ async function exportXLSX(){
         <c:axId val="111111111"/>
         <c:scaling><c:orientation val="minMax"/></c:scaling>
         <c:delete val="0"/><c:axPos val="b"/>
-        <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000"/></a:pPr>
-          <a:r><a:rPr lang="en-US" sz="1000" i="1"/><a:t>2&#x3B8;</a:t></a:r>
-          <a:r><a:rPr lang="en-US" sz="1000"/><a:t> / deg</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+        <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000">${arialFont}</a:defRPr></a:pPr>
+          <a:r><a:rPr lang="en-US" sz="1000" i="1">${arialFont}</a:rPr><a:t>2&#x3B8;</a:t></a:r>
+          <a:r><a:rPr lang="en-US" sz="1000">${arialFont}</a:rPr><a:t> / deg</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
         <c:numFmt formatCode="0" sourceLinked="0"/>
         <c:majorTickMark val="out"/><c:minorTickMark val="none"/>
+        <c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900">${arialFont}</a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>
         <c:crossAx val="222222222"/>
       </c:valAx>
       <c:valAx>
         <c:axId val="222222222"/>
         <c:scaling><c:orientation val="minMax"/></c:scaling>
         <c:delete val="0"/><c:axPos val="l"/>
-        <c:title><c:tx><c:rich><a:bodyPr rot="-5400000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000"/></a:pPr>
-          <a:r><a:rPr lang="en-US" sz="1000" i="1"/><a:t>Intensity</a:t></a:r>
-          <a:r><a:rPr lang="en-US" sz="1000"/><a:t> / a.u.</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+        <c:title><c:tx><c:rich><a:bodyPr rot="-5400000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000">${arialFont}</a:defRPr></a:pPr>
+          <a:r><a:rPr lang="en-US" sz="1000" i="1">${arialFont}</a:rPr><a:t>Intensity</a:t></a:r>
+          <a:r><a:rPr lang="en-US" sz="1000">${arialFont}</a:rPr><a:t> / a.u.</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
         <c:numFmt formatCode="General" sourceLinked="1"/>
         <c:majorTickMark val="out"/><c:minorTickMark val="none"/>
+        <c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900">${arialFont}</a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>
         <c:crossAx val="111111111"/>
       </c:valAx>
     </c:plotArea>
