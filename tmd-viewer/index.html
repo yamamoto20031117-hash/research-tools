@@ -1096,10 +1096,12 @@ function buildStructure() {
   updateInfo(info,phase,c_layer,d_xm,normalGap,bond,interKey,effExpansion);
   updateLegend(info,interKey);
 
-  // カメラを構造全体が収まるように自動調整
+  // カメラを構造全体が収まるように自動調整（構造サイズ変更時のみ）
   const structW=(dXMax-dXMin), structH=numLayers*layerStep, structD=(dZMax-dZMin);
-  const fitRadius=Math.max(structW, structH, structD)*0.85+5;
-  if(Math.abs(sph.radius-fitRadius)>2){
+  const fitKey=numLayers+'_'+Na+'_'+Nb+'_'+curMat+'_'+curPhase+'_'+effExpansion.toFixed(2);
+  if(fitKey!==buildStructure._lastFitKey){
+    buildStructure._lastFitKey=fitKey;
+    const fitRadius=Math.max(structW, structH, structD)*0.85+5;
     sph.radius=Math.max(8,Math.min(80,fitRadius));
     updateCam();
   }
