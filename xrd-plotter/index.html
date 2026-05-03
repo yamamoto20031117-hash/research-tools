@@ -782,9 +782,12 @@ function parseRichText(text){
         parts.push({text:text.substring(i+2,close), type});
         i=close+1; continue;
       }
+      // 閉じ括弧がない場合 → そのまま通常テキストとして扱う
+      parts.push({text:text.substring(i,i+2), type:'normal'});
+      i+=2; continue;
     }
     // 通常テキストを蓄積
-    let j=i;
+    let j=i+1;
     while(j<text.length){
       if((text[j]==='_'||text[j]==='^')&&text[j+1]==='{') break;
       j++;
