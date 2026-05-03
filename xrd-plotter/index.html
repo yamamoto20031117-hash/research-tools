@@ -176,7 +176,13 @@
         <h3>グラフカスタマイズ</h3>
         <div class="settings-grid">
           <div class="sg-section">タイトル・ラベル</div>
-          <div class="sg-item"><label>グラフタイトル（空欄で非表示）</label><input type="text" id="plotTitle" placeholder="ファイル名が自動入力" oninput="this.dataset.edited='1';redraw()"></div>
+          <div class="sg-item"><label>グラフタイトル（空欄で非表示）</label>
+            <div style="display:flex;gap:4px;align-items:center">
+              <input type="text" id="plotTitle" placeholder="ファイル名が自動入力  例: VSe_{2}" oninput="this.dataset.edited='1';redraw()" style="flex:1">
+              <button type="button" onclick="insertTitleMarkup('sub')" title="下付き文字 _{}" style="padding:2px 6px;font-size:12px;cursor:pointer">x₂</button>
+              <button type="button" onclick="insertTitleMarkup('sup')" title="上付き文字 ^{}" style="padding:2px 6px;font-size:12px;cursor:pointer">x²</button>
+            </div>
+          </div>
           <div class="sg-item"><label>X軸ラベル</label><input type="text" id="xLabel" value="2θ / deg" oninput="redraw()"></div>
           <div class="sg-item"><label>Y軸ラベル</label><input type="text" id="yLabel" value="Intensity / a.u." oninput="redraw()"></div>
 
@@ -756,14 +762,80 @@ function redraw(){
   ctx.restore();
 
   if(plotTitle){
-    ctx.font='bold '+titleSz+'px '+fontFam; ctx.fillStyle=axisCol; ctx.textAlign='center';
     const tx=titlePos.x!==null?titlePos.x:margin.left+pw/2;
     const ty=titlePos.y!==null?titlePos.y:margin.top-8;
-    ctx.fillText(plotTitle, tx, ty);
-    // タイトルのヒットボックスを保存（ドラッグ用）
-    const tw=ctx.measureText(plotTitle).width;
+    const tw=drawRichText(ctx, plotTitle, tx, ty, titleSz, fontFam, axisCol, true);
     titlePos._hitBox={x:tx-tw/2-4, y:ty-titleSz, w:tw+8, h:titleSz+6};
   }
+}
+
+// ===== 下付き・上付きマークアップ =====
+// 記法: _{text} → 下付き, ^{text} → 上付き
+// 例: "VSe_{2}" → "VSe₂", "x^{2+}" → "x²⁺"
+function parseRichText(text){
+  const parts=[];
+  let i=0;
+  while(i<text.length){
+    if((text[i]==='_'||text[i]==='^')&&text[i+1]==='{'){
+      const type=text[i]==='_'?'sub':'sup';
+      const close=text.indexOf('}',i+2);
+      if(close!==-1){
+        parts.push({text:text.substring(i+2,close), type});
+        i=close+1; continue;
+      }
+    }
+    // 通常テキストを蓄積
+    let j=i;
+    while(j<text.length){
+      if((text[j]==='_'||text[j]==='^')&&text[j+1]==='{') break;
+      j++;
+    }
+    parts.push({text:text.substring(i,j), type:'normal'});
+    i=j;
+  }
+  return parts;
+}
+
+// リッチテキスト描画（Canvas）。戻り値は全体幅
+function drawRichText(ctx, text, cx, cy, fontSize, fontFam, color, isBold){
+  const parts=parseRichText(text);
+  const prefix=isBold?'bold ':'';
+  const subSupSz=Math.round(fontSize*0.65);
+  // 全体幅を先に計算（中央揃え用）
+  let totalW=0;
+  for(const p of parts){
+    const sz=p.type==='normal'?fontSize:subSupSz;
+    ctx.font=prefix+sz+'px '+fontFam;
+    totalW+=ctx.measureText(p.text).width;
+  }
+  // 描画
+  let x=cx-totalW/2;
+  ctx.fillStyle=color; ctx.textAlign='left';
+  for(const p of parts){
+    const sz=p.type==='normal'?fontSize:subSupSz;
+    ctx.font=prefix+sz+'px '+fontFam;
+    let y=cy;
+    if(p.type==='sub') y=cy+fontSize*0.25;
+    if(p.type==='sup') y=cy-fontSize*0.35;
+    ctx.fillText(p.text, x, y);
+    x+=ctx.measureText(p.text).width;
+  }
+  return totalW;
+}
+
+// タイトル入力に下付き/上付きマークアップ挿入
+function insertTitleMarkup(type){
+  const inp=document.getElementById('plotTitle');
+  const start=inp.selectionStart, end=inp.selectionEnd;
+  const sel=inp.value.substring(start,end);
+  const wrap=type==='sub'?'_{'+sel+'}':'^{'+sel+'}';
+  inp.value=inp.value.substring(0,start)+wrap+inp.value.substring(end);
+  inp.dataset.edited='1';
+  // カーソルを中括弧の中に
+  const curPos=start+(type==='sub'?2:2)+sel.length;
+  inp.setSelectionRange(curPos,curPos);
+  inp.focus();
+  redraw();
 }
 
 // ===== 軸ラベル描画（変数部分を斜体、単位は通常体） =====
@@ -1635,10 +1707,24 @@ async function exportXLSX(){
     }
   }
 
-  // タイトル: 単一ファイルならファイル名、複数なら "XRD Pattern"
-  const chartTitle=nFiles===1?escXml(firstName):'XRD Pattern';
-  // 凡例: ピークラベルシリーズを除外するため、データシリーズのみ表示
-  // 単一ファイルなら凡例なし、複数なら凡例あり（ピークラベルシリーズは非表示）
+  // Arial フォント定義
+  const arialFont='<a:latin typeface="Arial"/><a:cs typeface="Arial"/>';
+
+  // タイトル: ユーザー編集済みならそれを使用、なければファイル名/XRD Pattern
+  const titleInput=document.getElementById('plotTitle');
+  const rawTitle=(titleInput&&titleInput.dataset.edited==='1'&&titleInput.value)?titleInput.value:(nFiles===1?firstName:'XRD Pattern');
+  // リッチテキスト（下付き/上付き）をOOXML runs に変換
+  function richTextToOoxml(text, sz, bold, font){
+    const parts=parseRichText(text);
+    return parts.map(p=>{
+      let baseline='';
+      let fsz=sz;
+      if(p.type==='sub'){baseline=' baseline="-25000"'; fsz=Math.round(sz*0.7);}
+      if(p.type==='sup'){baseline=' baseline="30000"'; fsz=Math.round(sz*0.7);}
+      return `<a:r><a:rPr lang="en-US" sz="${fsz}" ${bold?'b="1"':''}${baseline}>${font}</a:rPr><a:t>${escXml(p.text)}</a:t></a:r>`;
+    }).join('');
+  }
+  const chartTitleRuns=richTextToOoxml(rawTitle, 1400, true, arialFont);
   // 凡例: 単一ファイルは非表示、複数ファイルはデータシリーズのみ表示
   let legendXml='';
   if(nFiles>1){
@@ -1649,15 +1735,12 @@ async function exportXLSX(){
     legendXml=`<c:legend><c:legendPos val="r"/>${legendEntries}<c:overlay val="0"/></c:legend>`;
   }
 
-  // Arial フォント定義
-  const arialFont='<a:latin typeface="Arial"/><a:cs typeface="Arial"/>';
-
   const chartXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <c:roundedCorners val="0"/>
   <c:chart>
     <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="ctr"><a:defRPr sz="1400" b="1">${arialFont}</a:defRPr></a:pPr>
-      <a:r><a:rPr lang="en-US" sz="1400" b="1">${arialFont}</a:rPr><a:t>${chartTitle}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+      ${chartTitleRuns}</a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
     <c:autoTitleDeleted val="0"/>
     <c:plotArea>
       <c:layout/>
