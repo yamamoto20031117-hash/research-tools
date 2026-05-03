@@ -128,8 +128,8 @@
 
   <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
     <h2>XRDデータファイルをドロップ</h2>
-    <p>Rigaku SmartLab対応（.ras / .asc / .raw / .txt）— 複数ファイル → スタック / 重ね合わせ表示</p>
-    <input type="file" id="fileInput" multiple accept=".txt,.TXT,.ras,.RAS,.asc,.ASC,.raw,.RAW,.xy,.csv" style="display:none">
+    <p>Rigaku SmartLab対応（.ras / .txt のみ）— 複数ファイル → スタック / 重ね合わせ表示</p>
+    <input type="file" id="fileInput" multiple accept=".txt,.TXT,.ras,.RAS" style="display:none">
   </div>
 
   <div class="multi-list" id="multiList"></div>
@@ -268,7 +268,7 @@ dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remov
 fileInput.addEventListener('change',e=>{handleFiles(e.target.files);fileInput.value='';});
 
 function handleFiles(files){
-  const supported=['.txt','.ras','.asc','.raw','.xy','.csv'];
+  const supported=['.txt','.ras'];
   for(const f of files){
     const ext='.'+f.name.split('.').pop().toLowerCase();
     if(!supported.includes(ext)){alert(f.name+' は対応していないファイル形式です');continue;}
