@@ -238,10 +238,22 @@
     <span class="pm"><button onclick="stepSlider('sl-rot-c',-1)">−</button><button onclick="stepSlider('sl-rot-c',1)">+</button></span>
   </div>
   <div class="g">
-    <label>原子径</label>
-    <input type="range" id="sl-atom-r" min="0.1" max="1.5" step="0.05" value="1.0">
-    <input type="number" class="num-in" id="v-atom-r" min="0.1" max="1.5" step="0.05" value="1.0">
-    <span class="pm"><button onclick="stepSlider('sl-atom-r',-1)">−</button><button onclick="stepSlider('sl-atom-r',1)">+</button></span>
+    <label>M径</label>
+    <input type="range" id="sl-atom-m" min="0.1" max="2.0" step="0.05" value="1.0">
+    <input type="number" class="num-in" id="v-atom-m" min="0.1" max="2.0" step="0.05" value="1.0">
+    <span class="pm"><button onclick="stepSlider('sl-atom-m',-1)">−</button><button onclick="stepSlider('sl-atom-m',1)">+</button></span>
+  </div>
+  <div class="g">
+    <label>X径</label>
+    <input type="range" id="sl-atom-x" min="0.1" max="2.0" step="0.05" value="1.0">
+    <input type="number" class="num-in" id="v-atom-x" min="0.1" max="2.0" step="0.05" value="1.0">
+    <span class="pm"><button onclick="stepSlider('sl-atom-x',-1)">−</button><button onclick="stepSlider('sl-atom-x',1)">+</button></span>
+  </div>
+  <div class="g">
+    <label>分子径</label>
+    <input type="range" id="sl-atom-i" min="0.1" max="2.0" step="0.05" value="1.0">
+    <input type="number" class="num-in" id="v-atom-i" min="0.1" max="2.0" step="0.05" value="1.0">
+    <span class="pm"><button onclick="stepSlider('sl-atom-i',-1)">−</button><button onclick="stepSlider('sl-atom-i',1)">+</button></span>
   </div>
   <div class="g">
     <label>結合太さ</label>
@@ -669,7 +681,9 @@ function captureState(){
     poly:document.getElementById('chk-poly').checked,
     cell:document.getElementById('chk-cell').checked,
     dist:document.getElementById('chk-dist').checked,
-    atomR:document.getElementById('sl-atom-r').value,
+    atomM:document.getElementById('sl-atom-m').value,
+    atomX:document.getElementById('sl-atom-x').value,
+    atomI:document.getElementById('sl-atom-i').value,
     bondR:document.getElementById('sl-bond-r').value
   };
 }
@@ -694,7 +708,9 @@ function restoreState(s){
   document.getElementById('chk-poly').checked=s.poly;
   document.getElementById('chk-cell').checked=s.cell;
   document.getElementById('chk-dist').checked=s.dist;
-  if(s.atomR){document.getElementById('sl-atom-r').value=s.atomR;document.getElementById('v-atom-r').value=parseFloat(s.atomR).toFixed(1);}
+  if(s.atomM){document.getElementById('sl-atom-m').value=s.atomM;document.getElementById('v-atom-m').value=parseFloat(s.atomM).toFixed(1);}
+  if(s.atomX){document.getElementById('sl-atom-x').value=s.atomX;document.getElementById('v-atom-x').value=parseFloat(s.atomX).toFixed(1);}
+  if(s.atomI){document.getElementById('sl-atom-i').value=s.atomI;document.getElementById('v-atom-i').value=parseFloat(s.atomI).toFixed(1);}
   if(s.bondR){document.getElementById('sl-bond-r').value=s.bondR;document.getElementById('v-bond-r').value=parseFloat(s.bondR).toFixed(1);}
   setClickMode(s.clickMode);
   buildStructure();
@@ -783,10 +799,12 @@ function buildStructure() {
   const matM=new THREE.MeshPhongMaterial({color:MCOL[info.m],shininess:80,specular:0x446688});
   const matX=new THREE.MeshPhongMaterial({color:XCOL[info.x],shininess:60,specular:0x888844});
   const matBond=new THREE.MeshPhongMaterial({color:0x8abbdd,transparent:true,opacity:0.55});
-  const atomScale=parseFloat(document.getElementById('sl-atom-r').value)||1.0;
+  const scaleM=parseFloat(document.getElementById('sl-atom-m').value)||1.0;
+  const scaleX=parseFloat(document.getElementById('sl-atom-x').value)||1.0;
+  const scaleI=parseFloat(document.getElementById('sl-atom-i').value)||1.0;
   const bondScale=parseFloat(document.getElementById('sl-bond-r').value)||1.0;
-  const geoM=new THREE.SphereGeometry(0.45*atomScale,24,24);
-  const geoX=new THREE.SphereGeometry(0.36*atomScale,20,20);
+  const geoM=new THREE.SphereGeometry(0.45*scaleM,24,24);
+  const geoX=new THREE.SphereGeometry(0.36*scaleX,20,20);
 
   const Na=parseInt(document.getElementById('sl-na').value);
   const Nb=parseInt(document.getElementById('sl-nb').value);
@@ -999,7 +1017,7 @@ function buildStructure() {
 
         compCoords.forEach((rv,idx)=>{
           const at=inter.atoms[idx];
-          const geo=new THREE.SphereGeometry(at.r*atomScale,16,16);
+          const geo=new THREE.SphereGeometry(at.r*scaleI,16,16);
           const mat=new THREE.MeshPhongMaterial({color:at.color,shininess:60});
           const mesh=new THREE.Mesh(geo,mat);
           mesh.position.set(bx+rv.x+off.x+interOffset.dx, gapCenterY+rv.y+off.y, bz+rv.z+off.z+interOffset.dz);
@@ -1454,7 +1472,7 @@ function syncSliderToNum(slId){
   const k=slId.replace('sl-','');
   const vId=slId.startsWith('sl-rot-')?'v-rot-'+k.replace('rot-',''):'v-'+k;
   const vEl=document.getElementById(vId);
-  const decIds=['sl-gap','sl-atom-r','sl-bond-r'];
+  const decIds=['sl-gap','sl-atom-m','sl-atom-x','sl-atom-i','sl-bond-r'];
   vEl.value=decIds.includes(slId)?parseFloat(sl.value).toFixed(1):sl.value;
 }
 function syncNumToSlider(vId){
@@ -1469,7 +1487,7 @@ function syncNumToSlider(vId){
   if(isNaN(v)) v=parseFloat(sl.value);
   v=Math.max(mn,Math.min(mx,Math.round(v/st)*st));
   sl.value=v;
-  const decIds2=['sl-gap','sl-atom-r','sl-bond-r'];
+  const decIds2=['sl-gap','sl-atom-m','sl-atom-x','sl-atom-i','sl-bond-r'];
   vEl.value=decIds2.includes(slId)?v.toFixed(1):v;
   buildStructure();
 }
@@ -1484,7 +1502,7 @@ function stepSlider(slId, dir){
   buildStructure();
 }
 
-['sl-gap','sl-layers','sl-na','sl-nb','sl-atom-r','sl-bond-r'].forEach(id=>{
+['sl-gap','sl-layers','sl-na','sl-nb','sl-atom-m','sl-atom-x','sl-atom-i','sl-bond-r'].forEach(id=>{
   document.getElementById(id).addEventListener('pointerdown',function(){pushUndo();},{once:false});
   document.getElementById(id).addEventListener('input',function(){
     syncSliderToNum(id);
@@ -1492,7 +1510,7 @@ function stepSlider(slId, dir){
   });
 });
 // 数値入力欄のイベント
-['v-gap','v-layers','v-na','v-nb','v-atom-r','v-bond-r'].forEach(vId=>{
+['v-gap','v-layers','v-na','v-nb','v-atom-m','v-atom-x','v-atom-i','v-bond-r'].forEach(vId=>{
   document.getElementById(vId).addEventListener('change',function(){ syncNumToSlider(vId); });
 });
 // 層間距離（Å: M–M金属間距離）からの逆算入力
