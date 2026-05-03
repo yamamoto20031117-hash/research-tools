@@ -214,14 +214,11 @@
         <option value="Li">Li⁺</option>
         <option value="Na">Na⁺</option>
         <option value="K">K⁺</option>
+        <option value="Rb">Rb⁺</option>
       </optgroup>
       <optgroup label="分子">
-        <option value="H2O">H₂O</option>
-        <option value="NH3">NH₃</option>
-        <option value="Py">ピリジン</option>
-        <option value="CTAB">CTA⁺</option>
         <option value="TBA">TBA⁺</option>
-        <option value="N2H4">ヒドラジン</option>
+        <option value="helicene">ヘリセン</option>
       </optgroup>
       <optgroup id="og-custom" label="読込分子" style="display:none"></optgroup>
     </select>
@@ -396,65 +393,9 @@ const INTER = {
   K:  { name:'K⁺',  color:0xcc66ff,
     atoms:[{el:'K', color:0xcc66ff,r:0.42,dx:0,dy:0,dz:0}],
     minGap:1.8, spacing:1 },
-
-  // --- H₂O  O-H = 0.957Å, H-O-H = 104.5° ---
-  H2O: { name:'H₂O', color:0xff3333, atoms:[
-    {el:'O',color:0xff3333,r:0.30, dx:0,    dy:0,    dz:0   },
-    {el:'H',color:0xffffff,r:0.15, dx:0.76, dy:0.59, dz:0   },
-    {el:'H',color:0xffffff,r:0.15, dx:-0.76,dy:0.59, dz:0   }
-  ], minGap:1.8, spacing:1, bonds:[[0,1],[0,2]] },
-
-  // --- NH₃  N-H = 1.017Å, H-N-H = 106.7°, 三角錐 ---
-  // α=67.8° (C₃軸とN-H結合の角度)
-  // H: r_perp=0.942, r_para=0.383
-  NH3: { name:'NH₃', color:0x4488ff, atoms:[
-    {el:'N',color:0x4488ff,r:0.28, dx:0,     dy:0,    dz:0    },
-    {el:'H',color:0xffffff,r:0.15, dx:0.94,  dy:0.38, dz:0    },
-    {el:'H',color:0xffffff,r:0.15, dx:-0.47, dy:0.38, dz:0.82 },
-    {el:'H',color:0xffffff,r:0.15, dx:-0.47, dy:0.38, dz:-0.82}
-  ], minGap:1.8, spacing:1, bonds:[[0,1],[0,2],[0,3]] },
-
-  // --- N₂H₄ (ヒドラジン)  N-N = 1.449Å, N-H = 1.021Å ---
-  // H-N-N = 112.0°, H-N-H = 106.0°, 二面角 = 89° (ゴーシュ形)
-  N2H4: { name:'N₂H₄', color:0x44aaff, atoms:[
-    {el:'N',color:0x4488ff,r:0.28, dx:-0.72, dy:0.00,  dz:0.00 },
-    {el:'N',color:0x4488ff,r:0.28, dx:0.72,  dy:0.00,  dz:0.00 },
-    {el:'H',color:0xffffff,r:0.15, dx:-1.11, dy:0.95,  dz:0.00 },
-    {el:'H',color:0xffffff,r:0.15, dx:-1.11, dy:-0.46, dz:0.83 },
-    {el:'H',color:0xffffff,r:0.15, dx:1.11,  dy:0.02,  dz:-0.95},
-    {el:'H',color:0xffffff,r:0.15, dx:1.11,  dy:0.82,  dz:0.47 }
-  ], minGap:2.0, spacing:1, bonds:[[0,1],[0,2],[0,3],[1,4],[1,5]] },
-
-  // --- ピリジン C₅H₅N  正六角環, C-C ≈ 1.39Å, C-N ≈ 1.34Å ---
-  // center-to-vertex = 1.39Å, 60°間隔
-  Py: { name:'ピリジン', color:0x33bbaa, atoms:[
-    {el:'N',color:0x4488ff,r:0.28, dx:0,     dy:0, dz:1.39 },
-    {el:'C',color:0x555555,r:0.25, dx:1.20,  dy:0, dz:0.70 },
-    {el:'C',color:0x555555,r:0.25, dx:1.20,  dy:0, dz:-0.70},
-    {el:'C',color:0x555555,r:0.25, dx:0,     dy:0, dz:-1.39},
-    {el:'C',color:0x555555,r:0.25, dx:-1.20, dy:0, dz:-0.70},
-    {el:'C',color:0x555555,r:0.25, dx:-1.20, dy:0, dz:0.70 }
-  ], minGap:2.5, spacing:2, bonds:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,0]] },
-
-  // --- CTA⁺ (セチルトリメチルアンモニウム) CH₃-N⁺(CH₃)₂-(CH₂)₁₅CH₃ ---
-  // N(CH₃)₃ 四面体頭部 + C16 all-trans ジグザグ鎖 (省略8C)
-  // N-C = 1.50Å, C-C = 1.54Å, C-C-C = 112°
-  // 鎖はdy方向に伸びる。yz面内でジグザグ。重心をdy=0に補正
-  CTAB: { name:'CTA⁺', color:0xff8800, atoms:[
-    {el:'N',color:0x4488ff,r:0.30, dx:0.00,  dy:-3.68, dz:-0.27},
-    {el:'C',color:0xaaaaaa,r:0.20, dx:1.41,  dy:-4.18, dz:-0.27},
-    {el:'C',color:0xaaaaaa,r:0.20, dx:-0.71, dy:-4.18, dz:0.95 },
-    {el:'C',color:0xaaaaaa,r:0.20, dx:-0.71, dy:-4.18, dz:-1.50},
-    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:-2.44, dz:0.57 },
-    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:-1.16, dz:-0.29},
-    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:0.11,  dz:0.57 },
-    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:1.39,  dz:-0.29},
-    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:2.67,  dz:0.57 },
-    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:3.94,  dz:-0.29},
-    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:5.22,  dz:0.57 },
-    {el:'C',color:0xff8800,r:0.20, dx:0.00,  dy:6.50,  dz:-0.29}
-  ], minGap:5.0, spacing:3,
-  bonds:[[0,1],[0,2],[0,3],[0,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11]] },
+  Rb: { name:'Rb⁺', color:0xff44aa,
+    atoms:[{el:'Rb',color:0xff44aa,r:0.45,dx:0,dy:0,dz:0}],
+    minGap:2.0, spacing:1 },
 
   // --- TBA⁺ (テトラブチルアンモニウム) N(C₄H₉)₄⁺ ---
   // 中心Nから正四面体方向に4本のブチル鎖 (各4C)
@@ -487,6 +428,85 @@ const INTER = {
          [0,5],[5,6],[6,7],[7,8],
          [0,9],[9,10],[10,11],[11,12],
          [0,13],[13,14],[14,15],[15,16]] },
+
+  // --- DBPO-ヘリセン C₄₀H₂₂N₂O₂ (CCDC 1040766) ---
+  helicene: { name:'ヘリセン', color:0xccaa33, atoms:[
+    {el:'O',color:0xff3333,r:0.30,dx:-2.801,dy:-1.851,dz:-1.733},
+    {el:'O',color:0xff3333,r:0.30,dx:1.663,dy:3.069,dz:1.302},
+    {el:'N',color:0x4488ff,r:0.28,dx:-1.596,dy:-0.274,dz:0.151},
+    {el:'N',color:0x4488ff,r:0.28,dx:0.648,dy:1.231,dz:-0.496},
+    {el:'C',color:0x555555,r:0.25,dx:-2.063,dy:-1.546,dz:0.570},
+    {el:'C',color:0x555555,r:0.25,dx:-1.929,dy:-2.055,dz:1.831},
+    {el:'C',color:0x555555,r:0.25,dx:-2.434,dy:-3.343,dz:2.148},
+    {el:'C',color:0x555555,r:0.25,dx:-2.316,dy:-3.892,dz:3.451},
+    {el:'C',color:0x555555,r:0.25,dx:-2.826,dy:-5.131,dz:3.739},
+    {el:'C',color:0x555555,r:0.25,dx:-3.476,dy:-5.879,dz:2.741},
+    {el:'C',color:0x555555,r:0.25,dx:-3.592,dy:-5.392,dz:1.467},
+    {el:'C',color:0x555555,r:0.25,dx:-3.080,dy:-4.113,dz:1.137},
+    {el:'C',color:0x555555,r:0.25,dx:-3.182,dy:-3.572,dz:-0.169},
+    {el:'C',color:0x555555,r:0.25,dx:-2.686,dy:-2.336,dz:-0.437},
+    {el:'C',color:0x555555,r:0.25,dx:-1.790,dy:-1.000,dz:-2.147},
+    {el:'C',color:0x555555,r:0.25,dx:-1.441,dy:-0.953,dz:-3.457},
+    {el:'C',color:0x555555,r:0.25,dx:-0.468,dy:-0.012,dz:-3.886},
+    {el:'C',color:0x555555,r:0.25,dx:-0.158,dy:0.145,dz:-5.263},
+    {el:'C',color:0x555555,r:0.25,dx:0.683,dy:1.135,dz:-5.689},
+    {el:'C',color:0x555555,r:0.25,dx:1.253,dy:2.026,dz:-4.750},
+    {el:'C',color:0x555555,r:0.25,dx:1.035,dy:1.864,dz:-3.406},
+    {el:'C',color:0x555555,r:0.25,dx:0.193,dy:0.824,dz:-2.927},
+    {el:'C',color:0x555555,r:0.25,dx:-0.074,dy:0.594,dz:-1.541},
+    {el:'C',color:0x555555,r:0.25,dx:-1.136,dy:-0.207,dz:-1.178},
+    {el:'C',color:0x555555,r:0.25,dx:2.043,dy:1.441,dz:-0.481},
+    {el:'C',color:0x555555,r:0.25,dx:2.954,dy:0.774,dz:-1.264},
+    {el:'C',color:0x555555,r:0.25,dx:4.332,dy:1.120,dz:-1.241},
+    {el:'C',color:0x555555,r:0.25,dx:5.293,dy:0.425,dz:-2.015},
+    {el:'C',color:0x555555,r:0.25,dx:6.621,dy:0.779,dz:-1.966},
+    {el:'C',color:0x555555,r:0.25,dx:7.044,dy:1.849,dz:-1.180},
+    {el:'C',color:0x555555,r:0.25,dx:6.145,dy:2.570,dz:-0.440},
+    {el:'C',color:0x555555,r:0.25,dx:4.761,dy:2.220,dz:-0.434},
+    {el:'C',color:0x555555,r:0.25,dx:3.811,dy:2.869,dz:0.379},
+    {el:'C',color:0x555555,r:0.25,dx:2.517,dy:2.449,dz:0.402},
+    {el:'C',color:0x555555,r:0.25,dx:0.494,dy:2.405,dz:1.615},
+    {el:'C',color:0x555555,r:0.25,dx:-0.137,dy:2.706,dz:2.784},
+    {el:'C',color:0x555555,r:0.25,dx:-1.412,dy:2.149,dz:3.048},
+    {el:'C',color:0x555555,r:0.25,dx:-2.178,dy:2.577,dz:4.164},
+    {el:'C',color:0x555555,r:0.25,dx:-3.470,dy:2.157,dz:4.335},
+    {el:'C',color:0x555555,r:0.25,dx:-4.057,dy:1.280,dz:3.393},
+    {el:'C',color:0x555555,r:0.25,dx:-3.325,dy:0.786,dz:2.342},
+    {el:'C',color:0x555555,r:0.25,dx:-1.983,dy:1.195,dz:2.141},
+    {el:'C',color:0x555555,r:0.25,dx:-1.185,dy:0.761,dz:1.033},
+    {el:'C',color:0x555555,r:0.25,dx:-0.033,dy:1.445,dz:0.722},
+    {el:'H',color:0xffffff,r:0.15,dx:-1.459,dy:-1.526,dz:2.534},
+    {el:'H',color:0xffffff,r:0.15,dx:-1.842,dy:-3.383,dz:4.149},
+    {el:'H',color:0xffffff,r:0.15,dx:-2.676,dy:-5.473,dz:4.642},
+    {el:'H',color:0xffffff,r:0.15,dx:-3.843,dy:-6.741,dz:2.960},
+    {el:'H',color:0xffffff,r:0.15,dx:-4.014,dy:-5.898,dz:0.737},
+    {el:'H',color:0xffffff,r:0.15,dx:-3.692,dy:-4.075,dz:-0.866},
+    {el:'H',color:0xffffff,r:0.15,dx:-1.902,dy:-1.509,dz:-4.101},
+    {el:'H',color:0xffffff,r:0.15,dx:-0.585,dy:-0.470,dz:-5.933},
+    {el:'H',color:0xffffff,r:0.15,dx:0.869,dy:1.265,dz:-6.584},
+    {el:'H',color:0xffffff,r:0.15,dx:1.788,dy:2.777,dz:-5.059},
+    {el:'H',color:0xffffff,r:0.15,dx:1.470,dy:2.469,dz:-2.764},
+    {el:'H',color:0xffffff,r:0.15,dx:2.628,dy:0.082,dz:-1.909},
+    {el:'H',color:0xffffff,r:0.15,dx:4.983,dy:-0.316,dz:-2.571},
+    {el:'H',color:0xffffff,r:0.15,dx:7.261,dy:0.281,dz:-2.487},
+    {el:'H',color:0xffffff,r:0.15,dx:7.981,dy:2.064,dz:-1.159},
+    {el:'H',color:0xffffff,r:0.15,dx:6.457,dy:3.345,dz:0.117},
+    {el:'H',color:0xffffff,r:0.15,dx:4.065,dy:3.609,dz:0.959},
+    {el:'H',color:0xffffff,r:0.15,dx:0.273,dy:3.355,dz:3.406},
+    {el:'H',color:0xffffff,r:0.15,dx:-1.710,dy:3.207,dz:4.819},
+    {el:'H',color:0xffffff,r:0.15,dx:-3.956,dy:2.460,dz:5.127},
+    {el:'H',color:0xffffff,r:0.15,dx:-4.996,dy:1.013,dz:3.496},
+    {el:'H',color:0xffffff,r:0.15,dx:-3.761,dy:0.173,dz:1.691}
+  ], minGap:4.5, spacing:5,
+  bonds:[[0,13],[0,14],[1,33],[1,34],[2,4],[2,23],[2,42],[3,22],[3,24],[3,43],
+         [4,5],[4,13],[5,6],[5,44],[6,7],[6,11],[7,8],[7,45],[8,9],[8,46],
+         [9,10],[9,47],[10,11],[10,48],[11,12],[12,13],[12,49],
+         [14,15],[14,23],[15,16],[15,50],[16,17],[16,21],[17,18],[17,51],
+         [18,19],[18,52],[19,20],[19,53],[20,21],[20,54],[21,22],[22,23],
+         [24,25],[24,33],[25,26],[25,55],[26,27],[26,31],[27,28],[27,56],
+         [28,29],[28,57],[29,30],[29,58],[30,31],[30,59],[31,32],[32,33],[32,60],
+         [34,35],[34,43],[35,36],[35,61],[36,37],[36,41],[37,38],[37,62],
+         [38,39],[38,63],[39,40],[39,64],[40,41],[40,65],[41,42],[42,43]] },
 };
 
 // =====================================================
@@ -2121,7 +2141,7 @@ function eRepulsive(atoms){
 }
 
 // vdW radii for layer-molecule interaction (Å)
-const VDW_R={H:1.20,Li:1.82,C:1.70,N:1.55,O:1.52,Na:2.27,K:2.75,S:1.80,Se:1.90,Te:2.06};
+const VDW_R={H:1.20,Li:1.82,C:1.70,N:1.55,O:1.52,Na:2.27,K:2.75,Rb:3.03,S:1.80,Se:1.90,Te:2.06};
 
 // Layer confinement potential: molecule atoms between two walls at y=±gap/2
 // Uses LJ 9-3 wall potential (integrated LJ 12-6 over infinite plane)
