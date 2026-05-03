@@ -1611,13 +1611,11 @@ async function exportXLSX(){
         const dispLabel=formatPeakLabel(p.label);
         dLblEntries+=`<c:dLbl>
           <c:idx val="${i}"/>
-          <c:layout/>
           <c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p>
             <a:pPr><a:defRPr sz="900" b="1"><a:solidFill><a:srgbClr val="${peakClr}"/></a:solidFill><a:latin typeface="Arial"/></a:defRPr></a:pPr>
             <a:r><a:rPr lang="en-US" sz="900" b="1"><a:solidFill><a:srgbClr val="${peakClr}"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>${escXml(dispLabel)}</a:t></a:r>
           </a:p></c:rich></c:tx>
-          <c:dLblPos val="t"/>
-          <c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/>
+          <c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/>
         </c:dLbl>`;
       });
 
@@ -1627,8 +1625,7 @@ async function exportXLSX(){
         <c:spPr><a:ln><a:noFill/></a:ln></c:spPr>
         <c:marker><c:symbol val="none"/></c:marker>
         <c:dLbls>${dLblEntries}
-          <c:dLblPos val="t"/>
-          <c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/>
+          <c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/>
         </c:dLbls>
         <c:xVal><c:numLit><c:formatCode>General</c:formatCode><c:ptCount val="${peaks.length}"/>${xPts}</c:numLit></c:xVal>
         <c:yVal><c:numLit><c:formatCode>General</c:formatCode><c:ptCount val="${peaks.length}"/>${yPts}</c:numLit></c:yVal>
@@ -1644,19 +1641,16 @@ async function exportXLSX(){
   // 単一ファイルなら凡例なし、複数なら凡例あり（ピークラベルシリーズは非表示）
   let legendXml='';
   if(nFiles>1){
+    // ピークラベルシリーズのみ凡例から除外（データシリーズはデフォルト表示）
     let legendEntries='';
-    for(let si=0;si<nFiles;si++){
-      legendEntries+=`<c:legendEntry><c:idx val="${si}"/></c:legendEntry>`;
-    }
-    // ピークラベルシリーズを凡例から除外
     for(let si=nFiles;si<seriesCount;si++){
       legendEntries+=`<c:legendEntry><c:idx val="${si}"/><c:delete val="1"/></c:legendEntry>`;
     }
     legendXml=`<c:legend><c:legendPos val="r"/>${legendEntries}<c:overlay val="0"/></c:legend>`;
   } else if(seriesCount>nFiles){
-    // 単一ファイルでもピークラベルシリーズがある場合、凡例からすべて非表示
-    let legendEntries=`<c:legendEntry><c:idx val="0"/><c:delete val="1"/></c:legendEntry>`;
-    for(let si=nFiles;si<seriesCount;si++){
+    // 単一ファイル: 全シリーズを凡例から非表示
+    let legendEntries='';
+    for(let si=0;si<seriesCount;si++){
       legendEntries+=`<c:legendEntry><c:idx val="${si}"/><c:delete val="1"/></c:legendEntry>`;
     }
     legendXml=`<c:legend>${legendEntries}<c:overlay val="0"/></c:legend>`;
@@ -1745,8 +1739,11 @@ async function exportXLSX(){
   const s1Rels=zip.file(s1RelsPath);
   if(s1Rels){
     let rels=await s1Rels.async('string');
-    rels=rels.replace('</Relationships>',
-      '<Relationship Id="rIdDrw1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
+    // 重複防止
+    if(!rels.includes('drawing1.xml')){
+      rels=rels.replace('</Relationships>',
+        '<Relationship Id="rIdDrw1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
+    }
     zip.file(s1RelsPath, rels);
   } else {
     zip.file(s1RelsPath, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -1760,7 +1757,10 @@ async function exportXLSX(){
   if(!s1Xml.includes('xmlns:r=')){
     s1Xml=s1Xml.replace('<worksheet ','<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
   }
-  s1Xml=s1Xml.replace(/<\/worksheet>/,'<drawing r:id="rIdDrw1"/></worksheet>');
+  // 重複防止: 既存の<drawing>がなければ追加
+  if(!s1Xml.includes('<drawing ')){
+    s1Xml=s1Xml.replace(/<\/worksheet>/,'<drawing r:id="rIdDrw1"/></worksheet>');
+  }
   zip.file(s1Path, s1Xml);
 
   let ct=await zip.file('[Content_Types].xml').async('string');
