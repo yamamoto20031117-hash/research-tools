@@ -161,6 +161,7 @@
       <optgroup label="2H (三角柱)">
         <option value="MoS2">MoS₂</option>
         <option value="MoSe2">MoSe₂</option>
+        <option value="MoTe2">MoTe₂</option>
         <option value="WS2">WS₂</option>
         <option value="WSe2">WSe₂</option>
         <option value="NbSe2">NbSe₂</option>
@@ -235,6 +236,18 @@
     <input type="range" id="sl-rot-c" min="0" max="360" step="1" value="0" class="rot-sl">
     <input type="number" class="num-in" id="v-rot-c" min="0" max="360" step="1" value="0">°
     <span class="pm"><button onclick="stepSlider('sl-rot-c',-1)">−</button><button onclick="stepSlider('sl-rot-c',1)">+</button></span>
+  </div>
+  <div class="g">
+    <label>原子径</label>
+    <input type="range" id="sl-atom-r" min="0.1" max="1.5" step="0.05" value="1.0">
+    <input type="number" class="num-in" id="v-atom-r" min="0.1" max="1.5" step="0.05" value="1.0">
+    <span class="pm"><button onclick="stepSlider('sl-atom-r',-1)">−</button><button onclick="stepSlider('sl-atom-r',1)">+</button></span>
+  </div>
+  <div class="g">
+    <label>結合太さ</label>
+    <input type="range" id="sl-bond-r" min="0.1" max="2.0" step="0.05" value="1.0">
+    <input type="number" class="num-in" id="v-bond-r" min="0.1" max="2.0" step="0.05" value="1.0">
+    <span class="pm"><button onclick="stepSlider('sl-bond-r',-1)">−</button><button onclick="stepSlider('sl-bond-r',1)">+</button></span>
   </div>
   <div class="g"><input type="checkbox" id="chk-poly"><label for="chk-poly">多面体</label></div>
   <div class="g"><input type="checkbox" id="chk-cell"><label for="chk-cell">単位胞</label></div>
@@ -328,6 +341,7 @@ const DB = {
   ZrS2:  { m:'Zr', x:'S',  defPhase:'1T', a:3.662, c1T:5.81,  c2H:11.62, bond:2.57 },
   MoS2:  { m:'Mo', x:'S',  defPhase:'2H', a:3.160, c1T:6.15,  c2H:12.30, bond:2.41 },
   MoSe2: { m:'Mo', x:'Se', defPhase:'2H', a:3.289, c1T:6.47,  c2H:12.93, bond:2.53 },
+  MoTe2: { m:'Mo', x:'Te', defPhase:'2H', a:3.519, c1T:6.98,  c2H:13.97, bond:2.73 },
   WS2:   { m:'W',  x:'S',  defPhase:'2H', a:3.153, c1T:6.16,  c2H:12.32, bond:2.42 },
   WSe2:  { m:'W',  x:'Se', defPhase:'2H', a:3.282, c1T:6.48,  c2H:12.96, bond:2.53 },
   NbSe2: { m:'Nb', x:'Se', defPhase:'2H', a:3.442, c1T:6.27,  c2H:12.55, bond:2.60 },
@@ -654,7 +668,9 @@ function captureState(){
     inter:document.getElementById('sel-inter').value,
     poly:document.getElementById('chk-poly').checked,
     cell:document.getElementById('chk-cell').checked,
-    dist:document.getElementById('chk-dist').checked
+    dist:document.getElementById('chk-dist').checked,
+    atomR:document.getElementById('sl-atom-r').value,
+    bondR:document.getElementById('sl-bond-r').value
   };
 }
 function pushUndo(){
@@ -678,6 +694,8 @@ function restoreState(s){
   document.getElementById('chk-poly').checked=s.poly;
   document.getElementById('chk-cell').checked=s.cell;
   document.getElementById('chk-dist').checked=s.dist;
+  if(s.atomR){document.getElementById('sl-atom-r').value=s.atomR;document.getElementById('v-atom-r').value=parseFloat(s.atomR).toFixed(1);}
+  if(s.bondR){document.getElementById('sl-bond-r').value=s.bondR;document.getElementById('v-bond-r').value=parseFloat(s.bondR).toFixed(1);}
   setClickMode(s.clickMode);
   buildStructure();
   updateBg();
@@ -765,8 +783,10 @@ function buildStructure() {
   const matM=new THREE.MeshPhongMaterial({color:MCOL[info.m],shininess:80,specular:0x446688});
   const matX=new THREE.MeshPhongMaterial({color:XCOL[info.x],shininess:60,specular:0x888844});
   const matBond=new THREE.MeshPhongMaterial({color:0x8abbdd,transparent:true,opacity:0.55});
-  const geoM=new THREE.SphereGeometry(0.45,24,24);
-  const geoX=new THREE.SphereGeometry(0.36,20,20);
+  const atomScale=parseFloat(document.getElementById('sl-atom-r').value)||1.0;
+  const bondScale=parseFloat(document.getElementById('sl-bond-r').value)||1.0;
+  const geoM=new THREE.SphereGeometry(0.45*atomScale,24,24);
+  const geoX=new THREE.SphereGeometry(0.36*atomScale,20,20);
 
   const Na=parseInt(document.getElementById('sl-na').value);
   const Nb=parseInt(document.getElementById('sl-nb').value);
@@ -809,7 +829,7 @@ function buildStructure() {
     visX.forEach(xp=>{
       const d2=mp.distanceToSquared(xp);
       if(d2>0.01&&d2<bCut2){
-        const c=makeCyl(mp.clone().add(off),xp.clone().add(off),0.06,matBond);
+        const c=makeCyl(mp.clone().add(off),xp.clone().add(off),0.06*bondScale,matBond);
         if(c)structGroup.add(c);
         nb.push(xp.clone().add(off));
       }
@@ -979,7 +999,7 @@ function buildStructure() {
 
         compCoords.forEach((rv,idx)=>{
           const at=inter.atoms[idx];
-          const geo=new THREE.SphereGeometry(at.r,16,16);
+          const geo=new THREE.SphereGeometry(at.r*atomScale,16,16);
           const mat=new THREE.MeshPhongMaterial({color:at.color,shininess:60});
           const mesh=new THREE.Mesh(geo,mat);
           mesh.position.set(bx+rv.x+off.x+interOffset.dx, gapCenterY+rv.y+off.y, bz+rv.z+off.z+interOffset.dz);
@@ -992,7 +1012,7 @@ function buildStructure() {
             const r1=compCoords[ai], r2=compCoords[bi];
             const p1=new THREE.Vector3(bx+r1.x+off.x+interOffset.dx, gapCenterY+r1.y+off.y, bz+r1.z+off.z+interOffset.dz);
             const p2=new THREE.Vector3(bx+r2.x+off.x+interOffset.dx, gapCenterY+r2.y+off.y, bz+r2.z+off.z+interOffset.dz);
-            const c=makeCyl(p1,p2,0.05,matIBond);
+            const c=makeCyl(p1,p2,0.05*bondScale,matIBond);
             if(c){c.userData={isInter:true};structGroup.add(c);}
           });
         }
@@ -1434,7 +1454,8 @@ function syncSliderToNum(slId){
   const k=slId.replace('sl-','');
   const vId=slId.startsWith('sl-rot-')?'v-rot-'+k.replace('rot-',''):'v-'+k;
   const vEl=document.getElementById(vId);
-  vEl.value=slId==='sl-gap'?parseFloat(sl.value).toFixed(1):sl.value;
+  const decIds=['sl-gap','sl-atom-r','sl-bond-r'];
+  vEl.value=decIds.includes(slId)?parseFloat(sl.value).toFixed(1):sl.value;
 }
 function syncNumToSlider(vId){
   pushUndo();
@@ -1448,7 +1469,8 @@ function syncNumToSlider(vId){
   if(isNaN(v)) v=parseFloat(sl.value);
   v=Math.max(mn,Math.min(mx,Math.round(v/st)*st));
   sl.value=v;
-  vEl.value=slId==='sl-gap'?v.toFixed(1):v;
+  const decIds2=['sl-gap','sl-atom-r','sl-bond-r'];
+  vEl.value=decIds2.includes(slId)?v.toFixed(1):v;
   buildStructure();
 }
 function stepSlider(slId, dir){
@@ -1462,7 +1484,7 @@ function stepSlider(slId, dir){
   buildStructure();
 }
 
-['sl-gap','sl-layers','sl-na','sl-nb'].forEach(id=>{
+['sl-gap','sl-layers','sl-na','sl-nb','sl-atom-r','sl-bond-r'].forEach(id=>{
   document.getElementById(id).addEventListener('pointerdown',function(){pushUndo();},{once:false});
   document.getElementById(id).addEventListener('input',function(){
     syncSliderToNum(id);
@@ -1470,7 +1492,7 @@ function stepSlider(slId, dir){
   });
 });
 // 数値入力欄のイベント
-['v-gap','v-layers','v-na','v-nb'].forEach(vId=>{
+['v-gap','v-layers','v-na','v-nb','v-atom-r','v-bond-r'].forEach(vId=>{
   document.getElementById(vId).addEventListener('change',function(){ syncNumToSlider(vId); });
 });
 // 層間距離（Å: M–M金属間距離）からの逆算入力
