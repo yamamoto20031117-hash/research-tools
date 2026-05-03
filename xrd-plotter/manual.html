@@ -34,8 +34,7 @@
     margin:12px 0;font-size:.84rem;color:#dda}
   .back-link{display:inline-block;margin-top:30px;color:#58a6ff;text-decoration:none;font-size:.88rem}
   .back-link:hover{text-decoration:underline}
-  .img-placeholder{background:rgba(30,35,50,0.6);border:1px dashed rgba(88,166,255,0.2);border-radius:8px;
-    padding:40px 20px;text-align:center;color:#555;font-size:.8rem;margin:12px 0}
+  code{background:#1a2030;border:1px solid #2a3040;border-radius:3px;padding:1px 6px;font-size:.82rem;color:#7db8ff}
 </style>
 </head>
 <body>
@@ -48,15 +47,16 @@
 <div class="container">
 
   <h2>概要</h2>
-  <p>XRDデータプロッターは、Rigaku SmartLab等で取得したX線回折（XRD）データのTXTファイルを読み込み、
-    論文品質のグラフとして表示・出力するWebツールです。複数データのスタック表示、ピーク検出、
-    ドラッグ可能なラベル、Excel/PNG出力に対応しています。</p>
+  <p>XRDデータプロッターは、Rigaku SmartLab等で取得したX線回折（XRD）データを読み込み、
+    論文品質のグラフとして表示・出力するWebツールです。対応形式は <strong>.ras</strong> と <strong>.txt</strong> の2種類です。
+    複数データのスタック／重ね合わせ表示、ピーク検出・ラベリング、
+    ドラッグ可能なラベル、グラフカスタマイズ、Excel (.xlsx) / PNG出力に対応しています。</p>
 
   <h2>クイックスタート</h2>
   <div class="card">
     <div class="step">
       <div class="step-num">1</div>
-      <div class="step-text">TXTファイルをドロップゾーンにドラッグ＆ドロップ（またはクリックして選択）。複数ファイルを同時に読み込むとスタック表示されます。</div>
+      <div class="step-text">ファイル（.ras または .txt）をドロップゾーンにドラッグ＆ドロップ（またはクリックして選択）。複数ファイルを同時に読み込めます。</div>
     </div>
     <div class="step">
       <div class="step-num">2</div>
@@ -64,58 +64,93 @@
     </div>
     <div class="step">
       <div class="step-num">3</div>
-      <div class="step-text">「ピーク検出」でピーク位置を自動検出し、ラベル欄に (001) 等を入力するとグラフに表示されます。</div>
+      <div class="step-text">「ピーク検出」でピーク位置を自動検出。n欄に回折次数（1, 2, 3...）を入力すると (001), (002) 等がグラフに表示されます。</div>
     </div>
     <div class="step">
       <div class="step-num">4</div>
-      <div class="step-text">「PNG保存」または「Excel出力」で結果を保存します。</div>
+      <div class="step-text">「PNG保存」で画像出力、「Excel出力」でデータ＋チャート＋ピーク解析を含む .xlsx ファイルを出力します。</div>
     </div>
   </div>
 
   <h2>対応ファイル形式</h2>
   <div class="card">
-    <div class="card-title">Rigaku SmartLab TXT形式</div>
-    <p>タブ区切り・カンマ区切り・スペース区切りのいずれにも対応。ヘッダー行は自動スキップされます。
-      2列（2θ角度, 強度）のデータが必要です。</p>
-    <div class="note">Shift-JIS、UTF-8、EUC-JP のエンコーディングに自動対応。読み取れない場合はバイナリからASCII部分を抽出する最終手段も備えています。</div>
+    <table>
+      <thead><tr><th>形式</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><strong>.ras</strong></td><td>Rigaku SmartLab のネイティブ形式。ヘッダー情報を自動解析し、2θ / 強度データを抽出します。</td></tr>
+        <tr><td><strong>.txt</strong></td><td>タブ区切り・カンマ区切り・スペース区切りのいずれにも対応。ヘッダー行は自動スキップされます。2列（2θ角度, 強度）のデータが必要です。</td></tr>
+      </tbody>
+    </table>
+    <div class="note">Shift-JIS、UTF-8、EUC-JP のエンコーディングに自動対応。</div>
   </div>
 
-  <h2>ツールバーの各機能</h2>
+  <h2>ツールバー</h2>
   <table>
-    <thead><tr><th>ボタン / 設定</th><th>説明</th></tr></thead>
+    <thead><tr><th>ボタン</th><th>説明</th></tr></thead>
     <tbody>
-      <tr><td><span class="tag">データ表示</span></td><td>読み込んだ生データを表形式で表示/非表示。最初のデータセットの先頭500行を表示します。</td></tr>
-      <tr><td><span class="tag">ピーク検出</span></td><td>全データセットのピークを自動検出。2θ位置・強度・d値・ラベル入力欄を表示。</td></tr>
-      <tr><td><span class="tag">Excel出力</span></td><td>グラフ画像 + 生データ + ピーク情報をまとめたExcelファイル (.xls) をダウンロード。</td></tr>
+      <tr><td><span class="tag">Excel出力</span></td><td>1シートの .xlsx ファイルを出力。左側に生データ列、右側にピーク解析テーブル（d-spacingシリーズ別）、さらにチャート（ピークラベル付き）が含まれます。</td></tr>
       <tr><td><span class="tag">PNG保存</span></td><td>現在表示中のグラフをPNG画像として保存。そのまま論文に使えるクオリティです。</td></tr>
+      <tr><td><span class="tag">説明書</span></td><td>この取扱説明書を開きます。</td></tr>
+      <tr><td><span class="tag">ライブ受信</span></td><td>SmartLabからのリアルタイムデータ受信モードのON/OFF（要サーバー側設定）。</td></tr>
     </tbody>
   </table>
 
-  <h2>グラフ設定</h2>
-  <table>
-    <thead><tr><th>設定項目</th><th>説明</th></tr></thead>
-    <tbody>
-      <tr><td>X範囲</td><td>表示する2θの最小値・最大値を指定。データ読込時に自動設定されますが、手動で変更可能。</td></tr>
-      <tr><td>線幅</td><td>XRDパターンの描画線幅を 0.5〜4.0 の範囲で調整。</td></tr>
-      <tr><td>Y軸</td><td>Y軸のスケールモード。<strong>リニア</strong>（そのまま）、<strong>対数</strong>（弱いピークを強調）、<strong>平方根</strong>（中間）から選択。</td></tr>
-      <tr><td>グリッド</td><td>背景のグリッド線の表示/非表示。</td></tr>
-      <tr><td>ピークラベル</td><td>ピーク検出後のラベル表示/非表示を切り替え。</td></tr>
-    </tbody>
-  </table>
-
-  <h2>スタック表示</h2>
+  <h2>グラフツールバー</h2>
   <div class="card">
-    <p>複数ファイルを読み込むと、各データセットが縦方向にスタック表示されます。
-      各データセットは独立してY軸が正規化されるため、強度スケールが大きく異なるデータ同士でも
-      見やすく並べて表示できます。</p>
-    <p>ファイルリストでは各データセットの色（カラーピッカー）、ラベル名（テキスト入力）、
-      削除（×ボタン）が操作できます。ラベル名はグラフ右上に表示されます。</p>
+    <table>
+      <thead><tr><th>設定項目</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td>X範囲</td><td>表示する2θの最小値・最大値を指定。データ読込時に自動設定。</td></tr>
+        <tr><td>高さ</td><td>スライダーでグラフの縦幅を調整（左端=自動）。</td></tr>
+        <tr><td>線幅</td><td>XRDパターンの描画線幅を 0.5〜4.0 で調整。</td></tr>
+        <tr><td>Y軸</td><td>リニア（通常）/ 対数（弱いピーク強調）/ 平方根（中間）を選択。</td></tr>
+        <tr><td>表示</td><td><strong>スタック</strong>（縦に並べて比較）または<strong>重ね合わせ</strong>（同一座標軸で重畳）。</td></tr>
+        <tr><td>正規化</td><td>重ね合わせ表示時、最大ピークに合わせて全データセットを正規化。</td></tr>
+        <tr><td>グリッド</td><td>背景グリッド線の表示/非表示。</td></tr>
+        <tr><td>ピークラベル</td><td>ピーク検出後のラベル (001) 等の表示/非表示。</td></tr>
+        <tr><td>FWHM</td><td>各ピークのFWHM（半値幅）をラベルに併記。</td></tr>
+        <tr><td>カスタマイズ</td><td>グラフの詳細設定パネルを開きます（下記参照）。</td></tr>
+      </tbody>
+    </table>
   </div>
 
-  <h2>ピーク検出</h2>
+  <h2>グラフカスタマイズ</h2>
   <div class="card">
-    <div class="card-title">検出アルゴリズム</div>
-    <p>移動平均で平滑化後、局所的な極大点を検出します。以下のフィルタリングを適用：</p>
+    <div class="card-title">タイトル・ラベル</div>
+    <table>
+      <tbody>
+        <tr><td>グラフタイトル</td><td>空欄で非表示。ファイル名が自動入力されます。下付き・上付き文字に対応（下記参照）。</td></tr>
+        <tr><td>X軸ラベル</td><td>デフォルト: <code>2θ / deg</code></td></tr>
+        <tr><td>Y軸ラベル</td><td>デフォルト: <code>Intensity / a.u.</code>（Y軸モードに連動して自動変更）</td></tr>
+      </tbody>
+    </table>
+
+    <div class="card-title" style="margin-top:14px">下付き・上付き文字</div>
+    <p>グラフタイトルで化学式等を正しく表記できます。入力欄の横にある <span class="key">x₂</span> <span class="key">x²</span> ボタンでマークアップを挿入するか、直接記法を入力します。</p>
+    <table>
+      <thead><tr><th>記法</th><th>表示例</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><code>VSe_{2}</code></td><td>VSe<sub>2</sub></td><td>下付き文字</td></tr>
+        <tr><td><code>x^{2+}</code></td><td>x<sup>2+</sup></td><td>上付き文字</td></tr>
+        <tr><td><code>MoS_{2}^{*}</code></td><td>MoS<sub>2</sub><sup>*</sup></td><td>組み合わせ</td></tr>
+      </tbody>
+    </table>
+    <div class="note">この記法はPNG保存・Excel出力の両方に反映されます。Excel上でも下付き/上付きとして正しく描画されます。</div>
+
+    <div class="card-title" style="margin-top:14px">フォント・サイズ</div>
+    <p>フォント（Arial, Times New Roman, Helvetica, Georgia, Courier New）、タイトル・軸ラベル・目盛り・データラベル・ピークラベルの各サイズを個別に設定可能。</p>
+
+    <div class="card-title" style="margin-top:14px">色・背景</div>
+    <p>背景色、軸・文字色、グリッド色、ベースライン色をカラーピッカーで設定。「透過」チェックで背景を透過にしてPNG保存が可能。</p>
+
+    <div class="card-title" style="margin-top:14px">レイアウト</div>
+    <p>上下左右の余白、グラフ高さ、外枠表示のON/OFF、Y軸目盛り表示、X軸小目盛り（1°間隔）を設定できます。</p>
+  </div>
+
+  <h2>ピーク検出・ラベリング</h2>
+  <div class="card">
+    <div class="card-title">自動検出アルゴリズム</div>
+    <p>データを読み込むと「ピーク検出」ボタンが表示されます。移動平均で平滑化後、局所的な極大点を検出し、以下のフィルタリングを適用します。</p>
     <table>
       <tbody>
         <tr><td>閾値</td><td>最大強度の10%未満のピークを除外</td></tr>
@@ -123,56 +158,63 @@
         <tr><td>近接マージ</td><td>1.0°以内の近接ピークは最も強い方を採用</td></tr>
       </tbody>
     </table>
-    <div class="note">検出後、ピークリストの「ラベル」欄に (001) や (002) などのミラー指数を入力すると、
-      グラフ上にラベルが表示されます。ラベルが空のピークはグラフ上には表示されません。</div>
+
+    <div class="card-title" style="margin-top:14px">ラベル入力（回折次数）</div>
+    <p>検出されたピークリストの「n」欄に回折次数（1, 2, 3...）を入力すると、グラフ上に (001), (002), (003) のようなラベルが表示されます。
+      同じd-spacingに属するピークは自動でシリーズ（A, B, C...）に分類され、色分けされます。</p>
+    <div class="note">ラベルが空のピークはグラフに表示されません。複数のd-spacingシリーズがある場合、A=青、B=赤、C=緑 と自動配色されます。</div>
+
+    <div class="card-title" style="margin-top:14px">手動ピーク追加</div>
+    <p>自動検出で拾えなかったピークは、ピークリスト下部の「手動追加」から2θ値と回折次数を指定して追加できます。</p>
+
+    <div class="card-title" style="margin-top:14px">ラベルのドラッグ移動</div>
+    <p>ピークラベルはマウスでドラッグして任意の位置に移動できます。ピーク頂点からラベルまで点線のリーダーラインが自動描画されます。タッチ操作にも対応。位置はPNG保存・Excel出力に反映されます。</p>
   </div>
 
   <h3>d値の計算</h3>
-  <p>Braggの法則 (nλ = 2d sinθ) に基づき、Cu-Kα線の波長 λ = 1.5406 Å を使用して
-    d値（面間隔）を自動計算します。</p>
+  <p>Braggの法則 (nλ = 2d sinθ) に基づき、Cu-Kα線の波長 λ = 1.5418 Å を使用してd値（面間隔）を計算します。
+    nは入力した回折次数で、n次の回折ピークから1次のd値を逆算します。</p>
 
-  <h2>ピークラベルのドラッグ移動</h2>
+  <h2>スタック／重ね合わせ表示</h2>
   <div class="card">
-    <div class="card-title">ラベルを自由に配置</div>
-    <p>ピークラベルはマウスでドラッグして任意の位置に移動できます。</p>
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-text">ラベルにマウスを合わせるとカーソルが<span class="key">grab</span>に変わります。</div>
-    </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-text">ドラッグしてラベルを好きな位置に移動。ピーク頂点からラベルまで点線のリーダーラインが自動で描かれます。</div>
-    </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-text">ラベル位置はPNG保存・Excel出力にも反映されます。タッチ操作にも対応。</div>
-    </div>
+    <table>
+      <thead><tr><th>モード</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><strong>スタック</strong></td><td>各データセットを縦方向に並べて表示。各データは独立してY軸が正規化されるため、強度スケールが大きく異なるデータ同士でも比較しやすい。</td></tr>
+        <tr><td><strong>重ね合わせ</strong></td><td>全データを同一座標軸で重畳表示。「正規化」ボタンで最大ピークに合わせた正規化も可能。</td></tr>
+      </tbody>
+    </table>
+    <p>ファイルリストでは各データセットの色（カラーピッカー）、ラベル名（テキスト入力）、削除（×ボタン）が操作できます。</p>
   </div>
 
-  <h2>Y軸スケールモードの使い分け</h2>
+  <h2>Y軸スケールモード</h2>
   <div class="card">
     <table>
       <thead><tr><th>モード</th><th>計算</th><th>用途</th></tr></thead>
       <tbody>
         <tr><td><strong>リニア</strong></td><td>そのまま表示</td><td>通常の論文用グラフ。ピーク強度比を正確に反映。</td></tr>
-        <tr><td><strong>対数</strong></td><td>log₁₀(Intensity)</td><td>非常に弱いピークや微量相を確認する際に有効。バックグラウンドのノイズも見えやすくなります。</td></tr>
-        <tr><td><strong>平方根</strong></td><td>√Intensity</td><td>対数ほど極端でなく、弱いピークを少し強調したい場合に適しています。</td></tr>
+        <tr><td><strong>対数</strong></td><td>log₁₀(Intensity)</td><td>弱いピークや微量相の確認に有効。</td></tr>
+        <tr><td><strong>平方根</strong></td><td>√Intensity</td><td>対数ほど極端でなく、弱いピークを少し強調。</td></tr>
       </tbody>
     </table>
   </div>
 
-  <h2>Excel出力の仕様</h2>
+  <h2>Excel出力 (.xlsx) の仕様</h2>
   <div class="card">
-    <p>Excel出力 (.xls) ファイルには以下が含まれます：</p>
+    <p>1シートに以下の3要素が含まれます。</p>
     <table>
       <tbody>
-        <tr><td>グラフ画像</td><td>現在のキャンバスのスクリーンショットがそのまま埋め込まれます。</td></tr>
-        <tr><td>生データテーブル</td><td>各データセットの全 2θ / 強度データ。</td></tr>
-        <tr><td>ピークテーブル</td><td>ピーク検出済みの場合、2θ・強度・d値・ラベル情報が出力されます。</td></tr>
+        <tr><td><strong>生データ列（左側）</strong></td><td>各データセットの全 2θ / Intensity データ。複数ファイルの場合は横に並びます。</td></tr>
+        <tr><td><strong>ピーク解析テーブル（右側）</strong></td><td>d-spacingシリーズごとにグループ化。各シリーズにヘッダー「シリーズ A (d = 6.12 Å)」等。列: (00l), 2θ, d, Intensity, FWHM, L (Scherrer結晶子サイズ)。</td></tr>
+        <tr><td><strong>散布チャート</strong></td><td>サイト上のグラフと同様のXRDパターンチャート。ピークラベル (001) 等もシリーズ色で表示。フォントはArial。X軸はデータ範囲に合わせて自動調整。</td></tr>
       </tbody>
     </table>
-    <div class="note">出力形式は HTML-Excel (.xls) です。Microsoft Excel、LibreOffice Calc、Google Sheets 等で開けます。
-      macOS の Numbers では画像が表示されない場合があります。</div>
+    <div class="note">ファイル名に <code>~</code> 等の特殊文字が含まれる場合、シート名は自動でサニタイズされます。</div>
+  </div>
+
+  <h2>データテーブル</h2>
+  <div class="card">
+    <p>グラフ下部の「データ表示」エリアで、読み込んだ生データを表形式で確認できます。2θジャンプ機能で指定した2θ値の近傍に素早くスクロールできます。</p>
   </div>
 
   <h2>トラブルシューティング</h2>
@@ -180,10 +222,10 @@
     <table>
       <thead><tr><th>症状</th><th>原因と対処法</th></tr></thead>
       <tbody>
-        <tr><td>「データを読み取れませんでした」</td><td>TXTファイルが SmartLab 形式以外の可能性。2列（2θ, 強度）のタブ/カンマ/スペース区切りデータか確認してください。</td></tr>
+        <tr><td>「データを読み取れませんでした」</td><td>対応形式（.ras / .txt）以外のファイルの可能性。2列（2θ, 強度）のテキストデータか確認してください。</td></tr>
         <tr><td>ピークが検出されない</td><td>ピーク強度がバックグラウンドに対して十分でない可能性。X範囲を狭めて再検出してみてください。</td></tr>
-        <tr><td>ピークが多すぎる</td><td>ノイズの多いデータではピーク検出が過敏になることがあります。ピークリストのラベル欄に入力したもののみグラフ上に表示されます。</td></tr>
-        <tr><td>Excelにグラフが表示されない</td><td>.xls ファイルを Microsoft Excel または LibreOffice Calc で開いてください。ブラウザのプレビューでは画像が表示されない場合があります。</td></tr>
+        <tr><td>ピークが多すぎる</td><td>ノイズの多いデータでは検出が過敏になることがあります。n欄に入力したもののみグラフ上に表示されます。</td></tr>
+        <tr><td>Excelで「内容に問題」の警告</td><td>「はい」をクリックして回復してください。通常はデータに影響ありません。</td></tr>
       </tbody>
     </table>
   </div>
