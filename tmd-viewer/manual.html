@@ -10,7 +10,7 @@
   body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;
     min-height:100vh;line-height:1.8}
   .top-bar{background:rgba(8,11,18,0.95);backdrop-filter:blur(10px);padding:10px 20px;display:flex;
-    align-items:center;gap:14px;border-bottom:1px solid rgba(88,166,255,0.1)}
+    align-items:center;gap:14px;border-bottom:1px solid rgba(88,166,255,0.1);flex-wrap:wrap}
   .top-bar a{color:#58a6ff;text-decoration:none;font-size:.85rem}
   .top-bar h1{font-size:1rem;color:#fff}
   .container{max-width:860px;margin:0 auto;padding:30px 20px 60px}
@@ -38,6 +38,20 @@
   .mat-card{background:rgba(20,24,36,0.6);border:1px solid rgba(88,166,255,0.08);border-radius:6px;padding:10px 14px}
   .mat-card h4{color:#7db8ff;font-size:.82rem;margin-bottom:4px}
   .mat-card p{font-size:.78rem;margin-bottom:0;color:#999}
+  @media (max-width:600px){
+    .top-bar{padding:8px 12px;gap:8px}
+    .top-bar h1{font-size:.88rem}
+    .container{padding:20px 14px 50px}
+    h2{font-size:1.05rem;margin:28px 0 10px}
+    h3{font-size:.9rem}
+    p{font-size:.84rem}
+    table{font-size:.78rem}
+    th,td{padding:5px 8px}
+    .card{padding:12px 14px}
+    .mat-grid{grid-template-columns:1fr}
+    .key{font-size:.72rem;padding:1px 6px}
+    .tag{font-size:.7rem;padding:1px 6px}
+  }
 </style>
 </head>
 <body>
@@ -52,7 +66,8 @@
   <h2>概要</h2>
   <p>TMD結晶構造ビューアは、遷移金属ダイカルコゲナイド（TMD）の結晶構造をインタラクティブに
     3D表示するWebツールです。1T型（八面体配位）と2H型（三角柱配位）の両方に対応し、
-    インターカレーション分子の挿入、層間距離の調整、原子間距離測定などが可能です。</p>
+    インターカレーション分子の挿入、層間距離の調整、原子間距離測定、CIFファイルの入出力などが可能です。
+    PC・スマートフォン・タブレットいずれでも動作します。</p>
 
   <h2>基本操作</h2>
   <div class="card">
@@ -61,10 +76,10 @@
       <tbody>
         <tr><td>回転</td><td>ドラッグ</td><td>1本指スワイプ</td></tr>
         <tr><td>ズーム</td><td>スクロールホイール</td><td>ピンチイン/アウト</td></tr>
-        <tr><td>パン（平行移動）</td><td>右クリック + ドラッグ</td><td>2本指スワイプ</td></tr>
         <tr><td>原子クリック</td><td>左クリック</td><td>タップ</td></tr>
       </tbody>
     </table>
+    <div class="note">層数や幅を変更すると、構造全体が画面に収まるようにカメラが自動調整されます。原子径・結合太さの変更ではズーム位置は保持されます。</div>
   </div>
 
   <h2>対応物質一覧</h2>
@@ -75,10 +90,10 @@
     </div>
     <div class="mat-card">
       <h4>2H型（三角柱配位）</h4>
-      <p>MoS₂、MoSe₂、WS₂、WSe₂、NbSe₂、NbS₂</p>
+      <p>MoS₂、MoSe₂、MoTe₂、WS₂、WSe₂、NbSe₂、NbS₂</p>
     </div>
   </div>
-  <p>各物質の格子定数 (a, c) は文献値に基づいています。物質を選択すると結晶データパネルに詳細が表示されます。</p>
+  <p>各物質の格子定数 (a, c) および結合長は文献値に基づいています。物質を選択すると右上の結晶データパネルに詳細が表示されます。</p>
 
   <h2>ツールバーの各機能</h2>
 
@@ -87,8 +102,8 @@
     <thead><tr><th>設定</th><th>説明</th></tr></thead>
     <tbody>
       <tr><td><span class="tag">物質</span></td><td>表示する TMD を選択。1T / 2H がグループ分けされています。</td></tr>
-      <tr><td><span class="tag">層間</span></td><td>層間距離の倍率（1.0〜5.0）。1.0 = 文献値通り。インターカレーション時に広げて観察できます。</td></tr>
-      <tr><td><span class="tag">層数</span></td><td>表示する層の数（2〜5）。</td></tr>
+      <tr><td><span class="tag">層間</span></td><td>層間距離の倍率（1.0〜5.0×）。右の Å 入力欄に直接金属間距離を入力することも可能。</td></tr>
+      <tr><td><span class="tag">層数</span></td><td>表示する層の数（2〜5）。増やすとカメラが自動でズームアウトします。</td></tr>
       <tr><td><span class="tag">a₁幅 / a₂幅</span></td><td>a₁方向・a₂方向のユニットセル繰り返し数（1〜10）。</td></tr>
     </tbody>
   </table>
@@ -104,13 +119,29 @@
         <tr><td><strong>カスタム</strong></td><td>CIF / XYZ ファイルから任意の分子を読み込み可能</td></tr>
       </tbody>
     </table>
-    <div class="note">CIF/XYZ ファイルからの分子読み込みは「+ CIF/XYZ」ボタンから。読み込んだ分子は「読込分子」グループに追加されます。</div>
+    <div class="note">「+ CIF/XYZ」ボタンから分子ファイルを読み込みます。読み込んだ分子は「読込分子」グループに自動追加されます。分子は重心が層間中心に配置され、層間距離も自動調整されます。</div>
   </div>
 
-  <h3>回転制御</h3>
+  <h3>回転制御（挿入分子の向き）</h3>
   <div class="card">
     <p><span class="tag">a回転</span> <span class="tag">b回転</span> <span class="tag">c回転</span>
-      の3軸について結晶全体を回転できます（0〜360°）。スライダー、数値入力、±ボタンのいずれでも操作可能。</p>
+      の3軸について挿入分子を回転できます（0〜360°）。スライダー、数値入力、±ボタンのいずれでも操作可能。</p>
+  </div>
+
+  <h3>描画サイズ調整</h3>
+  <div class="card">
+    <div class="card-title">原子径・結合太さ</div>
+    <table>
+      <thead><tr><th>設定</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag">M径</span></td><td>金属原子（Mo, W, Ti など）の球の大きさ（0.1〜2.0×）</td></tr>
+        <tr><td><span class="tag">X径</span></td><td>カルコゲン原子（S, Se, Te）の球の大きさ（0.1〜2.0×）</td></tr>
+        <tr><td><span class="tag">分子径</span></td><td>挿入分子の原子の球の大きさ（0.1〜2.0×）</td></tr>
+        <tr><td><span class="tag">結合太さ</span></td><td>すべての結合（層内・分子内）の棒の太さ（0.1〜2.0×）</td></tr>
+      </tbody>
+    </table>
+    <p><span class="key">↺ サイズリセット</span> ボタンで全項目を一括で初期値（1.0×）に戻せます。</p>
+    <div class="note">サイズ変更時にカメラのズーム位置はリセットされません。</div>
   </div>
 
   <h3>表示オプション</h3>
@@ -131,7 +162,7 @@
       <tbody>
         <tr><td><span class="tag">距離</span></td><td>2つの原子をクリックすると原子間距離 (Å) を表示。結合長の確認に便利。</td></tr>
         <tr><td><span class="tag">移動</span></td><td>インターカレーション分子をクリック＆ドラッグで層間内の位置を移動。</td></tr>
-        <tr><td><span class="tag">四面体</span></td><td>原子をクリックすると周囲の原子との四面体角度を計算・表示。</td></tr>
+        <tr><td><span class="tag">四面体</span></td><td>中心原子→周囲原子の順にクリックして四面体角度を計算・表示。</td></tr>
       </tbody>
     </table>
   </div>
@@ -140,42 +171,54 @@
   <table>
     <thead><tr><th>ボタン</th><th>機能</th></tr></thead>
     <tbody>
-      <tr><td><span class="tag">透視</span> / <span class="tag">平行</span></td><td>投影法の切り替え。透視投影はパースがつき、平行投影は論文用に適しています。</td></tr>
-      <tr><td><span class="tag">a</span> <span class="tag">b</span> <span class="tag">c</span></td><td>それぞれ a軸・b軸・c軸方向からの正面視点に切り替え。</td></tr>
+      <tr><td><span class="tag">透視</span> / <span class="tag">平行</span></td><td>投影法の切り替え。透視投影はパースあり、平行投影は論文用に適しています。</td></tr>
+      <tr><td><span class="tag">a</span> <span class="tag">b</span> <span class="tag">c</span></td><td>a軸・b軸・c軸方向からの正面視点に切り替え。</td></tr>
       <tr><td><span class="tag">自由</span></td><td>自由回転モードに戻ります。</td></tr>
     </tbody>
   </table>
 
   <h2>撮影・出力</h2>
   <div class="card">
+    <div class="card-title">スクリーンショットとCIF出力</div>
     <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-text"><span class="key">撮影</span> ボタンで現在の表示をPNG画像として保存。背景は暗色 (#080b12) のまま保存されます。</div>
+      <div class="step-num">&#128247;</div>
+      <div class="step-text"><span class="key">撮影</span> ボタンで現在の表示をPNG画像として保存。</div>
     </div>
     <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-text">論文用に白背景が必要な場合は、画像編集ソフトで背景色を変更してください。</div>
+      <div class="step-num">&#128196;</div>
+      <div class="step-text"><span class="key">CIF出力</span> ボタンで現在の構造（物質＋インターカレーション分子を含む）を CIF ファイルとしてダウンロード。他の結晶構造ソフトで読み込み可能。</div>
     </div>
   </div>
 
   <h2>向き最適化</h2>
   <div class="card">
-    <div class="card-title">自動最適ビュー</div>
-    <p><span class="key">向き最適化</span> ボタンをクリックすると、結晶構造が最も見やすい角度を
-      自動的に探索します。最適化の進行状況はポップアップパネルに表示されます。</p>
+    <div class="card-title">挿入分子の自動回転最適化</div>
+    <p><span class="key">&#9883; 向き最適化</span> ボタンをクリックすると、挿入分子が層間に最もコンパクトに
+      収まる向き（Y方向の高さが最小になる回転角）を自動探索します。</p>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text">粗探索（15°刻み）で全方向を走査</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text">精密探索（1°刻み）で最適角度を絞り込み</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-text">回転スライダーと層間距離が自動で最適値に設定されます</div>
+    </div>
   </div>
 
   <h2>元に戻す（Undo）</h2>
   <div class="card">
-    <p><span class="key">戻す</span> ボタンまたは <span class="key">Ctrl+Z</span> で
-      直前の操作を元に戻せます。回転・層間距離の変更・インターカレーション変更などの
-      パラメータ変更に対応しています。</p>
+    <p><span class="key">↩ 戻す</span> ボタンまたは <span class="key">Ctrl+Z</span>（Mac: <span class="key">⌘+Z</span>）で
+      直前の操作を元に戻せます（最大50回）。原子径・結合太さ・層間距離・回転などすべてのスライダー操作に対応。</p>
   </div>
 
   <h2>色のカスタマイズ</h2>
   <div class="card">
-    <p>ツールバー右側のカラーピッカーで金属原子と配位子（カルコゲン）の色を変更できます。
-      凡例パネル（画面下部）に現在の色が反映されます。</p>
+    <p>ツールバー右端のカラーピッカーで金属原子と配位子（カルコゲン）の色を個別に変更できます。
+      画面下部の凡例パネルに現在の色が反映されます。</p>
   </div>
 
   <h2>結晶データパネル</h2>
@@ -183,10 +226,12 @@
     <p>画面右上の「結晶データ」パネルには以下の情報が表示されます：</p>
     <table>
       <tbody>
-        <tr><td>相構造</td><td>1T または 2H</td></tr>
-        <tr><td>格子定数</td><td>a (Å) と c (Å)</td></tr>
-        <tr><td>空間群</td><td>対応する空間群</td></tr>
+        <tr><td>化学式・相構造</td><td>MoS₂ 2H など</td></tr>
+        <tr><td>空間群</td><td>P6₃/mmc (No.194) など</td></tr>
+        <tr><td>格子定数</td><td>a (Å)、c (Å)</td></tr>
+        <tr><td>結合長</td><td>M–X 結合長 (Å)</td></tr>
         <tr><td>層間距離</td><td>現在の層間距離（倍率適用後）</td></tr>
+        <tr><td>挿入分子情報</td><td>分子名、圧縮率（該当時）</td></tr>
       </tbody>
     </table>
     <p>パネルは「結晶データ」ボタンで折りたたみ/展開できます。</p>
@@ -194,8 +239,15 @@
 
   <h2>スマートフォン対応</h2>
   <div class="card">
-    <p>スマホ・タブレットに最適化されています。横持ち・縦持ちの両方でレイアウトが調整されます。
-      ツールバーが長い場合はスクロール可能です。「メニュー」ボタンでツールバー全体を折りたたむことも可能。</p>
+    <p>スマートフォン・タブレットに最適化されています。</p>
+    <table>
+      <tbody>
+        <tr><td>ツールバー</td><td>画面上部にコンパクト表示。スクロールで全項目にアクセス可能。「☰ メニュー」で折りたたみ/展開。</td></tr>
+        <tr><td>3D操作</td><td>1本指スワイプで回転、ピンチでズーム。</td></tr>
+        <tr><td>横持ち/縦持ち</td><td>どちらにも自動でレイアウトが調整されます。</td></tr>
+        <tr><td>原子タップ</td><td>距離測定・移動・四面体モードに対応。</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <h2>トラブルシューティング</h2>
@@ -204,9 +256,11 @@
       <thead><tr><th>症状</th><th>対処法</th></tr></thead>
       <tbody>
         <tr><td>3Dが表示されない</td><td>WebGL対応ブラウザが必要です。Chrome, Firefox, Safari, Edge の最新版を推奨。</td></tr>
-        <tr><td>動作が重い</td><td>a₁幅・a₂幅・層数を小さくしてください。原子数が多いと描画負荷が増えます。</td></tr>
-        <tr><td>CIF/XYZファイルが読めない</td><td>標準的なCIF形式またはXYZ形式であることを確認してください。原子座標が含まれている必要があります。</td></tr>
-        <tr><td>インターカレーション分子が見えない</td><td>層間距離を1.5以上に広げてみてください。分子が層内に埋もれている場合があります。</td></tr>
+        <tr><td>動作が重い</td><td>a₁幅・a₂幅・層数を小さくしてください。原子径を小さくしても改善します。</td></tr>
+        <tr><td>CIF/XYZファイルが読めない</td><td>標準的なCIF形式（_atom_site 含む）またはXYZ形式であることを確認してください。</td></tr>
+        <tr><td>挿入分子が見えない</td><td>層間距離を広げるか、「向き最適化」を実行してください。分子径スライダーで大きくすることもできます。</td></tr>
+        <tr><td>ズームが足りない</td><td>スクロールホイールまたはピンチで最大80倍までズームアウト可能です。</td></tr>
+        <tr><td>構造が画面からはみ出る</td><td>層数や幅を変更すると自動でカメラが調整されます。手動でスクロールしてズームアウトも可能。</td></tr>
       </tbody>
     </table>
   </div>

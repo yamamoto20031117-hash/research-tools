@@ -120,17 +120,26 @@
 
   /* === スマホ縦持ち === */
   @media (max-width:600px) and (orientation:portrait){
-    #bar{font-size:.68rem;gap:6px;padding:4px 8px;max-height:60vh;overflow-y:auto;
+    #bar{font-size:.68rem;gap:5px;padding:4px 8px;max-height:55vh;overflow-y:auto;
       -webkit-overflow-scrolling:touch;scrollbar-width:thin}
     #bar h1{font-size:.82rem}
-    .g{gap:2px}
+    .g{gap:2px;flex-wrap:wrap}
+    .g label{font-size:.66rem;min-width:28px}
     .g select{min-width:74px;font-size:.7rem}
-    .g input[type=range]{width:70px}
-    .g .num-in{width:36px;font-size:.68rem}
+    .g input[type=range]{width:60px}
+    .g .num-in{width:34px;font-size:.66rem}
     .pm button{width:18px;height:18px}
-    .btn{padding:2px 7px;font-size:.7rem}
-    #info-wrap{top:40px;right:8px;max-width:180px}
-    #legend{font-size:.68rem;gap:8px}
+    .btn{padding:2px 6px;font-size:.68rem}
+    .col-pick{width:22px;height:22px}
+    #info-wrap{top:40px;right:8px;max-width:170px}
+    #info{font-size:.68rem;max-height:200px;padding:8px 10px}
+    #legend{font-size:.66rem;gap:6px;padding:5px 10px}
+    .dot{width:10px;height:10px}
+    #hint{font-size:.6rem;bottom:34px}
+    #ilayer-dist-panel{bottom:38px;left:8px;font-size:.68rem}
+    #mode-status{bottom:62px;font-size:.68rem;padding:4px 10px}
+    #opt-panel{bottom:38px;right:8px;font-size:.68rem;min-width:180px}
+    #dist-label{font-size:.74rem;padding:3px 8px}
   }
 
   /* Windows用スクロールバーのスタイル */
@@ -1210,7 +1219,7 @@ canvas.addEventListener('touchstart',e=>{
 canvas.addEventListener('touchmove',e=>{
   e.preventDefault();
   if(e.touches.length===1&&isDrag){sph.theta-=(e.touches[0].clientX-prev.x)*0.007;sph.phi=Math.max(0.1,Math.min(Math.PI-0.1,sph.phi+(e.touches[0].clientY-prev.y)*0.007));prev={x:e.touches[0].clientX,y:e.touches[0].clientY};updateCam();}
-  else if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY,d=Math.sqrt(dx*dx+dy*dy);sph.radius=Math.max(5,Math.min(45,sph.radius-(d-tDist)*0.03));tDist=d;updateCam();}
+  else if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY,d=Math.sqrt(dx*dx+dy*dy);sph.radius=Math.max(5,Math.min(80,sph.radius-(d-tDist)*0.03));tDist=d;updateCam();}
 },{passive:false});
 canvas.addEventListener('touchend',()=>isDrag=false);
 
