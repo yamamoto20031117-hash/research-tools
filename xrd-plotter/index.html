@@ -1639,21 +1639,14 @@ async function exportXLSX(){
   const chartTitle=nFiles===1?escXml(firstName):'XRD Pattern';
   // 凡例: ピークラベルシリーズを除外するため、データシリーズのみ表示
   // 単一ファイルなら凡例なし、複数なら凡例あり（ピークラベルシリーズは非表示）
+  // 凡例: 単一ファイルは非表示、複数ファイルはデータシリーズのみ表示
   let legendXml='';
   if(nFiles>1){
-    // ピークラベルシリーズのみ凡例から除外（データシリーズはデフォルト表示）
     let legendEntries='';
     for(let si=nFiles;si<seriesCount;si++){
       legendEntries+=`<c:legendEntry><c:idx val="${si}"/><c:delete val="1"/></c:legendEntry>`;
     }
     legendXml=`<c:legend><c:legendPos val="r"/>${legendEntries}<c:overlay val="0"/></c:legend>`;
-  } else if(seriesCount>nFiles){
-    // 単一ファイル: 全シリーズを凡例から非表示
-    let legendEntries='';
-    for(let si=0;si<seriesCount;si++){
-      legendEntries+=`<c:legendEntry><c:idx val="${si}"/><c:delete val="1"/></c:legendEntry>`;
-    }
-    legendXml=`<c:legend>${legendEntries}<c:overlay val="0"/></c:legend>`;
   }
 
   // Arial フォント定義
