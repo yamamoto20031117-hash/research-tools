@@ -261,6 +261,7 @@
     <input type="number" class="num-in" id="v-bond-r" min="0.1" max="2.0" step="0.05" value="1.0">
     <span class="pm"><button onclick="stepSlider('sl-bond-r',-1)">−</button><button onclick="stepSlider('sl-bond-r',1)">+</button></span>
   </div>
+  <div class="g"><button class="btn" onclick="resetSizeSliders()" title="原子径・結合太さを初期値に戻す">↺ サイズリセット</button></div>
   <div class="g"><input type="checkbox" id="chk-poly"><label for="chk-poly">多面体</label></div>
   <div class="g"><input type="checkbox" id="chk-cell"><label for="chk-cell">単位胞</label></div>
   <div class="g"><input type="checkbox" id="chk-dist" checked><label for="chk-dist">層間距離</label></div>
@@ -762,6 +763,14 @@ function updateModeStatus(){
   }
 }
 function resetInterOffset(){interOffset={dx:0,dz:0};}
+function resetSizeSliders(){
+  pushUndo();
+  ['sl-atom-m','sl-atom-x','sl-atom-i','sl-bond-r'].forEach(id=>{
+    document.getElementById(id).value='1.0';
+    document.getElementById(id.replace('sl-','v-')).value='1.0';
+  });
+  buildStructure();
+}
 
 // =====================================================
 //  Build Structure
