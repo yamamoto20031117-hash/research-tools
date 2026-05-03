@@ -581,21 +581,25 @@ function exportCIF(){
         atomList.push({el:info.x, fx:xx/cellA, fy:(yC-d_xm)/cellC, fz:xz/cellB});
       }
 
-      // インターカラント (重心ベース — 3Dビューアと一致)
-      if(interKey!=='none'&&l<numLayers-1){
-        const yInter=yC+d_xm+expandedGap/2;
-        const sp=inter.spacing;
-        if(i%sp===0&&j%sp===0){
-          const[bx,bz]=fracToXZ(i+0.5,j+0.5,a);
-          inter.atoms.forEach(at=>{
-            atomList.push({
-              el:at.el,
-              fx:(bx+at.dx)/cellA,
-              fy:(yInter+at.dy)/cellC,
-              fz:(bz+at.dz)/cellB
-            });
+    }
+
+    // インターカラント (重心ベース — 3Dビューアと一致、中心対称配置)
+    if(interKey!=='none'&&l<numLayers-1){
+      const yInter=yC+d_xm+expandedGap/2;
+      const sp=inter.spacing;
+      const cnI=Math.max(1,Math.floor(Na/sp)), cnJ=Math.max(1,Math.floor(Nb/sp));
+      const coI=(Na-(cnI-1)*sp)/2, coJ=(Nb-(cnJ-1)*sp)/2;
+      for(let ni=0;ni<cnI;ni++) for(let nj=0;nj<cnJ;nj++){
+        const fi=coI+ni*sp, fj=coJ+nj*sp;
+        const[bx,bz]=fracToXZ(fi,fj,a);
+        inter.atoms.forEach(at=>{
+          atomList.push({
+            el:at.el,
+            fx:(bx+at.dx)/cellA,
+            fy:(yInter+at.dy)/cellC,
+            fz:(bz+at.dz)/cellB
           });
-        }
+        });
       }
     }
   }
@@ -1005,24 +1009,23 @@ function buildStructure() {
 
     // --- 5) 各ギャップに分子を配置 (中心寄せ) ---
     // 配置候補を生成してから中心に最も近い順に配置
+    // 配置格子をスーパーセル中心に対称配置
+    const numI=Math.max(1, Math.floor(Na/sp));
+    const numJ=Math.max(1, Math.floor(Nb/sp));
+    const offI=(Na-(numI-1)*sp)/2;  // 中心に対称なオフセット
+    const offJ=(Nb-(numJ-1)*sp)/2;
     const placePts=[];
-    for(let i=0;i<Na;i+=sp) for(let j=0;j<Nb;j+=sp){
-      const[bx,bz]=fracToXZ(i+0.5,j+0.5,a);
+    for(let ni=0;ni<numI;ni++) for(let nj=0;nj<numJ;nj++){
+      const fi=offI+ni*sp, fj=offJ+nj*sp;
+      const[bx,bz]=fracToXZ(fi,fj,a);
       if(bx<dXMin||bx>dXMax||bz<dZMin||bz>dZMax) continue;
       placePts.push({bx,bz});
     }
-    // 中心がないなら結晶中心に1つ配置
+    // 配置点がなければスーパーセル中心に1つ配置
     if(placePts.length===0){
       const[cbx,cbz]=fracToXZ(Na/2,Nb/2,a);
       placePts.push({bx:cbx,bz:cbz});
     }
-    // 中心に近い順にソート
-    const ctrX=(dXMin+dXMax)/2+off.x, ctrZ=(dZMin+dZMax)/2+off.z;
-    placePts.sort((a,b)=>{
-      const da=(a.bx+off.x-ctrX)**2+(a.bz+off.z-ctrZ)**2;
-      const db=(b.bx+off.x-ctrX)**2+(b.bz+off.z-ctrZ)**2;
-      return da-db;
-    });
 
     for(let l=0;l<numLayers-1;l++){
       // ギャップ中心 = 層lの上部カルコゲンと層l+1の下部カルコゲンの中間
