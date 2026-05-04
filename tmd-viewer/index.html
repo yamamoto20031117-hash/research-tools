@@ -1115,7 +1115,7 @@ function buildStructure() {
 
   // Metal-Metal bonds for 1T' (zigzag chains)
   if(phase==='1Tp'){
-    const mmCut=(info.dimerD||2.85)+0.3;
+    const mmCut=(info.dimerD||2.85)+(info.triclinic?0.5:0.3);
     const mmCut2=mmCut*mmCut;
     const matMM=new THREE.MeshPhongMaterial({color:0xff6644,transparent:true,opacity:0.7});
     for(let i=0;i<visM.length;i++){
@@ -1130,7 +1130,7 @@ function buildStructure() {
   }
 
   // Bonds
-  const bCut=bond+(phase==='1Tp'?0.35:0.2), bCut2=bCut*bCut;
+  const bCut=bond+(phase==='1Tp'?(info.triclinic?0.45:0.35):0.2), bCut2=bCut*bCut;
   visM.forEach(mp=>{
     const nb=[];
     visX.forEach(xp=>{
