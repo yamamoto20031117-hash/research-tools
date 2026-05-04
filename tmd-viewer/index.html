@@ -287,6 +287,7 @@
   <div class="g"><input type="checkbox" id="chk-poly"><label for="chk-poly">多面体</label></div>
   <div class="g"><input type="checkbox" id="chk-cell"><label for="chk-cell">単位胞</label></div>
   <div class="g"><input type="checkbox" id="chk-dist" checked><label for="chk-dist">層間距離</label></div>
+  <div class="g" id="mm-bond-group" style="display:none"><input type="checkbox" id="chk-mm" checked><label for="chk-mm">M-M結合</label></div>
   <div class="g">
     <label>操作</label>
     <button class="btn mode-btn active" id="mode-dist" onclick="setClickMode('dist')">距離</button>
@@ -382,7 +383,7 @@ const DB = {
   NbSe2: { m:'Nb', x:'Se', defPhase:'2H', a:3.442, c1T:6.27,  c2H:12.55, bond:2.60 },
   NbS2:  { m:'Nb', x:'S',  defPhase:'2H', a:3.330, c1T:5.95,  c2H:11.89, bond:2.47 },
   PtTe2: { m:'Pt', x:'Te', defPhase:'1T', a:4.002, c1T:5.22,  c2H:10.44, bond:2.65 },
-  WTe2:  { m:'W',  x:'Te', defPhase:'2H', a:3.520, c1T:6.99,  c2H:13.97, bond:2.77 },
+  WTe2:  { m:'W',  x:'Te', defPhase:'2H', a:3.520, c1T:6.99,  c2H:13.97, bond:2.73 },
   // --- 1T' (歪み八面体 / 単斜晶) ---
   // 1T' has zigzag metal chains; a_1Tp, b_1Tp are in-plane lattice, c_1Tp is layer height
   // dimerD = metal-metal dimerization distance within zigzag chain
@@ -732,19 +733,21 @@ function exportCIF(){
         const baseX=i*aUn, baseZ=j*bUn;
         const dimerD=info.dimerD||2.85;
         if(info.triclinic){
-          const bHn=bUn/2;
-          for(let mm=0;mm<2;mm++){
-            const zOff=mm*bHn;
-            const d0t=Math.sqrt(aUn*aUn/4+bHn*bHn/4);
-            const dt=(d0t-dimerD)/2;
-            const uxt=(aUn/2)/d0t, uzt=(bHn/2)/d0t;
-            atomList.push({el:info.m, fx:(baseX+dt*uxt)/cellA, fy:yC/cellC, fz:(baseZ+zOff+dt*uzt)/cellB});
-            atomList.push({el:info.m, fx:(baseX+aUn/2-dt*uxt)/cellA, fy:yC/cellC, fz:(baseZ+zOff+bHn/2-dt*uzt)/cellB});
-            atomList.push({el:info.x, fx:(baseX+aUn/6)/cellA, fy:(yC+d_xm)/cellC, fz:(baseZ+zOff+bHn/2)/cellB});
-            atomList.push({el:info.x, fx:(baseX+2*aUn/3)/cellA, fy:(yC+d_xm)/cellC, fz:(baseZ+zOff)/cellB});
-            atomList.push({el:info.x, fx:(baseX+aUn/3)/cellA, fy:(yC-d_xm)/cellC, fz:(baseZ+zOff)/cellB});
-            atomList.push({el:info.x, fx:(baseX+5*aUn/6)/cellA, fy:(yC-d_xm)/cellC, fz:(baseZ+zOff+bHn/2)/cellB});
-          }
+          // Hex-derived positions for CIF (same as buildStructure)
+          const aHex=(aU/Na)/2;
+          const delta2=Math.max(0,(aHex-dimerD)/(2*(aU/Na)));
+          const mF=[[delta2,0],[0.5-delta2,0],[delta2,0.5],[0.5-delta2,0.5]];
+          const xTF=[[1/6,1/3],[2/3,1/3],[1/6,5/6],[2/3,5/6]];
+          const xBF=[[1/3,1/6],[5/6,1/6],[1/3,2/3],[5/6,2/3]];
+          mF.forEach(([fa,fb])=>{
+            atomList.push({el:info.m, fx:(i+fa)/Na, fy:yC/cellC, fz:(j+fb)/Nb});
+          });
+          xTF.forEach(([fa,fb])=>{
+            atomList.push({el:info.x, fx:(i+fa)/Na, fy:(yC+d_xm)/cellC, fz:(j+fb)/Nb});
+          });
+          xBF.forEach(([fa,fb])=>{
+            atomList.push({el:info.x, fx:(i+fa)/Na, fy:(yC-d_xm)/cellC, fz:(j+fb)/Nb});
+          });
         } else {
           const d0=Math.sqrt(aUn*aUn/4+bUn*bUn/4);
           const delta=(d0-dimerD)/2;
@@ -816,9 +819,9 @@ function exportCIF(){
   cif+=`_cell_length_a ${cellA.toFixed(4)}\n`;
   cif+=`_cell_length_b ${cellB.toFixed(4)}\n`;
   cif+=`_cell_length_c ${cellC.toFixed(4)}\n`;
-  cif+=`_cell_angle_alpha 90.0000\n`;
+  cif+=`_cell_angle_alpha ${(info.triclinic&&info.alpha?info.alpha:90).toFixed(4)}\n`;
   cif+=`_cell_angle_beta ${(phase==='1Tp'&&info.beta?info.beta:90).toFixed(4)}\n`;
-  cif+=`_cell_angle_gamma 120.0000\n`;
+  cif+=`_cell_angle_gamma ${(info.triclinic&&info.gamma?info.gamma:phase==='1Tp'?90:120).toFixed(4)}\n`;
   cif+=`_symmetry_space_group_name_H-M 'P 1'\n`;
   cif+=`_symmetry_Int_Tables_number 1\n\n`;
   cif+=`loop_\n`;
@@ -890,6 +893,7 @@ function captureState(){
     poly:document.getElementById('chk-poly').checked,
     cell:document.getElementById('chk-cell').checked,
     dist:document.getElementById('chk-dist').checked,
+    mm:document.getElementById('chk-mm').checked,
     atomM:document.getElementById('sl-atom-m').value,
     atomX:document.getElementById('sl-atom-x').value,
     atomI:document.getElementById('sl-atom-i').value,
@@ -917,6 +921,7 @@ function restoreState(s){
   document.getElementById('chk-poly').checked=s.poly;
   document.getElementById('chk-cell').checked=s.cell;
   document.getElementById('chk-dist').checked=s.dist;
+  if(s.mm!==undefined) document.getElementById('chk-mm').checked=s.mm;
   if(s.atomM){document.getElementById('sl-atom-m').value=s.atomM;document.getElementById('v-atom-m').value=parseFloat(s.atomM).toFixed(1);}
   if(s.atomX){document.getElementById('sl-atom-x').value=s.atomX;document.getElementById('v-atom-x').value=parseFloat(s.atomX).toFixed(1);}
   if(s.atomI){document.getElementById('sl-atom-i').value=s.atomI;document.getElementById('v-atom-i').value=parseFloat(s.atomI).toFixed(1);}
@@ -1029,9 +1034,12 @@ function buildStructure() {
   const Nb=parseInt(document.getElementById('sl-nb').value);
   const mAtoms=[], xAtoms=[];
 
+  // For triclinic cells, sheared grid needs extra cells in i-direction
+  const iExtra=(phase==='1Tp'&&info.triclinic)?Math.ceil(Nb*Math.abs(Math.cos((info.gamma||119)*Math.PI/180))*bEff/aEff)+1:0;
+
   for(let l=0;l<numLayers;l++){
     const yC=l*layerStep+d_xm;
-    for(let i=-1;i<=Na;i++) for(let j=-1;j<=Nb;j++){
+    for(let i=-1-iExtra;i<=Na+iExtra;i++) for(let j=-1;j<=Nb;j++){
       if(phase==='1T'){
         const[mx,mz]=fracToXZ(i,j,a); mAtoms.push(new THREE.Vector3(mx,yC,mz));
         const[xtx,xtz]=fracToXZ(i+1/3,j+2/3,a); xAtoms.push(new THREE.Vector3(xtx,yC+d_xm,xtz));
@@ -1041,21 +1049,26 @@ function buildStructure() {
         const baseX=i*aU; const baseZ=j*bU;
         const dimerD=info.dimerD||2.85;
         if(info.triclinic){
-          // Triclinic (ReS₂/ReSe₂): cell area ≈ 4× hexagonal → 4 M + 8 X per cell
-          // Two 1T'-like dimer motifs stacked along b, connected by M-X bonds
-          const bH=bU/2; // effective b per motif (≈ a_hex)
-          for(let mm=0;mm<2;mm++){
-            const zOff=mm*bH;
-            const d0=Math.sqrt(aU*aU/4+bH*bH/4);
-            const delta=(d0-dimerD)/2;
-            const ux=(aU/2)/d0, uz=(bH/2)/d0;
-            mAtoms.push(new THREE.Vector3(baseX+delta*ux, yC, baseZ+zOff+delta*uz));
-            mAtoms.push(new THREE.Vector3(baseX+aU/2-delta*ux, yC, baseZ+zOff+bH/2-delta*uz));
-            xAtoms.push(new THREE.Vector3(baseX+aU/6, yC+d_xm, baseZ+zOff+bH/2));
-            xAtoms.push(new THREE.Vector3(baseX+2*aU/3, yC+d_xm, baseZ+zOff));
-            xAtoms.push(new THREE.Vector3(baseX+aU/3, yC-d_xm, baseZ+zOff));
-            xAtoms.push(new THREE.Vector3(baseX+5*aU/6, yC-d_xm, baseZ+zOff+bH/2));
-          }
+          // Triclinic (ReS₂/ReSe₂): sheared grid with hex-derived positions
+          // 2×2 hexagonal supercell + Peierls distortion (Re₄ diamond clusters)
+          const gammaRad=(info.gamma||119)*Math.PI/180;
+          const bSx=bU*Math.cos(gammaRad), bSz=bU*Math.sin(gammaRad);
+          const bX=i*aU+j*bSx, bZ=j*bSz; // sheared cell origin
+          // Compute positions from undistorted 1T hex lattice (a_hex = a_sup/2)
+          const aHex=aU/2;
+          const delta2=Math.max(0,(aHex-dimerD)/(2*aU));
+          const mF=[[delta2,0],[0.5-delta2,0],[delta2,0.5],[0.5-delta2,0.5]];
+          const xTF=[[1/6,1/3],[2/3,1/3],[1/6,5/6],[2/3,5/6]];
+          const xBF=[[1/3,1/6],[5/6,1/6],[1/3,2/3],[5/6,2/3]];
+          mF.forEach(([fa,fb])=>{
+            mAtoms.push(new THREE.Vector3(bX+fa*aU+fb*bSx, yC, bZ+fb*bSz));
+          });
+          xTF.forEach(([fa,fb])=>{
+            xAtoms.push(new THREE.Vector3(bX+fa*aU+fb*bSx, yC+d_xm, bZ+fb*bSz));
+          });
+          xBF.forEach(([fa,fb])=>{
+            xAtoms.push(new THREE.Vector3(bX+fa*aU+fb*bSx, yC-d_xm, bZ+fb*bSz));
+          });
         } else {
           // Standard 1T' (P2₁/m): monoclinic cell with 2 M + 4 X per layer
           // Derived from hex 1T → monoclinic transformation:
@@ -1098,8 +1111,16 @@ function buildStructure() {
   let dXMin,dXMax,dZMin,dZMax;
   if(phase==='1Tp'){
     const aU=aEff||a*2, bU=bEff||a;
+    if(info.triclinic){
+      const gammaRad=(info.gamma||119)*Math.PI/180;
+      const bSx=bU*Math.cos(gammaRad), bSz=bU*Math.sin(gammaRad);
+      const cx0=0,cx1=Na*aU,cx2=Nb*bSx,cx3=Na*aU+Nb*bSx;
+      dXMin=Math.min(cx0,cx1,cx2,cx3)-aU*0.5-pad; dXMax=Math.max(cx0,cx1,cx2,cx3)+aU*0.5+pad;
+      dZMin=-bSz*0.5-pad; dZMax=Nb*bSz+pad;
+    } else {
     dXMin=-aU*0.5-pad; dXMax=Na*aU+pad;
     dZMin=-pad; dZMax=Nb*bU+pad;
+    }
   } else {
     const[x0]=fracToXZ(0,0,a),[xNa]=fracToXZ(Na,0,a),[,zNb]=fracToXZ(0,Nb,a),[xNmin]=fracToXZ(0,Nb,a);
     dXMin=Math.min(x0,xNmin)-pad; dXMax=xNa+pad; dZMin=-pad; dZMax=zNb+pad;
@@ -1113,9 +1134,10 @@ function buildStructure() {
   visM.forEach(p=>{const m=new THREE.Mesh(geoM,matM);m.position.copy(p).add(off);m.userData={isAtom:true,el:info.m};structGroup.add(m);});
   visX.forEach(p=>{const m=new THREE.Mesh(geoX,matX);m.position.copy(p).add(off);m.userData={isAtom:true,el:info.x};structGroup.add(m);});
 
-  // Metal-Metal bonds for 1T' (zigzag chains)
+  // Metal-Metal bonds for 1T' (zigzag chains / diamond clusters)
+  const mmGroup=new THREE.Group(); mmGroup.name='mmBonds';
   if(phase==='1Tp'){
-    const mmCut=(info.dimerD||2.85)+(info.triclinic?0.5:0.3);
+    const mmCut=(info.dimerD||2.85)+(info.triclinic?0.5:0.2);
     const mmCut2=mmCut*mmCut;
     const matMM=new THREE.MeshPhongMaterial({color:0xff6644,transparent:true,opacity:0.7});
     for(let i=0;i<visM.length;i++){
@@ -1123,14 +1145,19 @@ function buildStructure() {
         const d2=visM[i].distanceToSquared(visM[j]);
         if(d2>0.01&&d2<mmCut2){
           const c=makeCyl(visM[i].clone().add(off),visM[j].clone().add(off),0.08*bondScale,matMM);
-          if(c)structGroup.add(c);
+          if(c)mmGroup.add(c);
         }
       }
     }
+    mmGroup.visible=document.getElementById('chk-mm').checked;
+    document.getElementById('mm-bond-group').style.display='';
+  } else {
+    document.getElementById('mm-bond-group').style.display='none';
   }
+  structGroup.add(mmGroup);
 
   // Bonds
-  const bCut=bond+(phase==='1Tp'?(info.triclinic?0.45:0.35):0.2), bCut2=bCut*bCut;
+  const bCut=bond+(phase==='1Tp'?0.35:0.2), bCut2=bCut*bCut;
   visM.forEach(mp=>{
     const nb=[];
     visX.forEach(xp=>{
@@ -1875,7 +1902,7 @@ document.querySelectorAll('.rot-sl').forEach(sl=>{
 ['v-rot-a','v-rot-b','v-rot-c'].forEach(vId=>{
   document.getElementById(vId).addEventListener('change',function(){ syncNumToSlider(vId); });
 });
-['chk-poly','chk-cell','chk-dist'].forEach(id=>document.getElementById(id).addEventListener('change',buildStructure));
+['chk-poly','chk-cell','chk-dist','chk-mm'].forEach(id=>document.getElementById(id).addEventListener('change',buildStructure));
 
 // --- カラーピッカー ---
 function hexToInt(h){return parseInt(h.replace('#',''),16);}
