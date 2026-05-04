@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="robots" content="noindex, nofollow">
-<title>TMD 結晶構造ビューア — 1T / 2H + インターカレーション</title>
+<title>TMD 結晶構造ビューア — 1T / 2H / 1T' / 3R + インターカレーション</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:#080b12;overflow:hidden;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;color:#ccc;
@@ -173,8 +173,22 @@
         <option value="MoTe2">MoTe₂</option>
         <option value="WS2">WS₂</option>
         <option value="WSe2">WSe₂</option>
+        <option value="WTe2">WTe₂</option>
         <option value="NbSe2">NbSe₂</option>
         <option value="NbS2">NbS₂</option>
+      </optgroup>
+      <optgroup label="1T' (歪み八面体)">
+        <option value="MoTe2_1Tp">MoTe₂ (1T')</option>
+        <option value="WTe2_1Tp">WTe₂ (1T'/Td)</option>
+        <option value="MoS2_1Tp">MoS₂ (1T')</option>
+        <option value="ReS2">ReS₂</option>
+        <option value="ReSe2">ReSe₂</option>
+      </optgroup>
+      <optgroup label="3R (菱面体)">
+        <option value="MoS2_3R">MoS₂ (3R)</option>
+        <option value="NbS2_3R">NbS₂ (3R)</option>
+        <option value="NbSe2_3R">NbSe₂ (3R)</option>
+        <option value="TaS2_3R">TaS₂ (3R)</option>
       </optgroup>
     </select>
   </div>
@@ -368,8 +382,27 @@ const DB = {
   NbSe2: { m:'Nb', x:'Se', defPhase:'2H', a:3.442, c1T:6.27,  c2H:12.55, bond:2.60 },
   NbS2:  { m:'Nb', x:'S',  defPhase:'2H', a:3.310, c1T:5.97,  c2H:11.94, bond:2.47 },
   PtTe2: { m:'Pt', x:'Te', defPhase:'1T', a:4.002, c1T:5.22,  c2H:10.44, bond:2.65 },
+  WTe2:  { m:'W',  x:'Te', defPhase:'2H', a:3.496, c1T:6.96,  c2H:13.92, bond:2.72 },
+  // --- 1T' (歪み八面体 / 単斜晶) ---
+  // 1T' has zigzag metal chains; a_1Tp, b_1Tp are in-plane lattice, c_1Tp is layer height
+  // dimerD = metal-metal dimerization distance within zigzag chain
+  MoTe2_1Tp: { m:'Mo', x:'Te', defPhase:'1Tp', a:6.330, b:3.469, c1T:6.93, c2H:13.86, c1Tp:13.86, bond:2.73, dimerD:2.88, beta:93.9,
+    a1Tp:6.330, b1Tp:3.469 },
+  WTe2_1Tp:  { m:'W',  x:'Te', defPhase:'1Tp', a:6.282, b:3.496, c1T:6.96, c2H:13.92, c1Tp:14.07, bond:2.72, dimerD:2.86, beta:90.0,
+    a1Tp:6.282, b1Tp:3.496 },
+  MoS2_1Tp:  { m:'Mo', x:'S',  defPhase:'1Tp', a:5.716, b:3.175, c1T:6.15, c2H:12.30, c1Tp:12.30, bond:2.42, dimerD:2.78, beta:93.0,
+    a1Tp:5.716, b1Tp:3.175 },
+  ReS2:  { m:'Re', x:'S',  defPhase:'1Tp', a:6.417, b:6.510, c1T:5.65, c2H:11.30, c1Tp:12.82, bond:2.38, dimerD:2.82, beta:105.0,
+    a1Tp:6.417, b1Tp:6.510 },
+  ReSe2: { m:'Re', x:'Se', defPhase:'1Tp', a:6.597, b:6.718, c1T:6.01, c2H:12.02, c1Tp:13.26, bond:2.51, dimerD:2.87, beta:104.9,
+    a1Tp:6.597, b1Tp:6.718 },
+  // --- 3R (菱面体) - same in-plane structure as 2H but ABC stacking ---
+  MoS2_3R:  { m:'Mo', x:'S',  defPhase:'3R', a:3.160, c1T:6.15, c2H:12.30, c3R:18.37, bond:2.41 },
+  NbS2_3R:  { m:'Nb', x:'S',  defPhase:'3R', a:3.310, c1T:5.97, c2H:11.94, c3R:17.81, bond:2.47 },
+  NbSe2_3R: { m:'Nb', x:'Se', defPhase:'3R', a:3.442, c1T:6.27, c2H:12.55, c3R:18.93, bond:2.60 },
+  TaS2_3R:  { m:'Ta', x:'S',  defPhase:'3R', a:3.365, c1T:5.90, c2H:12.10, c3R:17.90, bond:2.43 },
 };
-const MCOL_DEFAULT = { V:0x2e8bc0,Ti:0x7799aa,Mo:0x8855bb,W:0x4466aa,Nb:0x22aa88,Ta:0x667788,Pt:0xaabbcc,Zr:0x55aa77 };
+const MCOL_DEFAULT = { V:0x2e8bc0,Ti:0x7799aa,Mo:0x8855bb,W:0x4466aa,Nb:0x22aa88,Ta:0x667788,Pt:0xaabbcc,Zr:0x55aa77,Re:0xaa6644 };
 const XCOL_DEFAULT = { S:0xddc000, Se:0xd48a00, Te:0xcc7722 };
 const MCOL = {...MCOL_DEFAULT};
 const XCOL = {...XCOL_DEFAULT};
@@ -619,7 +652,7 @@ function exportCIF(){
   const Na=parseInt(document.getElementById('sl-na').value);
   const Nb=parseInt(document.getElementById('sl-nb').value);
 
-  const c_layer=phase==='2H'?info.c2H/2:info.c1T;
+  const c_layer=phase==='2H'?info.c2H/2:phase==='3R'?(info.c3R||info.c2H*1.5)/3:phase==='1Tp'?(info.c1Tp||info.c1T*2)/2:info.c1T;
   const r_inp=a/S3;
   const d_xm=Math.sqrt(Math.max(bond*bond-r_inp*r_inp,0.1));
   const sandwich=2*d_xm;
@@ -629,8 +662,10 @@ function exportCIF(){
   const layerStep=sandwich+expandedGap;
 
   // スーパーセルの実空間サイズ
-  const cellA=a*Na;
-  const cellB=a*Nb;
+  const aU=phase==='1Tp'?(info.a1Tp||a*2):a;
+  const bU=phase==='1Tp'?(info.b1Tp||a):a;
+  const cellA=(phase==='1Tp'?aU:a)*Na;
+  const cellB=(phase==='1Tp'?bU:a)*Nb;
   const cellC=numLayers*layerStep;
 
   // インターカラントの回転・圧縮座標を事前計算 (画面と一致)
@@ -691,6 +726,26 @@ function exportCIF(){
         atomList.push({el:info.x, fx:xtx/cellA, fy:(yC+d_xm)/cellC, fz:xtz/cellB});
         const[xbx,xbz]=fracToXZ(i+2/3,j+1/3,a);
         atomList.push({el:info.x, fx:xbx/cellA, fy:(yC-d_xm)/cellC, fz:xbz/cellB});
+      } else if(phase==='1Tp'){
+        const dd=(info.dimerD||2.85)/2;
+        const aUnit=aU/Na, bUnit=bU/Na;
+        const baseX=i*aU/Na, baseZ=j*bU/Na;
+        atomList.push({el:info.m, fx:(baseX-dd*0.5)/cellA, fy:yC/cellC, fz:baseZ/cellB});
+        atomList.push({el:info.m, fx:(baseX+dd*0.5)/cellA, fy:yC/cellC, fz:(baseZ+bU/(Na*2))/cellB});
+        const xOff1=aU*0.22/Na, xOff2=aU*0.28/Na;
+        atomList.push({el:info.x, fx:(baseX-xOff1)/cellA, fy:(yC+d_xm)/cellC, fz:(baseZ+bU*0.25/Na)/cellB});
+        atomList.push({el:info.x, fx:(baseX+xOff2)/cellA, fy:(yC+d_xm)/cellC, fz:(baseZ+bU*0.75/Na)/cellB});
+        atomList.push({el:info.x, fx:(baseX-xOff2)/cellA, fy:(yC-d_xm)/cellC, fz:(baseZ+bU*0.75/Na)/cellB});
+        atomList.push({el:info.x, fx:(baseX+xOff1)/cellA, fy:(yC-d_xm)/cellC, fz:(baseZ+bU*0.25/Na)/cellB});
+      } else if(phase==='3R'){
+        const shift=l%3;
+        const mf=[1/3+shift/3, 2/3-shift/3];
+        const xf=[2/3-shift/3, 1/3+shift/3];
+        const[mx,mz]=fracToXZ(i+mf[0]%1,j+mf[1]%1,a);
+        atomList.push({el:info.m, fx:mx/cellA, fy:yC/cellC, fz:mz/cellB});
+        const[xx,xz]=fracToXZ(i+xf[0]%1,j+xf[1]%1,a);
+        atomList.push({el:info.x, fx:xx/cellA, fy:(yC+d_xm)/cellC, fz:xz/cellB});
+        atomList.push({el:info.x, fx:xx/cellA, fy:(yC-d_xm)/cellC, fz:xz/cellB});
       } else {
         const mf=l%2===0?[1/3,2/3]:[2/3,1/3], xf=l%2===0?[2/3,1/3]:[1/3,2/3];
         const[mx,mz]=fracToXZ(i+mf[0],j+mf[1],a);
@@ -733,15 +788,16 @@ function exportCIF(){
   // CIF文字列を生成
   const matName=`${info.m}${info.x}2`;
   const interName=interKey!=='none'?`_${interKey}`:'';
-  const title=`${matName}_${phase}${interName}_${Na}x${Nb}x${numLayers}`;
+  const phaseLabel=phase==='1Tp'?"1T'":phase;
+  const title=`${matName}_${phaseLabel}${interName}_${Na}x${Nb}x${numLayers}`;
 
-  let cif=`data_${title}\n`;
-  cif+=`_chemical_name_common '${matName} ${phase}${interName}'\n`;
+  let cif=`data_${title.replace(/'/g,'')}\n`;
+  cif+=`_chemical_name_common '${matName} ${phaseLabel}${interName}'\n`;
   cif+=`_cell_length_a ${cellA.toFixed(4)}\n`;
   cif+=`_cell_length_b ${cellB.toFixed(4)}\n`;
   cif+=`_cell_length_c ${cellC.toFixed(4)}\n`;
   cif+=`_cell_angle_alpha 90.0000\n`;
-  cif+=`_cell_angle_beta 90.0000\n`;
+  cif+=`_cell_angle_beta ${(phase==='1Tp'&&info.beta?info.beta:90).toFixed(4)}\n`;
   cif+=`_cell_angle_gamma 120.0000\n`;
   cif+=`_symmetry_space_group_name_H-M 'P 1'\n`;
   cif+=`_symmetry_Int_Tables_number 1\n\n`;
@@ -919,7 +975,9 @@ function buildStructure() {
   const interKey=document.getElementById('sel-inter').value;
   const inter=INTER[interKey];
 
-  const c_layer=phase==='2H'?info.c2H/2:info.c1T;
+  const c_layer=phase==='2H'?info.c2H/2:phase==='3R'?(info.c3R||info.c2H*1.5)/3:phase==='1Tp'?(info.c1Tp||info.c1T*2)/2:info.c1T;
+  const aEff=phase==='1Tp'?(info.a1Tp||info.a):info.a;
+  const bEff=phase==='1Tp'?(info.b1Tp||info.a):info.a;
   const r_inp=a/S3;
   const d_xm=Math.sqrt(Math.max(bond*bond-r_inp*r_inp,0.1));
   const sandwich=2*d_xm;
@@ -958,7 +1016,37 @@ function buildStructure() {
         const[mx,mz]=fracToXZ(i,j,a); mAtoms.push(new THREE.Vector3(mx,yC,mz));
         const[xtx,xtz]=fracToXZ(i+1/3,j+2/3,a); xAtoms.push(new THREE.Vector3(xtx,yC+d_xm,xtz));
         const[xbx,xbz]=fracToXZ(i+2/3,j+1/3,a); xAtoms.push(new THREE.Vector3(xbx,yC-d_xm,xbz));
+      } else if(phase==='1Tp'){
+        // 1T' structure: zigzag metal chains along b-axis
+        // Unit cell has 2 metal atoms forming dimers (displaced ±dx along a)
+        // Chalcogens are in distorted octahedral positions
+        const dd=(info.dimerD||2.85)/2; // half dimerization distance
+        const aU=aEff||a*2; // 1T' doubled cell along a
+        const bU=bEff||a;
+        // Metal pair: two Mo/W atoms displaced ±dd along x from center
+        const baseX=i*aU;
+        const baseZ=j*bU;
+        // Metal 1 (shifted -dx)
+        mAtoms.push(new THREE.Vector3(baseX-dd*0.5, yC, baseZ));
+        // Metal 2 (shifted +dx)
+        mAtoms.push(new THREE.Vector3(baseX+dd*0.5, yC, baseZ+bU*0.5));
+        // Chalcogens: 4 per unit cell in distorted octahedral sites
+        const xOff1=aU*0.22, xOff2=aU*0.28;
+        xAtoms.push(new THREE.Vector3(baseX-xOff1, yC+d_xm, baseZ+bU*0.25));
+        xAtoms.push(new THREE.Vector3(baseX+xOff2, yC+d_xm, baseZ+bU*0.75));
+        xAtoms.push(new THREE.Vector3(baseX-xOff2, yC-d_xm, baseZ+bU*0.75));
+        xAtoms.push(new THREE.Vector3(baseX+xOff1, yC-d_xm, baseZ+bU*0.25));
+      } else if(phase==='3R'){
+        // 3R: same trigonal prismatic as 2H but with ABC stacking (shift by 1/3 each layer)
+        const shift=l%3; // 0,1,2 → A,B,C
+        const mf=[1/3+shift/3, 2/3-shift/3];
+        const xf=[2/3-shift/3, 1/3+shift/3];
+        const[mx,mz]=fracToXZ(i+mf[0]%1,j+mf[1]%1,a); mAtoms.push(new THREE.Vector3(mx,yC,mz));
+        const[xx,xz]=fracToXZ(i+xf[0]%1,j+xf[1]%1,a);
+        xAtoms.push(new THREE.Vector3(xx,yC+d_xm,xz));
+        xAtoms.push(new THREE.Vector3(xx,yC-d_xm,xz));
       } else {
+        // 2H: AB stacking trigonal prismatic
         const mf=l%2===0?[1/3,2/3]:[2/3,1/3], xf=l%2===0?[2/3,1/3]:[1/3,2/3];
         const[mx,mz]=fracToXZ(i+mf[0],j+mf[1],a); mAtoms.push(new THREE.Vector3(mx,yC,mz));
         const[xx,xz]=fracToXZ(i+xf[0],j+xf[1],a);
@@ -970,8 +1058,15 @@ function buildStructure() {
 
   // Bounding box
   const pad=0.5;
-  const[x0]=fracToXZ(0,0,a),[xNa]=fracToXZ(Na,0,a),[,zNb]=fracToXZ(0,Nb,a),[xNmin]=fracToXZ(0,Nb,a);
-  const dXMin=Math.min(x0,xNmin)-pad, dXMax=xNa+pad, dZMin=-pad, dZMax=zNb+pad;
+  let dXMin,dXMax,dZMin,dZMax;
+  if(phase==='1Tp'){
+    const aU=aEff||a*2, bU=bEff||a;
+    dXMin=-aU*0.5-pad; dXMax=Na*aU+pad;
+    dZMin=-pad; dZMax=Nb*bU+pad;
+  } else {
+    const[x0]=fracToXZ(0,0,a),[xNa]=fracToXZ(Na,0,a),[,zNb]=fracToXZ(0,Nb,a),[xNmin]=fracToXZ(0,Nb,a);
+    dXMin=Math.min(x0,xNmin)-pad; dXMax=xNa+pad; dZMin=-pad; dZMax=zNb+pad;
+  }
   const inB=p=>p.x>=dXMin&&p.x<=dXMax&&p.z>=dZMin&&p.z<=dZMax;
 
   const cx=(dXMin+dXMax)/2, cy=((numLayers-1)*layerStep+sandwich)/2, cz=(dZMin+dZMax)/2;
@@ -980,6 +1075,22 @@ function buildStructure() {
   const visM=mAtoms.filter(inB), visX=xAtoms.filter(inB);
   visM.forEach(p=>{const m=new THREE.Mesh(geoM,matM);m.position.copy(p).add(off);m.userData={isAtom:true,el:info.m};structGroup.add(m);});
   visX.forEach(p=>{const m=new THREE.Mesh(geoX,matX);m.position.copy(p).add(off);m.userData={isAtom:true,el:info.x};structGroup.add(m);});
+
+  // Metal-Metal bonds for 1T' (zigzag chains)
+  if(phase==='1Tp'){
+    const mmCut=(info.dimerD||2.85)+0.3;
+    const mmCut2=mmCut*mmCut;
+    const matMM=new THREE.MeshPhongMaterial({color:0xff6644,transparent:true,opacity:0.7});
+    for(let i=0;i<visM.length;i++){
+      for(let j=i+1;j<visM.length;j++){
+        const d2=visM[i].distanceToSquared(visM[j]);
+        if(d2>0.01&&d2<mmCut2){
+          const c=makeCyl(visM[i].clone().add(off),visM[j].clone().add(off),0.08*bondScale,matMM);
+          if(c)structGroup.add(c);
+        }
+      }
+    }
+  }
 
   // Bonds
   const bCut=bond+0.2, bCut2=bCut*bCut;
@@ -1005,7 +1116,7 @@ function buildStructure() {
         fv.push(bot3[0].x,bot3[0].y,bot3[0].z,bot3[2].x,bot3[2].y,bot3[2].z,bot3[1].x,bot3[1].y,bot3[1].z);
         for(let ti=0;ti<3;ti++){
           const tni=(ti+1)%3;
-          if(phase==='1T'){
+          if(phase==='1T'||phase==='1Tp'){
             let bj=0,bd=Infinity;
             for(let k=0;k<3;k++){const d=top3[ti].distanceTo(bot3[k])+top3[tni].distanceTo(bot3[k]);if(d<bd){bd=d;bj=k;}}
             fv.push(top3[ti].x,top3[ti].y,top3[ti].z,top3[tni].x,top3[tni].y,top3[tni].z,bot3[bj].x,bot3[bj].y,bot3[bj].z);
@@ -1019,7 +1130,7 @@ function buildStructure() {
             fv.push(top3[tni].x,top3[tni].y,top3[tni].z,bot3[bni].x,bot3[bni].y,bot3[bni].z,bot3[bi].x,bot3[bi].y,bot3[bi].z);
           }
         }
-        const pcol=phase==='1T'?0x3399ff:0x33cc88;
+        const pcol=(phase==='1T'||phase==='1Tp')?0x3399ff:0x33cc88;
         const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute(fv,3));fg.computeVertexNormals();
         structGroup.add(new THREE.Mesh(fg,new THREE.MeshBasicMaterial({color:pcol,transparent:true,opacity:0.07,side:THREE.DoubleSide,depthWrite:false})));
         for(let i=0;i<3;i++){
@@ -1242,16 +1353,30 @@ function buildStructure() {
 //  Info / Legend
 // =====================================================
 function updateInfo(info,phase,cL,dxm,gap,bond,interKey,effExp) {
-  const sg=phase==='1T'?'P-3m1 (No.164)':'P6₃/mmc (No.194)';
-  const pt=phase==='1T'?'CdI₂型 (八面体)':'MoS₂型 (三角柱)';
-  const cd=phase==='1T'?'八面体 (6配位)':'三角柱 (6配位)';
-  const cf=phase==='2H'?info.c2H:info.c1T;
+  const sgMap={'1T':'P-3m1 (No.164)','2H':'P6₃/mmc (No.194)','1Tp':'P2₁/m (No.11)','3R':'R3m (No.160)'};
+  const ptMap={'1T':'CdI₂型 (八面体)','2H':'MoS₂型 (三角柱)','1Tp':'歪み八面体 (ジグザグ鎖)','3R':'菱面体 (三角柱 ABC積層)'};
+  const cdMap={'1T':'八面体 (6配位)','2H':'三角柱 (6配位)','1Tp':'歪み八面体 (6配位)','3R':'三角柱 (6配位)'};
+  const sg=sgMap[phase]||sgMap['1T'];
+  const pt=ptMap[phase]||ptMap['1T'];
+  const cd=cdMap[phase]||cdMap['1T'];
+  const cf=phase==='2H'?info.c2H:phase==='3R'?(info.c3R||info.c2H*1.5):phase==='1Tp'?(info.c1Tp||info.c1T*2):info.c1T;
   const f=info.m+info.x+'₂';
-  let html=`<strong>${f} — ${phase}</strong><br>`+
+  let lattice='';
+  if(phase==='1Tp'){
+    const aU=info.a1Tp||info.a*2, bU=info.b1Tp||info.a;
+    lattice=`a = ${aU.toFixed(3)} Å, b = ${bU.toFixed(3)} Å, c = ${cf.toFixed(2)} Å`;
+    if(info.beta) lattice+=`, β = ${info.beta}°`;
+  } else {
+    lattice=`a = ${info.a.toFixed(3)} Å, c = ${cf.toFixed(2)} Å`;
+  }
+  let html=`<strong>${f} — ${phase==='1Tp'?"1T'":phase}</strong><br>`+
     `空間群: <span class="hl">${sg}</span><br>構造型: ${pt}<br>`+
-    `a = ${info.a.toFixed(3)} Å, c = ${cf.toFixed(2)} Å<br>`+
+    `${lattice}<br>`+
     `${info.m}–${info.x} 結合長: <span class="hl">${bond.toFixed(2)} Å</span><br>`+
     `配位: ${cd}<br>層間 (vdW gap): ${gap.toFixed(2)} Å`;
+  if(phase==='1Tp'&&info.dimerD){
+    html+=`<br>${info.m}–${info.m} ダイマー距離: <span class="hl">${info.dimerD.toFixed(2)} Å</span>`;
+  }
   if(interKey!=='none'){
     const inter=INTER[interKey];
     html+=`<br><span class="hl">挿入: ${inter.name}</span>`;
@@ -1259,13 +1384,17 @@ function updateInfo(info,phase,cL,dxm,gap,bond,interKey,effExp) {
     const cf2=window._lastCompF||1;
     if(cf2<0.999) html+=`<br><span style="color:#ff8844">層間圧縮: ${(cf2*100).toFixed(0)}% (${cf2<0.5?'強圧縮':cf2<0.8?'中圧縮':'弱圧縮'})</span>`;
   }
-  html+=`<br><span style="color:#555;font-size:.68rem">`+
-    (phase==='1T'?`Wyckoff: ${info.m} 1a(0,0,0), ${info.x} 2d(⅓,⅔,±z)`
-      :`Wyckoff: ${info.m} 2c(⅓,⅔,¼), ${info.x} 4f(⅔,⅓,z)`)+`</span>`;
+  const wyckoffMap={
+    '1T':`Wyckoff: ${info.m} 1a(0,0,0), ${info.x} 2d(⅓,⅔,±z)`,
+    '2H':`Wyckoff: ${info.m} 2c(⅓,⅔,¼), ${info.x} 4f(⅔,⅓,z)`,
+    '1Tp':`Wyckoff: ${info.m} 2e(x,¼,z), ${info.x} 4f(x,y,z)`,
+    '3R':`Wyckoff: ${info.m} 3a(0,0,z), ${info.x} 6c(x,x̄,z)`
+  };
+  html+=`<br><span style="color:#555;font-size:.68rem">${wyckoffMap[phase]||''}</span>`;
   document.getElementById('info').innerHTML=html;
 }
 
-const MNAME={V:'バナジウム',Ti:'チタン',Mo:'モリブデン',W:'タングステン',Nb:'ニオブ',Ta:'タンタル',Pt:'白金',Zr:'ジルコニウム'};
+const MNAME={V:'バナジウム',Ti:'チタン',Mo:'モリブデン',W:'タングステン',Nb:'ニオブ',Ta:'タンタル',Pt:'白金',Zr:'ジルコニウム',Re:'レニウム'};
 const XNAME={S:'硫黄',Se:'セレン',Te:'テルル'};
 function updateLegend(info,interKey) {
   document.getElementById('leg-m').style.background='#'+MCOL[info.m].toString(16).padStart(6,'0');
@@ -1670,7 +1799,7 @@ document.getElementById('v-gap-abs').addEventListener('change',function(){
   if(isNaN(targetDist)||targetDist<=0) return;
   // 現在の材料のパラメータ
   const info=DB[curMat], phase=curPhase;
-  const c_layer=phase==='2H'?info.c2H/2:info.c1T;
+  const c_layer=phase==='2H'?info.c2H/2:phase==='3R'?(info.c3R||info.c2H*1.5)/3:phase==='1Tp'?(info.c1Tp||info.c1T*2)/2:info.c1T;
   const r_inp=info.a/S3;
   const d_xm=Math.sqrt(Math.max(info.bond*info.bond-r_inp*r_inp,0.1));
   const sandwich=2*d_xm;
@@ -2315,7 +2444,7 @@ function runOptimize(){
   const matInfo=DB[curMat], phase=curPhase;
   const r_inp=matInfo.a/S3;
   const d_xm=Math.sqrt(Math.max(matInfo.bond*matInfo.bond-r_inp*r_inp,0.1));
-  const c_layer=phase==='2H'?matInfo.c2H/2:matInfo.c1T;
+  const c_layer=phase==='2H'?matInfo.c2H/2:phase==='3R'?(matInfo.c3R||matInfo.c2H*1.5)/3:phase==='1Tp'?(matInfo.c1Tp||matInfo.c1T*2)/2:matInfo.c1T;
   const normalGap=c_layer-2*d_xm;
 
   const panel=document.getElementById('opt-panel');
