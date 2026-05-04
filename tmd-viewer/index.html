@@ -1035,7 +1035,7 @@ function buildStructure() {
   const mAtoms=[], xAtoms=[];
 
   // For triclinic cells, sheared grid needs extra cells in i-direction
-  const iExtra=(phase==='1Tp'&&info.triclinic)?Math.ceil(Nb*Math.abs(Math.cos((info.gamma||119)*Math.PI/180))*bEff/aEff)+1:0;
+  const iExtra=(phase==='1Tp'&&info.triclinic)?Math.ceil(Nb*Math.abs(Math.cos((info.gamma||119)*Math.PI/180))*bEff/aEff):0;
 
   for(let l=0;l<numLayers;l++){
     const yC=l*layerStep+d_xm;
@@ -1109,23 +1109,33 @@ function buildStructure() {
   // Bounding box
   const pad=0.5;
   let dXMin,dXMax,dZMin,dZMax;
+  let inB; // bounding test function
   if(phase==='1Tp'){
     const aU=aEff||a*2, bU=bEff||a;
     if(info.triclinic){
+      // Parallelogram bounding for sheared triclinic grid
       const gammaRad=(info.gamma||119)*Math.PI/180;
-      const bSx=bU*Math.cos(gammaRad), bSz=bU*Math.sin(gammaRad);
-      const cx0=0,cx1=Na*aU,cx2=Nb*bSx,cx3=Na*aU+Nb*bSx;
-      dXMin=Math.min(cx0,cx1,cx2,cx3)-aU*0.5-pad; dXMax=Math.max(cx0,cx1,cx2,cx3)+aU*0.5+pad;
-      dZMin=-bSz*0.5-pad; dZMax=Nb*bSz+pad;
+      const _bSx=bU*Math.cos(gammaRad), _bSz=bU*Math.sin(gammaRad);
+      const padI=pad/aU, padJ=pad/_bSz;
+      inB=p=>{
+        const fj=p.z/_bSz;
+        const fi=(p.x-fj*_bSx)/aU;
+        return fi>=-padI&&fi<=Na+padI&&fj>=-padJ&&fj<=Nb+padJ;
+      };
+      // Rectangle enclosing parallelogram (for camera centering)
+      const cx0=0,cx1=Na*aU,cx2=Nb*_bSx,cx3=Na*aU+Nb*_bSx;
+      dXMin=Math.min(cx0,cx1,cx2,cx3)-pad; dXMax=Math.max(cx0,cx1,cx2,cx3)+pad;
+      dZMin=-pad; dZMax=Nb*_bSz+pad;
     } else {
     dXMin=-aU*0.5-pad; dXMax=Na*aU+pad;
     dZMin=-pad; dZMax=Nb*bU+pad;
+    inB=p=>p.x>=dXMin&&p.x<=dXMax&&p.z>=dZMin&&p.z<=dZMax;
     }
   } else {
     const[x0]=fracToXZ(0,0,a),[xNa]=fracToXZ(Na,0,a),[,zNb]=fracToXZ(0,Nb,a),[xNmin]=fracToXZ(0,Nb,a);
     dXMin=Math.min(x0,xNmin)-pad; dXMax=xNa+pad; dZMin=-pad; dZMax=zNb+pad;
+    inB=p=>p.x>=dXMin&&p.x<=dXMax&&p.z>=dZMin&&p.z<=dZMax;
   }
-  const inB=p=>p.x>=dXMin&&p.x<=dXMax&&p.z>=dZMin&&p.z<=dZMax;
 
   const cx=(dXMin+dXMax)/2, cy=((numLayers-1)*layerStep+sandwich)/2, cz=(dZMin+dZMax)/2;
   const off=new THREE.Vector3(-cx,-cy,-cz);
