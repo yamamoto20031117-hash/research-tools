@@ -730,16 +730,32 @@ function exportCIF(){
         // 1T' CIF: same positions as buildStructure
         const aUn=aU/Na, bUn=bU/Na;
         const baseX=i*aUn, baseZ=j*bUn;
-        const d0=Math.sqrt(aUn*aUn/4+bUn*bUn/4);
         const dimerD=info.dimerD||2.85;
-        const delta=(d0-dimerD)/2;
-        const ux2=(aUn/2)/d0, uz2=(bUn/2)/d0;
-        atomList.push({el:info.m, fx:(baseX+delta*ux2)/cellA, fy:yC/cellC, fz:(baseZ+delta*uz2)/cellB});
-        atomList.push({el:info.m, fx:(baseX+aUn/2-delta*ux2)/cellA, fy:yC/cellC, fz:(baseZ+bUn/2-delta*uz2)/cellB});
-        atomList.push({el:info.x, fx:(baseX+aUn/6)/cellA, fy:(yC+d_xm)/cellC, fz:(baseZ+bUn/2)/cellB});
-        atomList.push({el:info.x, fx:(baseX+2*aUn/3)/cellA, fy:(yC+d_xm)/cellC, fz:baseZ/cellB});
-        atomList.push({el:info.x, fx:(baseX+aUn/3)/cellA, fy:(yC-d_xm)/cellC, fz:baseZ/cellB});
-        atomList.push({el:info.x, fx:(baseX+5*aUn/6)/cellA, fy:(yC-d_xm)/cellC, fz:(baseZ+bUn/2)/cellB});
+        if(info.triclinic){
+          const bHn=bUn/2;
+          for(let mm=0;mm<2;mm++){
+            const zOff=mm*bHn;
+            const d0t=Math.sqrt(aUn*aUn/4+bHn*bHn/4);
+            const dt=(d0t-dimerD)/2;
+            const uxt=(aUn/2)/d0t, uzt=(bHn/2)/d0t;
+            atomList.push({el:info.m, fx:(baseX+dt*uxt)/cellA, fy:yC/cellC, fz:(baseZ+zOff+dt*uzt)/cellB});
+            atomList.push({el:info.m, fx:(baseX+aUn/2-dt*uxt)/cellA, fy:yC/cellC, fz:(baseZ+zOff+bHn/2-dt*uzt)/cellB});
+            atomList.push({el:info.x, fx:(baseX+aUn/6)/cellA, fy:(yC+d_xm)/cellC, fz:(baseZ+zOff+bHn/2)/cellB});
+            atomList.push({el:info.x, fx:(baseX+2*aUn/3)/cellA, fy:(yC+d_xm)/cellC, fz:(baseZ+zOff)/cellB});
+            atomList.push({el:info.x, fx:(baseX+aUn/3)/cellA, fy:(yC-d_xm)/cellC, fz:(baseZ+zOff)/cellB});
+            atomList.push({el:info.x, fx:(baseX+5*aUn/6)/cellA, fy:(yC-d_xm)/cellC, fz:(baseZ+zOff+bHn/2)/cellB});
+          }
+        } else {
+          const d0=Math.sqrt(aUn*aUn/4+bUn*bUn/4);
+          const delta=(d0-dimerD)/2;
+          const ux2=(aUn/2)/d0, uz2=(bUn/2)/d0;
+          atomList.push({el:info.m, fx:(baseX+delta*ux2)/cellA, fy:yC/cellC, fz:(baseZ+delta*uz2)/cellB});
+          atomList.push({el:info.m, fx:(baseX+aUn/2-delta*ux2)/cellA, fy:yC/cellC, fz:(baseZ+bUn/2-delta*uz2)/cellB});
+          atomList.push({el:info.x, fx:(baseX+aUn/6)/cellA, fy:(yC+d_xm)/cellC, fz:(baseZ+bUn/2)/cellB});
+          atomList.push({el:info.x, fx:(baseX+2*aUn/3)/cellA, fy:(yC+d_xm)/cellC, fz:baseZ/cellB});
+          atomList.push({el:info.x, fx:(baseX+aUn/3)/cellA, fy:(yC-d_xm)/cellC, fz:baseZ/cellB});
+          atomList.push({el:info.x, fx:(baseX+5*aUn/6)/cellA, fy:(yC-d_xm)/cellC, fz:(baseZ+bUn/2)/cellB});
+        }
       } else if(phase==='3R'){
         // 3R ABC stacking: each layer translates by (+1/3, +1/3) in fractional coords
         const shift=l%3;
@@ -1021,31 +1037,41 @@ function buildStructure() {
         const[xtx,xtz]=fracToXZ(i+1/3,j+2/3,a); xAtoms.push(new THREE.Vector3(xtx,yC+d_xm,xtz));
         const[xbx,xbz]=fracToXZ(i+2/3,j+1/3,a); xAtoms.push(new THREE.Vector3(xbx,yC-d_xm,xbz));
       } else if(phase==='1Tp'){
-        // 1T' structure derived from hexagonal 1T → monoclinic cell transformation:
-        //   a_mono ≈ √3 × a_hex (perpendicular to zigzag), b_mono ≈ a_hex (along zigzag)
-        //   Cell contains 2 MX₂ formula units per layer.
-        // Undistorted (ideal 1T) positions in monoclinic fractional coords:
-        //   M1:(0,0) M2:(1/2,1/2) X_top1:(1/6,1/2) X_bot1:(1/3,0) X_top2:(2/3,0) X_bot2:(5/6,1/2)
-        // Dimerization: M1 and M2 move toward each other along M1→M2 diagonal.
         const aU=aEff||(a*S3); const bU=bEff||a;
         const baseX=i*aU; const baseZ=j*bU;
-        // Undistorted M-M distance across diagonal of monoclinic cell
-        const d0=Math.sqrt(aU*aU/4+bU*bU/4);
         const dimerD=info.dimerD||2.85;
-        const delta=(d0-dimerD)/2; // displacement toward each other
-        const ux=(aU/2)/d0, uz=(bU/2)/d0; // unit vector M1→M2
-        // Metal positions (dimerized toward each other)
-        const m1x=baseX+delta*ux, m1z=baseZ+delta*uz;
-        const m2x=baseX+aU/2-delta*ux, m2z=baseZ+bU/2-delta*uz;
-        mAtoms.push(new THREE.Vector3(m1x, yC, m1z));
-        mAtoms.push(new THREE.Vector3(m2x, yC, m2z));
-        // Chalcogens at ideal 1T positions mapped to monoclinic cell
-        // Top layer (yC+d_xm): near M1→(1/6,1/2), near M2→(2/3,0)
-        xAtoms.push(new THREE.Vector3(baseX+aU/6, yC+d_xm, baseZ+bU/2));
-        xAtoms.push(new THREE.Vector3(baseX+2*aU/3, yC+d_xm, baseZ));
-        // Bottom layer (yC-d_xm): near M1→(1/3,0), near M2→(5/6,1/2)
-        xAtoms.push(new THREE.Vector3(baseX+aU/3, yC-d_xm, baseZ));
-        xAtoms.push(new THREE.Vector3(baseX+5*aU/6, yC-d_xm, baseZ+bU/2));
+        if(info.triclinic){
+          // Triclinic (ReS₂/ReSe₂): cell area ≈ 4× hexagonal → 4 M + 8 X per cell
+          // Two 1T'-like dimer motifs stacked along b, connected by M-X bonds
+          const bH=bU/2; // effective b per motif (≈ a_hex)
+          for(let mm=0;mm<2;mm++){
+            const zOff=mm*bH;
+            const d0=Math.sqrt(aU*aU/4+bH*bH/4);
+            const delta=(d0-dimerD)/2;
+            const ux=(aU/2)/d0, uz=(bH/2)/d0;
+            mAtoms.push(new THREE.Vector3(baseX+delta*ux, yC, baseZ+zOff+delta*uz));
+            mAtoms.push(new THREE.Vector3(baseX+aU/2-delta*ux, yC, baseZ+zOff+bH/2-delta*uz));
+            xAtoms.push(new THREE.Vector3(baseX+aU/6, yC+d_xm, baseZ+zOff+bH/2));
+            xAtoms.push(new THREE.Vector3(baseX+2*aU/3, yC+d_xm, baseZ+zOff));
+            xAtoms.push(new THREE.Vector3(baseX+aU/3, yC-d_xm, baseZ+zOff));
+            xAtoms.push(new THREE.Vector3(baseX+5*aU/6, yC-d_xm, baseZ+zOff+bH/2));
+          }
+        } else {
+          // Standard 1T' (P2₁/m): monoclinic cell with 2 M + 4 X per layer
+          // Derived from hex 1T → monoclinic transformation:
+          //   a_mono ≈ √3 × a_hex, b_mono ≈ a_hex
+          // Undistorted positions: M1:(0,0) M2:(1/2,1/2)
+          //   X_top1:(1/6,1/2) X_bot1:(1/3,0) X_top2:(2/3,0) X_bot2:(5/6,1/2)
+          const d0=Math.sqrt(aU*aU/4+bU*bU/4);
+          const delta=(d0-dimerD)/2;
+          const ux=(aU/2)/d0, uz=(bU/2)/d0;
+          mAtoms.push(new THREE.Vector3(baseX+delta*ux, yC, baseZ+delta*uz));
+          mAtoms.push(new THREE.Vector3(baseX+aU/2-delta*ux, yC, baseZ+bU/2-delta*uz));
+          xAtoms.push(new THREE.Vector3(baseX+aU/6, yC+d_xm, baseZ+bU/2));
+          xAtoms.push(new THREE.Vector3(baseX+2*aU/3, yC+d_xm, baseZ));
+          xAtoms.push(new THREE.Vector3(baseX+aU/3, yC-d_xm, baseZ));
+          xAtoms.push(new THREE.Vector3(baseX+5*aU/6, yC-d_xm, baseZ+bU/2));
+        }
       } else if(phase==='3R'){
         // 3R: same trigonal prismatic as 2H but with ABC stacking
         // Each layer shifted by (1/3, 1/3) in fractional coords → translational, not rotational
