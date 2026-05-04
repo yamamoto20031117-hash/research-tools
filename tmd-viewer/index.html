@@ -371,7 +371,7 @@ const DB = {
   VSe2:  { m:'V',  x:'Se', defPhase:'1T', a:3.354, c1T:6.10,  c2H:12.20, bond:2.50 },
   TiS2:  { m:'Ti', x:'S',  defPhase:'1T', a:3.407, c1T:5.70,  c2H:11.40, bond:2.43 },
   TiSe2: { m:'Ti', x:'Se', defPhase:'1T', a:3.540, c1T:6.01,  c2H:12.02, bond:2.55 },
-  TaS2:  { m:'Ta', x:'S',  defPhase:'1T', a:3.365, c1T:5.90,  c2H:12.10, bond:2.43 },
+  TaS2:  { m:'Ta', x:'S',  defPhase:'1T', a:3.367, c1T:5.90,  c2H:12.10, bond:2.48 },
   PtS2:  { m:'Pt', x:'S',  defPhase:'1T', a:3.543, c1T:5.04,  c2H:10.08, bond:2.40 },
   ZrS2:  { m:'Zr', x:'S',  defPhase:'1T', a:3.662, c1T:5.81,  c2H:11.62, bond:2.57 },
   MoS2:  { m:'Mo', x:'S',  defPhase:'2H', a:3.160, c1T:6.15,  c2H:12.30, bond:2.41 },
@@ -380,27 +380,27 @@ const DB = {
   WS2:   { m:'W',  x:'S',  defPhase:'2H', a:3.153, c1T:6.16,  c2H:12.32, bond:2.42 },
   WSe2:  { m:'W',  x:'Se', defPhase:'2H', a:3.282, c1T:6.48,  c2H:12.96, bond:2.53 },
   NbSe2: { m:'Nb', x:'Se', defPhase:'2H', a:3.442, c1T:6.27,  c2H:12.55, bond:2.60 },
-  NbS2:  { m:'Nb', x:'S',  defPhase:'2H', a:3.310, c1T:5.97,  c2H:11.94, bond:2.47 },
+  NbS2:  { m:'Nb', x:'S',  defPhase:'2H', a:3.330, c1T:5.95,  c2H:11.89, bond:2.47 },
   PtTe2: { m:'Pt', x:'Te', defPhase:'1T', a:4.002, c1T:5.22,  c2H:10.44, bond:2.65 },
-  WTe2:  { m:'W',  x:'Te', defPhase:'2H', a:3.496, c1T:6.96,  c2H:13.92, bond:2.72 },
+  WTe2:  { m:'W',  x:'Te', defPhase:'2H', a:3.520, c1T:6.99,  c2H:13.97, bond:2.77 },
   // --- 1T' (歪み八面体 / 単斜晶) ---
   // 1T' has zigzag metal chains; a_1Tp, b_1Tp are in-plane lattice, c_1Tp is layer height
   // dimerD = metal-metal dimerization distance within zigzag chain
-  MoTe2_1Tp: { m:'Mo', x:'Te', defPhase:'1Tp', a:6.330, b:3.469, c1T:6.93, c2H:13.86, c1Tp:13.86, bond:2.73, dimerD:2.88, beta:93.9,
-    a1Tp:6.330, b1Tp:3.469 },
+  MoTe2_1Tp: { m:'Mo', x:'Te', defPhase:'1Tp', a:6.330, b:3.470, c1T:6.93, c2H:13.86, c1Tp:13.86, bond:2.73, dimerD:2.88, beta:93.55,
+    a1Tp:6.330, b1Tp:3.470 },
   WTe2_1Tp:  { m:'W',  x:'Te', defPhase:'1Tp', a:6.282, b:3.496, c1T:6.96, c2H:13.92, c1Tp:14.07, bond:2.72, dimerD:2.86, beta:90.0,
     a1Tp:6.282, b1Tp:3.496 },
-  MoS2_1Tp:  { m:'Mo', x:'S',  defPhase:'1Tp', a:5.716, b:3.175, c1T:6.15, c2H:12.30, c1Tp:12.30, bond:2.42, dimerD:2.78, beta:93.0,
-    a1Tp:5.716, b1Tp:3.175 },
-  ReS2:  { m:'Re', x:'S',  defPhase:'1Tp', a:6.417, b:6.510, c1T:5.65, c2H:11.30, c1Tp:12.82, bond:2.38, dimerD:2.82, beta:105.0,
-    a1Tp:6.417, b1Tp:6.510 },
-  ReSe2: { m:'Re', x:'Se', defPhase:'1Tp', a:6.597, b:6.718, c1T:6.01, c2H:12.02, c1Tp:13.26, bond:2.51, dimerD:2.87, beta:104.9,
-    a1Tp:6.597, b1Tp:6.718 },
+  MoS2_1Tp:  { m:'Mo', x:'S',  defPhase:'1Tp', a:5.720, b:3.170, c1T:6.15, c2H:12.30, c1Tp:6.45, bond:2.42, dimerD:2.78, beta:99.0,
+    a1Tp:5.720, b1Tp:3.170 },
+  ReS2:  { m:'Re', x:'S',  defPhase:'1Tp', a:6.450, b:6.390, c1T:5.65, c2H:11.30, c1Tp:6.40, bond:2.38, dimerD:2.81, beta:91.6,
+    a1Tp:6.450, b1Tp:6.390, triclinic:true, alpha:105.04, gamma:118.97 },
+  ReSe2: { m:'Re', x:'Se', defPhase:'1Tp', a:6.580, b:6.690, c1T:6.01, c2H:12.02, c1Tp:6.70, bond:2.51, dimerD:2.83, beta:105.0,
+    a1Tp:6.580, b1Tp:6.690, triclinic:true, alpha:91.8, gamma:118.9 },
   // --- 3R (菱面体) - same in-plane structure as 2H but ABC stacking ---
   MoS2_3R:  { m:'Mo', x:'S',  defPhase:'3R', a:3.160, c1T:6.15, c2H:12.30, c3R:18.37, bond:2.41 },
-  NbS2_3R:  { m:'Nb', x:'S',  defPhase:'3R', a:3.310, c1T:5.97, c2H:11.94, c3R:17.81, bond:2.47 },
+  NbS2_3R:  { m:'Nb', x:'S',  defPhase:'3R', a:3.330, c1T:5.95, c2H:11.89, c3R:17.80, bond:2.47 },
   NbSe2_3R: { m:'Nb', x:'Se', defPhase:'3R', a:3.442, c1T:6.27, c2H:12.55, c3R:18.93, bond:2.60 },
-  TaS2_3R:  { m:'Ta', x:'S',  defPhase:'3R', a:3.365, c1T:5.90, c2H:12.10, c3R:17.90, bond:2.43 },
+  TaS2_3R:  { m:'Ta', x:'S',  defPhase:'3R', a:3.340, c1T:5.90, c2H:12.10, c3R:17.90, bond:2.48 },
 };
 const MCOL_DEFAULT = { V:0x2e8bc0,Ti:0x7799aa,Mo:0x8855bb,W:0x4466aa,Nb:0x22aa88,Ta:0x667788,Pt:0xaabbcc,Zr:0x55aa77,Re:0xaa6644 };
 const XCOL_DEFAULT = { S:0xddc000, Se:0xd48a00, Te:0xcc7722 };
@@ -1353,19 +1353,28 @@ function buildStructure() {
 //  Info / Legend
 // =====================================================
 function updateInfo(info,phase,cL,dxm,gap,bond,interKey,effExp) {
-  const sgMap={'1T':'P-3m1 (No.164)','2H':'P6₃/mmc (No.194)','1Tp':'P2₁/m (No.11)','3R':'R3m (No.160)'};
-  const ptMap={'1T':'CdI₂型 (八面体)','2H':'MoS₂型 (三角柱)','1Tp':'歪み八面体 (ジグザグ鎖)','3R':'菱面体 (三角柱 ABC積層)'};
-  const cdMap={'1T':'八面体 (6配位)','2H':'三角柱 (6配位)','1Tp':'歪み八面体 (6配位)','3R':'三角柱 (6配位)'};
-  const sg=sgMap[phase]||sgMap['1T'];
-  const pt=ptMap[phase]||ptMap['1T'];
-  const cd=cdMap[phase]||cdMap['1T'];
+  let sg,pt,cd;
+  if(phase==='1Tp'&&info.triclinic){
+    sg='P-1 (No.2)'; pt='歪み八面体 (三斜晶 / Re₄クラスター)'; cd='歪み八面体 (6配位)';
+  } else if(phase==='1Tp'&&info.beta===90.0){
+    sg='Pmn2₁ (No.31, Td型)'; pt='歪み八面体 (直方晶 Td)'; cd='歪み八面体 (6配位)';
+  } else {
+    const sgMap={'1T':'P-3m1 (No.164)','2H':'P6₃/mmc (No.194)','1Tp':'P2₁/m (No.11)','3R':'R3m (No.160)'};
+    const ptMap={'1T':'CdI₂型 (八面体)','2H':'MoS₂型 (三角柱)','1Tp':'歪み八面体 (ジグザグ鎖)','3R':'菱面体 (三角柱 ABC積層)'};
+    const cdMap={'1T':'八面体 (6配位)','2H':'三角柱 (6配位)','1Tp':'歪み八面体 (6配位)','3R':'三角柱 (6配位)'};
+    sg=sgMap[phase]||sgMap['1T']; pt=ptMap[phase]||ptMap['1T']; cd=cdMap[phase]||cdMap['1T'];
+  }
   const cf=phase==='2H'?info.c2H:phase==='3R'?(info.c3R||info.c2H*1.5):phase==='1Tp'?(info.c1Tp||info.c1T*2):info.c1T;
   const f=info.m+info.x+'₂';
   let lattice='';
   if(phase==='1Tp'){
     const aU=info.a1Tp||info.a*2, bU=info.b1Tp||info.a;
     lattice=`a = ${aU.toFixed(3)} Å, b = ${bU.toFixed(3)} Å, c = ${cf.toFixed(2)} Å`;
-    if(info.beta) lattice+=`, β = ${info.beta}°`;
+    if(info.triclinic){
+      lattice+=`<br>α = ${info.alpha||90}°, β = ${info.beta||90}°, γ = ${info.gamma||90}°`;
+    } else if(info.beta){
+      lattice+=`, β = ${info.beta}°`;
+    }
   } else {
     lattice=`a = ${info.a.toFixed(3)} Å, c = ${cf.toFixed(2)} Å`;
   }
