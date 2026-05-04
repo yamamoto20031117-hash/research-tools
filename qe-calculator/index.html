@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>QE 計算ランチャー — Quantum ESPRESSO via AiiDAlab</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;min-height:100vh}
+.top-bar{background:rgba(8,11,18,0.95);backdrop-filter:blur(10px);padding:10px 20px;display:flex;align-items:center;gap:14px;border-bottom:1px solid rgba(88,166,255,0.1);flex-wrap:wrap}
+.top-bar a{color:#58a6ff;text-decoration:none;font-size:.85rem}
+.top-bar h1{font-size:1rem;color:#fff;flex:1}
+.btn{background:rgba(88,166,255,0.12);border:1px solid rgba(88,166,255,0.2);color:#58a6ff;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:.8rem;transition:.15s}
+.btn:hover{background:rgba(88,166,255,0.25)}
+.btn-primary{background:#58a6ff;color:#0a0e17;border:none;font-weight:bold}
+.btn-primary:hover{background:#7db8ff}
+.btn-danger{background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.3);color:#ef4444}
+.btn-danger:hover{background:rgba(239,68,68,0.3)}
+
+/* 接続ステータス */
+.conn-status{display:flex;align-items:center;gap:6px;font-size:.78rem;padding:4px 10px;border-radius:12px;background:rgba(255,255,255,0.05)}
+.conn-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.conn-dot.ok{background:#22c55e}
+.conn-dot.ng{background:#ef4444}
+.conn-dot.loading{background:#eab308;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+.container{max-width:1000px;margin:0 auto;padding:16px 20px 60px}
+
+/* セクション */
+.section{background:rgba(15,18,28,0.8);border:1px solid rgba(88,166,255,0.1);border-radius:10px;padding:20px;margin-bottom:16px}
+.section h2{font-size:1rem;color:#58a6ff;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.section h2 .num{background:#58a6ff;color:#0a0e17;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:bold;flex-shrink:0}
+
+/* ドロップゾーン */
+.drop-zone{border:2px dashed rgba(88,166,255,0.2);border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:.2s}
+.drop-zone:hover,.drop-zone.drag-over{border-color:#58a6ff;background:rgba(88,166,255,0.05)}
+.drop-zone h3{color:#999;font-size:.95rem;margin-bottom:6px}
+.drop-zone p{color:#666;font-size:.78rem}
+
+/* 構造プレビュー */
+.struct-info{display:none;margin-top:14px}
+.struct-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:.82rem}
+.struct-grid dt{color:#888}
+.struct-grid dd{color:#ddd;font-family:monospace}
+.atom-list{max-height:120px;overflow-y:auto;font-size:.75rem;background:rgba(0,0,0,0.3);border-radius:6px;padding:8px;margin-top:8px;font-family:monospace;color:#aaa}
+
+/* フォーム */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+@media(max-width:600px){.form-grid{grid-template-columns:1fr}}
+.form-item{display:flex;flex-direction:column;gap:3px}
+.form-item label{font-size:.78rem;color:#888}
+.form-item input,.form-item select{background:#0e1220;border:1px solid #2a3040;border-radius:5px;padding:6px 10px;color:#ddd;font-size:.82rem}
+.form-item input:focus,.form-item select:focus{border-color:#58a6ff;outline:none}
+.form-item .hint{font-size:.68rem;color:#555}
+
+.form-section-title{grid-column:1/-1;font-size:.85rem;color:#7db8ff;padding-top:10px;border-top:1px solid rgba(88,166,255,0.1);margin-top:4px}
+
+/* チェックボックス行 */
+.check-row{display:flex;align-items:center;gap:8px;font-size:.82rem;color:#ccc}
+.check-row input[type=checkbox]{accent-color:#58a6ff}
+
+/* 折り畳み */
+.collapsible{cursor:pointer;display:flex;align-items:center;gap:6px;font-size:.85rem;color:#7db8ff;margin:12px 0 8px;user-select:none}
+.collapsible::before{content:'▶';font-size:.6rem;transition:transform .2s}
+.collapsible.open::before{transform:rotate(90deg)}
+.coll-body{display:none;padding-left:4px}
+.coll-body.open{display:block}
+
+/* パイプライン */
+.pipeline{display:flex;align-items:center;gap:0;margin:16px 0;flex-wrap:wrap}
+.pipe-step{display:flex;align-items:center;gap:0}
+.pipe-box{padding:10px 18px;border-radius:8px;font-size:.82rem;font-weight:bold;text-align:center;min-width:100px;position:relative}
+.pipe-box.pending{background:rgba(255,255,255,0.05);color:#666;border:1px solid #2a3040}
+.pipe-box.running{background:rgba(88,166,255,0.15);color:#58a6ff;border:1px solid rgba(88,166,255,0.4);animation:pulse 1.5s infinite}
+.pipe-box.done{background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.4)}
+.pipe-box.error{background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.4)}
+.pipe-box .sub{font-size:.68rem;font-weight:normal;display:block;margin-top:3px;opacity:.7}
+.pipe-arrow{color:#555;font-size:1.2rem;margin:0 8px}
+
+/* ログ */
+.log-area{background:#080b12;border:1px solid #1a2030;border-radius:6px;padding:10px;max-height:200px;overflow-y:auto;font-family:'Courier New',monospace;font-size:.72rem;color:#888;white-space:pre-wrap;line-height:1.6;display:none}
+.log-area.visible{display:block}
+
+/* バンド構造 */
+.band-canvas-wrap{position:relative;width:100%;overflow-x:auto}
+#bandCanvas{display:none;max-width:100%}
+
+/* モーダル */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#0e1220;border:1px solid rgba(88,166,255,0.2);border-radius:12px;padding:24px;width:90%;max-width:480px;max-height:80vh;overflow-y:auto}
+.modal h3{color:#fff;margin-bottom:14px;font-size:1rem}
+.modal .form-item{margin-bottom:12px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+
+/* 結果テーブル */
+.result-table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:10px}
+.result-table th{background:rgba(88,166,255,0.08);color:#58a6ff;padding:6px 10px;text-align:left}
+.result-table td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);color:#bbb;font-family:monospace}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="/">&#8592; Research Tools</a>
+  <h1>QE 計算ランチャー</h1>
+  <div class="conn-status" id="connStatus">
+    <span class="conn-dot ng" id="connDot"></span>
+    <span id="connText">未接続</span>
+  </div>
+  <button class="btn" onclick="openConnModal()">&#9881; 接続設定</button>
+  <a href="/qe-calculator/manual.html" class="btn" style="text-decoration:none">&#128214; セットアップガイド</a>
+</div>
+
+<div class="container">
+
+<!-- ===== 1. 構造入力 ===== -->
+<div class="section">
+  <h2><span class="num">1</span> 構造入力</h2>
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('cifInput').click()">
+    <h3>CIFファイルをドロップ</h3>
+    <p>TMD結晶構造ビューアで出力したCIFファイル、またはその他のCIFファイル</p>
+    <input type="file" id="cifInput" accept=".cif,.CIF" style="display:none">
+  </div>
+  <div style="margin-top:8px;text-align:center">
+    <button class="btn" onclick="importFromViewer()">TMDビューアから取得</button>
+  </div>
+
+  <div class="struct-info" id="structInfo">
+    <dl class="struct-grid">
+      <dt>化学式</dt><dd id="si-formula">—</dd>
+      <dt>原子数</dt><dd id="si-natoms">—</dd>
+      <dt>a (Å)</dt><dd id="si-a">—</dd>
+      <dt>b (Å)</dt><dd id="si-b">—</dd>
+      <dt>c (Å)</dt><dd id="si-c">—</dd>
+      <dt>α (°)</dt><dd id="si-alpha">—</dd>
+      <dt>β (°)</dt><dd id="si-beta">—</dd>
+      <dt>γ (°)</dt><dd id="si-gamma">—</dd>
+    </dl>
+    <div class="atom-list" id="si-atoms"></div>
+  </div>
+</div>
+
+<!-- ===== 2. 計算設定 ===== -->
+<div class="section">
+  <h2><span class="num">2</span> 計算設定</h2>
+
+  <div class="form-grid">
+    <div class="form-item">
+      <label>擬ポテンシャル</label>
+      <select id="pseudo-lib">
+        <option value="SSSP/1.3/PBEsol/efficiency">SSSP 1.3 Efficiency (PBEsol)</option>
+        <option value="SSSP/1.3/PBEsol/precision">SSSP 1.3 Precision (PBEsol)</option>
+        <option value="SSSP/1.3/PBE/efficiency">SSSP 1.3 Efficiency (PBE)</option>
+        <option value="SSSP/1.3/PBE/precision">SSSP 1.3 Precision (PBE)</option>
+        <option value="PseudoDojo/0.4/PBEsol/SR/standard">PseudoDojo 0.4 (PBEsol SR)</option>
+        <option value="PseudoDojo/0.4/PBE/SR/standard">PseudoDojo 0.4 (PBE SR)</option>
+      </select>
+    </div>
+    <div class="form-item">
+      <label>構造緩和タイプ</label>
+      <select id="relax-type">
+        <option value="relax">relax（原子位置のみ）</option>
+        <option value="vc-relax">vc-relax（格子＋原子位置）</option>
+        <option value="none">固定（SCFのみ）</option>
+      </select>
+    </div>
+    <div class="form-item">
+      <label>波動関数カットオフ ecutwfc (Ry)</label>
+      <input type="number" id="ecutwfc" value="60" min="10" max="200" step="5">
+      <span class="hint">擬ポテンシャルにより推奨値が異なる</span>
+    </div>
+    <div class="form-item">
+      <label>電荷密度カットオフ ecutrho (Ry)</label>
+      <input type="number" id="ecutrho" value="480" min="40" max="2000" step="10">
+      <span class="hint">通常 ecutwfc × 8（PAW）または × 4（NC）</span>
+    </div>
+    <div class="form-item">
+      <label>k点メッシュ (kx × ky × kz)</label>
+      <div style="display:flex;gap:4px">
+        <input type="number" id="kx" value="6" min="1" max="24" style="width:50px">
+        <span style="color:#555;line-height:2">×</span>
+        <input type="number" id="ky" value="6" min="1" max="24" style="width:50px">
+        <span style="color:#555;line-height:2">×</span>
+        <input type="number" id="kz" value="1" min="1" max="24" style="width:50px">
+      </div>
+      <span class="hint">層状構造ではkz=1が適切な場合が多い</span>
+    </div>
+    <div class="form-item">
+      <label>スメアリング</label>
+      <select id="smearing">
+        <option value="cold">cold (Marzari-Vanderbilt)</option>
+        <option value="gaussian">gaussian</option>
+        <option value="mp">methfessel-paxton</option>
+        <option value="fd">fermi-dirac</option>
+      </select>
+    </div>
+    <div class="form-item">
+      <label>degauss (Ry)</label>
+      <input type="number" id="degauss" value="0.01" min="0.001" max="0.1" step="0.001">
+    </div>
+    <div class="form-item">
+      <label>SCF収束閾値 conv_thr</label>
+      <input type="text" id="conv-thr" value="1.0e-8">
+    </div>
+  </div>
+
+  <!-- 高度な設定 -->
+  <div class="collapsible" onclick="toggleColl(this)">高度な設定</div>
+  <div class="coll-body" id="advSettings">
+    <div class="form-grid">
+      <div class="form-section-title">スピン・相対論</div>
+      <div class="form-item">
+        <label>&nbsp;</label>
+        <div class="check-row"><input type="checkbox" id="chk-spin"> スピン分極 (nspin=2)</div>
+      </div>
+      <div class="form-item">
+        <label>&nbsp;</label>
+        <div class="check-row"><input type="checkbox" id="chk-soc"> スピン軌道結合 (SOC)</div>
+      </div>
+
+      <div class="form-section-title">相関補正</div>
+      <div class="form-item">
+        <label>van der Waals 補正</label>
+        <select id="vdw-corr">
+          <option value="none">なし</option>
+          <option value="dft-d2">DFT-D2 (Grimme)</option>
+          <option value="dft-d3">DFT-D3 (Grimme)</option>
+          <option value="xdm">XDM</option>
+        </select>
+      </div>
+      <div class="form-item">
+        <label>&nbsp;</label>
+        <div class="check-row"><input type="checkbox" id="chk-hubbard"> Hubbard U 補正 (DFT+U)</div>
+      </div>
+      <div class="form-item" id="hubbard-wrap" style="display:none;grid-column:1/-1">
+        <label>Hubbard U パラメータ（元素ごと、eV）</label>
+        <div id="hubbard-list" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+        <span class="hint">例: Mo d軌道 = 4.0 eV</span>
+      </div>
+
+      <div class="form-section-title">収束・性能</div>
+      <div class="form-item">
+        <label>最大SCF反復 electron_maxstep</label>
+        <input type="number" id="max-scf" value="80" min="10" max="500">
+      </div>
+      <div class="form-item">
+        <label>力の収束閾値 forc_conv_thr (Ry/au)</label>
+        <input type="text" id="forc-conv" value="1.0e-3">
+      </div>
+      <div class="form-item">
+        <label>バンド計算 k点密度</label>
+        <input type="number" id="band-kpts" value="20" min="5" max="100">
+        <span class="hint">高対称点間の分割数</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 3. ワークフロー制御 ===== -->
+<div class="section">
+  <h2><span class="num">3</span> ワークフロー制御</h2>
+
+  <div class="pipeline" id="pipeline">
+    <div class="pipe-step">
+      <div class="pipe-box pending" id="pipe-relax">relax<span class="sub">構造最適化</span></div>
+      <span class="pipe-arrow">→</span>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-box pending" id="pipe-scf">SCF<span class="sub">自己無撞着場</span></div>
+      <span class="pipe-arrow">→</span>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-box pending" id="pipe-nscf">NSCF<span class="sub">非自己無撞着</span></div>
+      <span class="pipe-arrow">→</span>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-box pending" id="pipe-bands">bands<span class="sub">バンド構造</span></div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <button class="btn btn-primary" id="btnSubmit" onclick="submitWorkflow()">&#9654; 計算開始</button>
+    <button class="btn btn-danger" id="btnAbort" onclick="abortWorkflow()" style="display:none">&#9632; 計算停止</button>
+    <button class="btn" onclick="toggleLog()">&#128220; ログ表示</button>
+    <span id="elapsedTime" style="font-size:.75rem;color:#666"></span>
+  </div>
+
+  <div class="log-area" id="logArea"></div>
+</div>
+
+<!-- ===== 4. 結果表示 ===== -->
+<div class="section" id="resultSection" style="display:none">
+  <h2><span class="num">4</span> 結果</h2>
+
+  <div id="resultSummary">
+    <table class="result-table" id="resultTable">
+      <thead><tr><th>項目</th><th>値</th></tr></thead>
+      <tbody id="resultBody"></tbody>
+    </table>
+  </div>
+
+  <h3 style="color:#7db8ff;font-size:.9rem;margin:16px 0 8px">バンド構造</h3>
+  <div class="band-canvas-wrap">
+    <canvas id="bandCanvas" width="800" height="450"></canvas>
+  </div>
+  <div id="bandInfo" style="font-size:.75rem;color:#666;margin-top:6px"></div>
+
+  <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+    <button class="btn" onclick="downloadBandPNG()">PNG保存</button>
+    <button class="btn" onclick="downloadBandCSV()">CSV出力</button>
+    <button class="btn" onclick="downloadOptCIF()">最適化CIF</button>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<!-- ===== 接続設定モーダル ===== -->
+<div class="modal-bg" id="connModal">
+  <div class="modal">
+    <h3>&#9881; AiiDAlab 接続設定</h3>
+    <div class="form-item">
+      <label>AiiDAlab REST API エンドポイント</label>
+      <input type="text" id="cfg-endpoint" placeholder="https://lab-pc.local:5000/api/v4">
+      <span class="hint">研究室PCのAiiDA REST APIアドレス</span>
+    </div>
+    <div class="form-item">
+      <label>API トークン</label>
+      <input type="password" id="cfg-token" placeholder="Bearer トークンを入力">
+      <span class="hint">トークンはブラウザのlocalStorageに保存されます</span>
+    </div>
+    <div class="form-item">
+      <label>QEコード名 (pw.x)</label>
+      <input type="text" id="cfg-code" placeholder="pw@localhost" value="pw@localhost">
+      <span class="hint">AiiDAに登録されたpw.xコードのラベル</span>
+    </div>
+    <div id="connTestResult" style="font-size:.78rem;margin-top:8px"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="testConnection()">接続テスト</button>
+      <button class="btn" onclick="closeConnModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveConnection()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== グローバル状態 =====
+let cifData = null;       // パース済みCIF
+let cifRawText = '';      // 生CIFテキスト
+let workflowPK = null;    // AiiDA process PK
+let pollTimer = null;
+let startTime = null;
+let currentStep = '';     // relax/scf/nscf/bands
+
+// ===== 接続設定 =====
+function loadConfig(){
+  return {
+    endpoint: localStorage.getItem('qe_endpoint')||'',
+    token: localStorage.getItem('qe_token')||'',
+    code: localStorage.getItem('qe_code')||'pw@localhost'
+  };
+}
+function saveConfig(cfg){
+  localStorage.setItem('qe_endpoint', cfg.endpoint);
+  localStorage.setItem('qe_token', cfg.token);
+  localStorage.setItem('qe_code', cfg.code);
+}
+function openConnModal(){
+  const cfg=loadConfig();
+  document.getElementById('cfg-endpoint').value=cfg.endpoint;
+  document.getElementById('cfg-token').value=cfg.token;
+  document.getElementById('cfg-code').value=cfg.code;
+  document.getElementById('connTestResult').textContent='';
+  document.getElementById('connModal').classList.add('open');
+}
+function closeConnModal(){ document.getElementById('connModal').classList.remove('open'); }
+function saveConnection(){
+  const cfg={
+    endpoint:document.getElementById('cfg-endpoint').value.replace(/\/$/,''),
+    token:document.getElementById('cfg-token').value,
+    code:document.getElementById('cfg-code').value
+  };
+  saveConfig(cfg);
+  closeConnModal();
+  checkConnection();
+}
+
+// ===== AiiDA REST API クライアント =====
+class AiiDAClient{
+  constructor(){
+    const cfg=loadConfig();
+    this.base=cfg.endpoint;
+    this.token=cfg.token;
+    this.code=cfg.code;
+  }
+  headers(){
+    const h={'Content-Type':'application/json'};
+    if(this.token) h['Authorization']='Bearer '+this.token;
+    return h;
+  }
+  async get(path){
+    const r=await fetch(this.base+path,{headers:this.headers()});
+    if(!r.ok) throw new Error(`API ${r.status}: ${r.statusText}`);
+    return r.json();
+  }
+  async post(path, body){
+    const r=await fetch(this.base+path,{method:'POST',headers:this.headers(),body:JSON.stringify(body)});
+    if(!r.ok){
+      const t=await r.text().catch(()=>'');
+      throw new Error(`API ${r.status}: ${t||r.statusText}`);
+    }
+    return r.json();
+  }
+  async testConnection(){
+    return this.get('/computers');
+  }
+  async getProcess(pk){
+    return this.get('/processes/'+pk);
+  }
+  async getNode(pk){
+    return this.get('/nodes/'+pk);
+  }
+  async submitProcess(processType, inputs){
+    return this.post('/processes',{process_type:processType, inputs});
+  }
+}
+
+async function testConnection(){
+  const el=document.getElementById('connTestResult');
+  el.style.color='#eab308';
+  el.textContent='接続テスト中...';
+  try{
+    const cfg={
+      endpoint:document.getElementById('cfg-endpoint').value.replace(/\/$/,''),
+      token:document.getElementById('cfg-token').value
+    };
+    const r=await fetch(cfg.endpoint+'/computers',{
+      headers:cfg.token?{'Authorization':'Bearer '+cfg.token}:{}
+    });
+    if(r.ok){
+      const data=await r.json();
+      const n=data.data?data.data.length:0;
+      el.style.color='#22c55e';
+      el.textContent=`✓ 接続成功（${n}台のコンピュータが登録済み）`;
+    }else{
+      el.style.color='#ef4444';
+      el.textContent=`✗ エラー: HTTP ${r.status}`;
+    }
+  }catch(e){
+    el.style.color='#ef4444';
+    el.textContent='✗ 接続失敗: '+e.message;
+  }
+}
+
+async function checkConnection(){
+  const cfg=loadConfig();
+  const dot=document.getElementById('connDot');
+  const txt=document.getElementById('connText');
+  if(!cfg.endpoint){
+    dot.className='conn-dot ng'; txt.textContent='未設定'; return;
+  }
+  dot.className='conn-dot loading'; txt.textContent='接続中...';
+  try{
+    const client=new AiiDAClient();
+    await client.testConnection();
+    dot.className='conn-dot ok'; txt.textContent='接続済み';
+  }catch(e){
+    dot.className='conn-dot ng'; txt.textContent='接続エラー';
+  }
+}
+
+// ===== CIF パーサー =====
+function parseCIF(text){
+  const lines=text.split(/\r?\n/);
+  const cell={a:0,b:0,c:0,alpha:90,beta:90,gamma:90};
+  const atoms=[];
+  let inLoop=false, loopCols=[], loopData=[];
+
+  for(let i=0;i<lines.length;i++){
+    const ln=lines[i].trim();
+    if(!inLoop){
+      if(ln.startsWith('_cell_length_a')) cell.a=parseFloat(ln.split(/\s+/)[1]);
+      if(ln.startsWith('_cell_length_b')) cell.b=parseFloat(ln.split(/\s+/)[1]);
+      if(ln.startsWith('_cell_length_c')) cell.c=parseFloat(ln.split(/\s+/)[1]);
+      if(ln.startsWith('_cell_angle_alpha')) cell.alpha=parseFloat(ln.split(/\s+/)[1]);
+      if(ln.startsWith('_cell_angle_beta')) cell.beta=parseFloat(ln.split(/\s+/)[1]);
+      if(ln.startsWith('_cell_angle_gamma')) cell.gamma=parseFloat(ln.split(/\s+/)[1]);
+      if(ln==='loop_'){
+        inLoop=true; loopCols=[]; loopData=[];
+      }
+    }else{
+      if(ln.startsWith('_')){
+        loopCols.push(ln);
+      }else if(ln===''||ln.startsWith('loop_')||ln.startsWith('#')){
+        processLoop(loopCols,loopData,atoms);
+        inLoop=ln==='loop_'; loopCols=[]; loopData=[];
+      }else{
+        loopData.push(ln);
+      }
+    }
+  }
+  if(inLoop) processLoop(loopCols,loopData,atoms);
+
+  // 化学式
+  const elCount={};
+  atoms.forEach(a=>{elCount[a.el]=(elCount[a.el]||0)+1;});
+  const formula=Object.entries(elCount).map(([e,n])=>n>1?e+n:e).join('');
+
+  return {cell, atoms, formula, rawText:text};
+}
+
+function processLoop(cols, data, atoms){
+  const iLabel=cols.indexOf('_atom_site_label');
+  const iType=cols.indexOf('_atom_site_type_symbol');
+  const iFx=cols.indexOf('_atom_site_fract_x');
+  const iFy=cols.indexOf('_atom_site_fract_y');
+  const iFz=cols.indexOf('_atom_site_fract_z');
+  // Cartesian座標もチェック
+  const iCx=cols.indexOf('_atom_site_Cartn_x');
+  const iCy=cols.indexOf('_atom_site_Cartn_y');
+  const iCz=cols.indexOf('_atom_site_Cartn_z');
+
+  if((iFx<0||iFy<0||iFz<0)&&(iCx<0||iCy<0||iCz<0)) return;
+
+  for(const line of data){
+    const parts=line.trim().split(/\s+/);
+    if(parts.length<cols.length) continue;
+    const el=(iType>=0?parts[iType]:parts[iLabel>=0?iLabel:0]).replace(/[^A-Za-z]/g,'');
+    let fx,fy,fz;
+    if(iFx>=0){
+      fx=parseFloat(parts[iFx]); fy=parseFloat(parts[iFy]); fz=parseFloat(parts[iFz]);
+    } else {
+      // Cartesian→fractionalは後で変換が必要だが、ここでは仮にCartesianのまま
+      fx=parseFloat(parts[iCx]); fy=parseFloat(parts[iCy]); fz=parseFloat(parts[iCz]);
+    }
+    if(!isNaN(fx)&&!isNaN(fy)&&!isNaN(fz)){
+      atoms.push({el, fx, fy, fz});
+    }
+  }
+}
+
+// ===== CIF読み込みUI =====
+const dropZone=document.getElementById('dropZone');
+const cifInput=document.getElementById('cifInput');
+
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag-over');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop',e=>{
+  e.preventDefault();dropZone.classList.remove('drag-over');
+  if(e.dataTransfer.files.length) loadCIFFile(e.dataTransfer.files[0]);
+});
+cifInput.addEventListener('change',e=>{if(e.target.files.length) loadCIFFile(e.target.files[0]);});
+
+function loadCIFFile(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    cifRawText=reader.result;
+    cifData=parseCIF(cifRawText);
+    updateStructInfo();
+    addLog('CIF読込完了: '+file.name+' ('+cifData.atoms.length+'原子)');
+  };
+  reader.readAsText(file);
+}
+
+function importFromViewer(){
+  const data=localStorage.getItem('tmd_cif_data');
+  if(data){
+    cifRawText=data;
+    cifData=parseCIF(data);
+    updateStructInfo();
+    addLog('TMDビューアからCIFデータを取得');
+  }else{
+    alert('TMDビューアにエクスポートされたCIFデータがありません。\nTMDビューアでCIFエクスポートを実行してください。');
+  }
+}
+
+function updateStructInfo(){
+  if(!cifData) return;
+  const c=cifData.cell;
+  document.getElementById('si-formula').textContent=cifData.formula;
+  document.getElementById('si-natoms').textContent=cifData.atoms.length;
+  document.getElementById('si-a').textContent=c.a.toFixed(4);
+  document.getElementById('si-b').textContent=c.b.toFixed(4);
+  document.getElementById('si-c').textContent=c.c.toFixed(4);
+  document.getElementById('si-alpha').textContent=c.alpha.toFixed(2);
+  document.getElementById('si-beta').textContent=c.beta.toFixed(2);
+  document.getElementById('si-gamma').textContent=c.gamma.toFixed(2);
+  // 原子リスト
+  const atomsEl=document.getElementById('si-atoms');
+  atomsEl.textContent=cifData.atoms.map((a,i)=>
+    `${(i+1).toString().padStart(3)} ${a.el.padEnd(4)} ${a.fx.toFixed(6)}  ${a.fy.toFixed(6)}  ${a.fz.toFixed(6)}`
+  ).join('\n');
+  document.getElementById('structInfo').style.display='block';
+  dropZone.querySelector('h3').textContent='✓ '+cifData.formula+' ('+cifData.atoms.length+'原子)';
+  dropZone.querySelector('h3').style.color='#22c55e';
+
+  // k点自動提案
+  autoSuggestKpoints();
+  // Hubbard U対象元素を更新
+  updateHubbardList();
+}
+
+function autoSuggestKpoints(){
+  if(!cifData) return;
+  const c=cifData.cell;
+  // 目標: k密度 ≈ 30/length (Å⁻¹)
+  const target=30;
+  document.getElementById('kx').value=Math.max(1,Math.round(target/c.a));
+  document.getElementById('ky').value=Math.max(1,Math.round(target/c.b));
+  document.getElementById('kz').value=Math.max(1,Math.round(target/c.c));
+}
+
+// ===== Hubbard U =====
+document.getElementById('chk-hubbard').addEventListener('change',function(){
+  document.getElementById('hubbard-wrap').style.display=this.checked?'block':'none';
+});
+
+function updateHubbardList(){
+  if(!cifData) return;
+  const els=[...new Set(cifData.atoms.map(a=>a.el))];
+  // 遷移金属のみ提案
+  const tm='Sc Ti V Cr Mn Fe Co Ni Cu Zn Y Zr Nb Mo Tc Ru Rh Pd Ag Cd Hf Ta W Re Os Ir Pt Au'.split(' ');
+  const wrap=document.getElementById('hubbard-list');
+  wrap.innerHTML='';
+  els.filter(e=>tm.includes(e)).forEach(e=>{
+    wrap.innerHTML+=`<div style="display:flex;align-items:center;gap:4px">
+      <span style="color:#ddd;font-size:.8rem;width:28px">${e}</span>
+      <input type="number" class="hubbard-u" data-el="${e}" value="0" min="0" max="10" step="0.5"
+        style="width:60px;background:#0e1220;border:1px solid #2a3040;border-radius:4px;padding:3px 6px;color:#ddd;font-size:.8rem">
+      <span style="color:#666;font-size:.72rem">eV</span>
+    </div>`;
+  });
+}
+
+// ===== 折りたたみ =====
+function toggleColl(el){
+  el.classList.toggle('open');
+  const body=el.nextElementSibling;
+  body.classList.toggle('open');
+}
+
+// ===== ログ =====
+function addLog(msg){
+  const el=document.getElementById('logArea');
+  const ts=new Date().toLocaleTimeString('ja-JP');
+  el.textContent+='['+ts+'] '+msg+'\n';
+  el.scrollTop=el.scrollHeight;
+}
+function toggleLog(){
+  document.getElementById('logArea').classList.toggle('visible');
+}
+
+// ===== ワークフロー =====
+function setPipeStatus(step, status){
+  const el=document.getElementById('pipe-'+step);
+  if(el) el.className='pipe-box '+status;
+}
+
+function resetPipeline(){
+  ['relax','scf','nscf','bands'].forEach(s=>setPipeStatus(s,'pending'));
+}
+
+function gatherParams(){
+  return {
+    pseudo_family: document.getElementById('pseudo-lib').value,
+    relax_type: document.getElementById('relax-type').value,
+    ecutwfc: parseFloat(document.getElementById('ecutwfc').value),
+    ecutrho: parseFloat(document.getElementById('ecutrho').value),
+    kpoints: [
+      parseInt(document.getElementById('kx').value),
+      parseInt(document.getElementById('ky').value),
+      parseInt(document.getElementById('kz').value)
+    ],
+    smearing: document.getElementById('smearing').value,
+    degauss: parseFloat(document.getElementById('degauss').value),
+    conv_thr: parseFloat(document.getElementById('conv-thr').value),
+    spin: document.getElementById('chk-spin').checked,
+    soc: document.getElementById('chk-soc').checked,
+    vdw_corr: document.getElementById('vdw-corr').value,
+    hubbard: document.getElementById('chk-hubbard').checked,
+    hubbard_u: {},
+    electron_maxstep: parseInt(document.getElementById('max-scf').value),
+    forc_conv_thr: parseFloat(document.getElementById('forc-conv').value),
+    band_kpoints: parseInt(document.getElementById('band-kpts').value)
+  };
+}
+
+async function submitWorkflow(){
+  if(!cifData){alert('CIFファイルを先に読み込んでください');return;}
+  const cfg=loadConfig();
+  if(!cfg.endpoint){alert('接続設定を先に行ってください');openConnModal();return;}
+
+  const params=gatherParams();
+
+  // Hubbard U値を収集
+  if(params.hubbard){
+    document.querySelectorAll('.hubbard-u').forEach(inp=>{
+      const v=parseFloat(inp.value);
+      if(v>0) params.hubbard_u[inp.dataset.el]=v;
+    });
+  }
+
+  resetPipeline();
+  addLog('計算を投入します...');
+  document.getElementById('btnSubmit').style.display='none';
+  document.getElementById('btnAbort').style.display='inline-block';
+  startTime=Date.now();
+  updateElapsed();
+
+  try{
+    const client=new AiiDAClient();
+
+    // AiiDA REST APIへワークフロー投入
+    const payload={
+      structure_cif: cifRawText,
+      parameters: params,
+      code_label: cfg.code
+    };
+
+    addLog('ワークフロー投入中...');
+    const result=await client.post('/processes', {
+      process_type: 'aiida.workflows:quantumespresso.pw.bands',
+      inputs: payload
+    });
+
+    workflowPK=result.data?result.data.pk:result.pk;
+    addLog('ワークフロー投入完了 (PK='+workflowPK+')');
+    setPipeStatus('relax','running');
+    currentStep='relax';
+
+    // ポーリング開始
+    pollTimer=setInterval(()=>pollStatus(), 5000);
+
+  }catch(e){
+    addLog('エラー: '+e.message);
+    document.getElementById('btnSubmit').style.display='inline-block';
+    document.getElementById('btnAbort').style.display='none';
+    startTime=null;
+  }
+}
+
+async function pollStatus(){
+  if(!workflowPK) return;
+  try{
+    const client=new AiiDAClient();
+    const res=await client.getProcess(workflowPK);
+    const proc=res.data||res;
+    const state=proc.attributes?.process_state||proc.process_state||'';
+    const exitStatus=proc.attributes?.exit_status??proc.exit_status;
+
+    addLog('状態: '+state+(exitStatus!=null?' (exit='+exitStatus+')':''));
+
+    // ステップ判定（ワークチェインの子プロセスを見る）
+    if(state==='waiting'||state==='running'){
+      // 進行中
+    }else if(state==='finished'){
+      clearInterval(pollTimer);
+      pollTimer=null;
+      if(exitStatus===0){
+        ['relax','scf','nscf','bands'].forEach(s=>setPipeStatus(s,'done'));
+        addLog('計算完了！結果を取得します...');
+        await fetchResults();
+      }else{
+        setPipeStatus(currentStep,'error');
+        addLog('計算エラー (exit_status='+exitStatus+')');
+      }
+      document.getElementById('btnSubmit').style.display='inline-block';
+      document.getElementById('btnAbort').style.display='none';
+      startTime=null;
+    }else if(state==='excepted'||state==='killed'){
+      clearInterval(pollTimer); pollTimer=null;
+      setPipeStatus(currentStep,'error');
+      addLog('計算が異常終了しました: '+state);
+      document.getElementById('btnSubmit').style.display='inline-block';
+      document.getElementById('btnAbort').style.display='none';
+      startTime=null;
+    }
+
+    updateElapsed();
+  }catch(e){
+    addLog('ポーリングエラー: '+e.message);
+  }
+}
+
+async function abortWorkflow(){
+  if(!workflowPK) return;
+  if(!confirm('計算を中止しますか？')) return;
+  try{
+    const client=new AiiDAClient();
+    await client.post('/processes/'+workflowPK+'/kill',{});
+    addLog('計算を中止しました');
+  }catch(e){
+    addLog('中止エラー: '+e.message);
+  }
+  clearInterval(pollTimer); pollTimer=null;
+  document.getElementById('btnSubmit').style.display='inline-block';
+  document.getElementById('btnAbort').style.display='none';
+  startTime=null;
+}
+
+function updateElapsed(){
+  const el=document.getElementById('elapsedTime');
+  if(!startTime){el.textContent='';return;}
+  const sec=Math.floor((Date.now()-startTime)/1000);
+  const m=Math.floor(sec/60); const s=sec%60;
+  el.textContent='経過時間: '+m+'分'+s.toString().padStart(2,'0')+'秒';
+  if(startTime) requestAnimationFrame(()=>setTimeout(updateElapsed,1000));
+}
+
+// ===== 結果取得 =====
+async function fetchResults(){
+  try{
+    const client=new AiiDAClient();
+    // ワークフローの出力ノードを取得
+    const res=await client.get('/nodes/'+workflowPK+'/links/outgoing');
+    const outputs=(res.data||[]);
+
+    const resultSection=document.getElementById('resultSection');
+    resultSection.style.display='block';
+    const tbody=document.getElementById('resultBody');
+    tbody.innerHTML='';
+
+    // バンド構造データを探す
+    for(const link of outputs){
+      if(link.label==='band_structure'||link.type?.includes('BandsData')){
+        const bandNode=await client.get('/nodes/'+link.pk+'/download/json');
+        if(bandNode) renderBandStructure(bandNode);
+      }
+    }
+
+    addLog('結果の表示が完了しました');
+  }catch(e){
+    addLog('結果取得エラー: '+e.message);
+  }
+}
+
+// ===== バンド構造描画 =====
+let bandData=null;
+function renderBandStructure(data){
+  bandData=data;
+  const canvas=document.getElementById('bandCanvas');
+  canvas.style.display='block';
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  const margin={top:30, bottom:50, left:70, right:20};
+  const pw=W-margin.left-margin.right;
+  const ph=H-margin.top-margin.bottom;
+
+  ctx.fillStyle='#0a0e17';
+  ctx.fillRect(0,0,W,H);
+
+  if(!data||!data.bands||!data.bands.length){
+    ctx.fillStyle='#666'; ctx.font='14px Arial'; ctx.textAlign='center';
+    ctx.fillText('バンドデータなし',W/2,H/2);
+    return;
+  }
+
+  const bands=data.bands; // [{kpoints:[...], eigenvalues:[...]}]
+  const kpath=data.kpoints||[];
+  const labels=data.labels||[];
+  const fermi=data.fermi_energy||0;
+
+  // エネルギー範囲
+  let eMin=Infinity, eMax=-Infinity;
+  bands.forEach(b=>{
+    b.eigenvalues.forEach(e=>{
+      const ev=e-fermi;
+      if(ev<eMin) eMin=ev; if(ev>eMax) eMax=ev;
+    });
+  });
+  // 表示範囲を±5eVに制限
+  eMin=Math.max(eMin,-5); eMax=Math.min(eMax,5);
+
+  const kMin=0, kMax=kpath.length>0?kpath[kpath.length-1]:1;
+
+  function toX(k){ return margin.left+(k-kMin)/(kMax-kMin)*pw; }
+  function toY(e){ return margin.top+(eMax-e)/(eMax-eMin)*ph; }
+
+  // グリッド
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=0.5;
+  for(let e=Math.ceil(eMin);e<=Math.floor(eMax);e++){
+    const y=toY(e);
+    ctx.beginPath(); ctx.moveTo(margin.left,y); ctx.lineTo(margin.left+pw,y); ctx.stroke();
+  }
+
+  // フェルミ準位
+  ctx.strokeStyle='rgba(255,200,60,0.5)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  const yf=toY(0);
+  ctx.beginPath(); ctx.moveTo(margin.left,yf); ctx.lineTo(margin.left+pw,yf); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#eab308'; ctx.font='11px Arial'; ctx.textAlign='left';
+  ctx.fillText('E_F',margin.left+pw+3,yf+4);
+
+  // バンド描画
+  ctx.strokeStyle='#58a6ff'; ctx.lineWidth=1.2;
+  bands.forEach(b=>{
+    ctx.beginPath();
+    b.eigenvalues.forEach((e,i)=>{
+      const ev=e-fermi;
+      if(ev<eMin-0.5||ev>eMax+0.5) return;
+      const x=toX(kpath[i]||i/(b.eigenvalues.length-1)*kMax);
+      const y=toY(ev);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  });
+
+  // 軸
+  ctx.strokeStyle='#555'; ctx.lineWidth=1;
+  ctx.strokeRect(margin.left, margin.top, pw, ph);
+
+  // Y軸ラベル
+  ctx.fillStyle='#999'; ctx.font='11px Arial'; ctx.textAlign='right';
+  for(let e=Math.ceil(eMin);e<=Math.floor(eMax);e++){
+    ctx.fillText(e.toString(), margin.left-6, toY(e)+4);
+  }
+  ctx.save();
+  ctx.translate(16, margin.top+ph/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.font='13px Arial'; ctx.fillStyle='#999';
+  ctx.fillText('E - E_F (eV)',0,0);
+  ctx.restore();
+
+  // 高対称点ラベル
+  if(labels.length){
+    ctx.fillStyle='#58a6ff'; ctx.font='12px Arial'; ctx.textAlign='center';
+    labels.forEach(l=>{
+      const x=toX(l.k);
+      ctx.strokeStyle='rgba(88,166,255,0.3)'; ctx.lineWidth=0.5;
+      ctx.beginPath(); ctx.moveTo(x,margin.top); ctx.lineTo(x,margin.top+ph); ctx.stroke();
+      ctx.fillText(l.label==='GAMMA'?'Γ':l.label, x, margin.top+ph+16);
+    });
+  }
+}
+
+function downloadBandPNG(){
+  const canvas=document.getElementById('bandCanvas');
+  const a=document.createElement('a');
+  a.download='band_structure.png';
+  a.href=canvas.toDataURL('image/png');
+  a.click();
+}
+function downloadBandCSV(){
+  if(!bandData||!bandData.bands) return;
+  let csv='k-point';
+  bandData.bands.forEach((_,i)=>csv+=',band_'+(i+1));
+  csv+='\n';
+  const nk=bandData.kpoints?.length||bandData.bands[0]?.eigenvalues?.length||0;
+  for(let i=0;i<nk;i++){
+    csv+=(bandData.kpoints?bandData.kpoints[i]:i);
+    bandData.bands.forEach(b=>csv+=','+(b.eigenvalues[i]||''));
+    csv+='\n';
+  }
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.download='band_structure.csv'; a.href=URL.createObjectURL(blob); a.click();
+}
+function downloadOptCIF(){
+  // 最適化CIFはAiiDAから取得する必要がある（将来実装）
+  alert('最適化CIFのダウンロードは将来実装予定です');
+}
+
+// ===== 初期化 =====
+checkConnection();
+</script>
+</body>
+</html>

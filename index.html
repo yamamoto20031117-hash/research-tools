@@ -480,6 +480,63 @@
   </div>
 </div>
 
+<!-- ===== QE 計算ランチャー ===== -->
+<div class="tool-section" data-tool="qe-calculator">
+  <div class="card">
+    <div class="card-top">
+      <div class="icon">&#9883;</div>
+      <div>
+        <h2>QE 計算ランチャー</h2>
+        <p>Quantum ESPRESSO による第一原理計算を AiiDAlab REST API 経由で自動化。TMD ビューアで作成した CIF ファイルを投入し、構造最適化→バンド計算を一括実行。Bearer トークン認証でセキュリティを確保。</p>
+        <div class="tags">
+          <span class="tag">Quantum ESPRESSO</span><span class="tag">AiiDAlab</span>
+          <span class="tag">バンド計算</span><span class="tag">REST API</span>
+        </div>
+        <a class="launch" href="/qe-calculator/">ツールを開く &#8594;</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- スレッド板 -->
+  <div class="board" id="board-qe-calculator">
+    <div class="board-header" onclick="toggleBoard('qe-calculator')">
+      <h3>&#128172; スレッド板</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="count" id="count-qe-calculator">0 スレッド</span>
+        <span class="toggle-arrow closed" id="arrow-qe-calculator">&#9660;</span>
+      </div>
+    </div>
+    <div class="board-body collapsed" id="body-qe-calculator">
+      <div class="thread-list" id="threads-qe-calculator"></div>
+      <button class="new-thread-btn" id="ntbtn-qe-calculator" onclick="showNewThread('qe-calculator')">+ 新しいスレッドを立てる</button>
+      <div class="new-thread-form" id="newform-qe-calculator">
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="nt-name-qe-calculator" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <div class="pf-row"><input type="text" id="nt-title-qe-calculator" placeholder="スレッドタイトル" maxlength="80"></div>
+          <textarea id="nt-body-qe-calculator" placeholder="本文を入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button class="cancel-btn" onclick="hideNewThread('qe-calculator')">キャンセル</button>
+            <button onclick="createThread('qe-calculator')">スレッドを立てる</button>
+          </div>
+        </div>
+      </div>
+      <div class="thread-view" id="view-qe-calculator">
+        <span class="tv-back" onclick="backToList('qe-calculator')">&#8592; スレッド一覧に戻る</span>
+        <div class="tv-title" id="vtitle-qe-calculator"></div>
+        <div id="replies-qe-calculator"></div>
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="rp-name-qe-calculator" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <textarea id="rp-body-qe-calculator" placeholder="レスを入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button onclick="postReply('qe-calculator')">書き込む</button>
+          </div>
+        </div>
+      </div>
+      <div class="auto-refresh" id="autorefresh-qe-calculator"><div class="spinner"></div> リアルタイム更新中</div>
+    </div>
+  </div>
+</div>
+
 <!-- 将来のツール: tool-sectionをコピーして追加 -->
 
 </main>
@@ -807,6 +864,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadThreads('dmm-monitor');
   loadThreads('dmm-monitor-2');
   loadThreads('cfms-plotter');
+  loadThreads('qe-calculator');
 });
 </script>
 </body>

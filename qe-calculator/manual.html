@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>QE 計算ランチャー — セットアップガイド</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;line-height:1.8;padding:20px}
+.container{max-width:860px;margin:0 auto}
+.top-bar{display:flex;align-items:center;gap:14px;margin-bottom:32px;padding-bottom:14px;border-bottom:1px solid rgba(88,166,255,0.1)}
+.top-bar a{color:#58a6ff;text-decoration:none;font-size:.85rem}
+.top-bar h1{font-size:1.2rem;color:#fff;flex:1}
+
+h2{color:#58a6ff;font-size:1.1rem;margin:32px 0 12px;padding-bottom:6px;border-bottom:1px solid rgba(88,166,255,0.15)}
+h3{color:#fff;font-size:.95rem;margin:20px 0 8px}
+p{margin-bottom:12px;font-size:.88rem;color:#bbb}
+ul,ol{margin:8px 0 16px 24px;font-size:.85rem;color:#bbb}
+li{margin-bottom:6px}
+code{background:rgba(88,166,255,0.08);color:#7db8ff;padding:2px 6px;border-radius:4px;font-size:.82rem;font-family:'SF Mono','Fira Code',monospace}
+pre{background:rgba(10,14,24,0.9);border:1px solid rgba(88,166,255,0.1);border-radius:8px;padding:14px 18px;overflow-x:auto;margin:12px 0 20px;font-size:.8rem;line-height:1.6;color:#ddd;font-family:'SF Mono','Fira Code',monospace}
+.warn{background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);border-radius:8px;padding:12px 16px;margin:12px 0;font-size:.82rem;color:#eab308}
+.info{background:rgba(88,166,255,0.06);border:1px solid rgba(88,166,255,0.15);border-radius:8px;padding:12px 16px;margin:12px 0;font-size:.82rem;color:#7db8ff}
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:.82rem}
+th{background:rgba(88,166,255,0.08);color:#58a6ff;text-align:left;padding:8px 12px;border:1px solid rgba(88,166,255,0.1)}
+td{padding:8px 12px;border:1px solid rgba(255,255,255,0.06);color:#bbb}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#58a6ff;color:#0a0e17;font-weight:bold;font-size:.8rem;margin-right:8px;flex-shrink:0}
+.toc{background:rgba(15,18,28,0.8);border:1px solid rgba(88,166,255,0.1);border-radius:10px;padding:16px 20px;margin:20px 0}
+.toc h3{color:#58a6ff;margin:0 0 10px;font-size:.9rem}
+.toc ol{margin:0 0 0 20px}
+.toc a{color:#7db8ff;text-decoration:none;font-size:.82rem}
+.toc a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="top-bar">
+  <a href="/qe-calculator/">← QE 計算ランチャー</a>
+  <h1>セットアップガイド</h1>
+  <a href="/">Research Tools</a>
+</div>
+
+<div class="toc">
+  <h3>目次</h3>
+  <ol>
+    <li><a href="#overview">概要・システム構成</a></li>
+    <li><a href="#requirements">前提条件</a></li>
+    <li><a href="#aiida-install">AiiDA + AiiDAlab のインストール</a></li>
+    <li><a href="#qe-setup">Quantum ESPRESSO のセットアップ</a></li>
+    <li><a href="#rest-api">REST API の有効化</a></li>
+    <li><a href="#security">セキュリティ設定（リバースプロキシ + トークン）</a></li>
+    <li><a href="#connect">QE 計算ランチャーとの接続</a></li>
+    <li><a href="#workflow">ワークフロー解説</a></li>
+    <li><a href="#troubleshoot">トラブルシューティング</a></li>
+  </ol>
+</div>
+
+<!-- ===== 1. 概要 ===== -->
+<h2 id="overview">1. 概要・システム構成</h2>
+<p>QE 計算ランチャーは、ブラウザ上の Web UI から研究室の計算サーバー上の AiiDA / Quantum ESPRESSO にジョブを投入し、結果（バンド構造等）を自動取得するシステムです。</p>
+
+<pre>
+┌─────────────────┐        HTTPS         ┌──────────────────────────┐
+│  ブラウザ (UI)   │  ◄───────────────►  │  計算サーバー (研究室)     │
+│  qe-calculator   │      REST API        │  AiiDA + QE + AiiDAlab   │
+└─────────────────┘     Bearer Token      └──────────────────────────┘
+</pre>
+
+<p>通信は Bearer トークン認証付きの HTTPS で保護されます。計算サーバーは研究室の高性能 PC（Linux）を想定しています。</p>
+
+<!-- ===== 2. 前提条件 ===== -->
+<h2 id="requirements">2. 前提条件</h2>
+<table>
+<tr><th>項目</th><th>要件</th></tr>
+<tr><td>OS</td><td>Ubuntu 22.04+ / CentOS 8+ (Linux)</td></tr>
+<tr><td>Python</td><td>3.9 以上</td></tr>
+<tr><td>Docker</td><td>24.0+（AiiDAlab を Docker で動かす場合）</td></tr>
+<tr><td>メモリ</td><td>16 GB 以上推奨</td></tr>
+<tr><td>ストレージ</td><td>50 GB 以上（擬ポテンシャル + 計算データ）</td></tr>
+<tr><td>ネットワーク</td><td>外部からアクセス可能なポート（443 推奨）</td></tr>
+</table>
+
+<!-- ===== 3. AiiDA インストール ===== -->
+<h2 id="aiida-install">3. AiiDA + AiiDAlab のインストール</h2>
+
+<h3><span class="step-num">A</span> 方法 1: Docker（推奨）</h3>
+<p>AiiDAlab の公式 Docker イメージを利用する方法が最も簡単です。</p>
+<pre>
+# Docker イメージの取得と起動
+docker pull aiidalab/aiidalab-docker-stack:latest
+
+docker run -d \
+  --name aiidalab \
+  -p 8888:8888 \
+  -p 5000:5000 \
+  -v aiidalab_data:/home/jovyan \
+  --restart unless-stopped \
+  aiidalab/aiidalab-docker-stack:latest
+</pre>
+
+<div class="info">ポート 8888 は JupyterLab UI、ポート 5000 は AiiDA REST API に使用します。</div>
+
+<h3><span class="step-num">B</span> 方法 2: ネイティブインストール</h3>
+<pre>
+# 仮想環境作成
+python3 -m venv ~/aiida-env
+source ~/aiida-env/bin/activate
+
+# AiiDA コアインストール
+pip install aiida-core aiida-quantumespresso
+
+# RabbitMQ と PostgreSQL のインストール
+sudo apt install rabbitmq-server postgresql postgresql-client
+
+# AiiDA プロファイル作成
+verdi quicksetup --profile default \
+  --db-backend core.psql_dos \
+  --email your@email.com
+
+# デーモン起動
+verdi daemon start
+</pre>
+
+<!-- ===== 4. QE セットアップ ===== -->
+<h2 id="qe-setup">4. Quantum ESPRESSO のセットアップ</h2>
+
+<h3>インストール</h3>
+<pre>
+# apt でインストール（Ubuntu）
+sudo apt install quantum-espresso
+
+# または ソースからビルド
+wget https://github.com/QEF/q-e/releases/download/qe-7.3.1/qe-7.3.1-ReleasePack.tar.gz
+tar xzf qe-7.3.1-ReleasePack.tar.gz
+cd qe-7.3.1
+./configure --enable-parallel
+make all
+sudo make install
+</pre>
+
+<h3>AiiDA に計算機（Computer）を登録</h3>
+<pre>
+# ローカルマシンを計算機として登録
+verdi computer setup --label localhost \
+  --hostname localhost \
+  --transport core.local \
+  --scheduler core.direct \
+  --work-dir /tmp/aiida_run \
+  --mpirun-command "mpirun -np {tot_num_mpiprocs}"
+
+verdi computer configure core.local localhost
+verdi computer test localhost
+</pre>
+
+<h3>QE コードの登録</h3>
+<pre>
+# pw.x の登録
+verdi code create core.code.installed \
+  --label pw-7.3 \
+  --computer localhost \
+  --default-calc-job-plugin quantumespresso.pw \
+  --filepath-executable $(which pw.x)
+
+# bands.x の登録
+verdi code create core.code.installed \
+  --label bands-7.3 \
+  --computer localhost \
+  --default-calc-job-plugin quantumespresso.bands \
+  --filepath-executable $(which bands.x)
+</pre>
+
+<h3>擬ポテンシャルのインストール</h3>
+<pre>
+# SSSP ライブラリ（推奨）
+aiida-pseudo install sssp --version 1.3 --functional PBEsol
+aiida-pseudo install sssp --version 1.3 --functional PBE
+</pre>
+
+<!-- ===== 5. REST API ===== -->
+<h2 id="rest-api">5. REST API の有効化</h2>
+
+<h3>AiiDA REST API の起動</h3>
+<pre>
+# デフォルト設定で起動（ポート 5000）
+verdi restapi --host 0.0.0.0 --port 5000
+
+# バックグラウンドで起動する場合
+nohup verdi restapi --host 0.0.0.0 --port 5000 &> /var/log/aiida-rest.log &
+</pre>
+
+<h3>systemd サービス化（推奨）</h3>
+<pre>
+# /etc/systemd/system/aiida-rest.service
+[Unit]
+Description=AiiDA REST API
+After=network.target postgresql.service rabbitmq-server.service
+
+[Service]
+Type=simple
+User=aiida
+Environment="PATH=/home/aiida/aiida-env/bin:/usr/bin"
+ExecStart=/home/aiida/aiida-env/bin/verdi restapi --host 127.0.0.1 --port 5000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+</pre>
+<pre>
+sudo systemctl enable aiida-rest
+sudo systemctl start aiida-rest
+</pre>
+
+<h3>API 動作確認</h3>
+<pre>
+# エンドポイント一覧
+curl http://localhost:5000/api/v4
+
+# 計算機一覧
+curl http://localhost:5000/api/v4/computers
+
+# ノード一覧
+curl http://localhost:5000/api/v4/nodes?limit=5
+</pre>
+
+<!-- ===== 6. セキュリティ ===== -->
+<h2 id="security">6. セキュリティ設定</h2>
+
+<div class="warn">⚠️ AiiDA REST API をインターネットに直接公開しないでください。必ず nginx 等のリバースプロキシ経由で Bearer トークン認証を設けてください。</div>
+
+<h3><span class="step-num">1</span> SSL 証明書の取得（Let's Encrypt）</h3>
+<pre>
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d calc.your-domain.com
+</pre>
+
+<h3><span class="step-num">2</span> Bearer トークンの生成</h3>
+<pre>
+# ランダムな 64 文字のトークンを生成
+openssl rand -hex 32
+# 例: a1b2c3d4e5f6...（このトークンを安全に保管）
+</pre>
+
+<h3><span class="step-num">3</span> nginx リバースプロキシ設定</h3>
+<pre>
+# /etc/nginx/sites-available/aiida-api
+server {
+    listen 443 ssl http2;
+    server_name calc.your-domain.com;
+
+    ssl_certificate     /etc/letsencrypt/live/calc.your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/calc.your-domain.com/privkey.pem;
+
+    # Bearer トークン認証
+    set $expected_token "Bearer YOUR_GENERATED_TOKEN_HERE";
+
+    location /api/ {
+        # トークン検証
+        if ($http_authorization != $expected_token) {
+            return 401 '{"error": "Unauthorized"}';
+        }
+
+        # CORS ヘッダー
+        add_header 'Access-Control-Allow-Origin' 'https://your-research-tools-site.com' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type' always;
+
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' 'https://your-research-tools-site.com';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+            add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type';
+            add_header 'Access-Control-Max-Age' 86400;
+            return 204;
+        }
+
+        # AiiDA REST API にプロキシ
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+</pre>
+<pre>
+sudo ln -s /etc/nginx/sites-available/aiida-api /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+</pre>
+
+<h3><span class="step-num">4</span> ファイアウォール設定</h3>
+<pre>
+# 443 のみ外部公開（5000 は localhost のみ）
+sudo ufw allow 443/tcp
+sudo ufw deny 5000/tcp
+sudo ufw enable
+</pre>
+
+<!-- ===== 7. 接続 ===== -->
+<h2 id="connect">7. QE 計算ランチャーとの接続</h2>
+
+<ol>
+  <li>QE 計算ランチャーを開き、右上の <strong>接続設定</strong> ボタンをクリック</li>
+  <li><strong>API エンドポイント</strong> に <code>https://calc.your-domain.com/api/v4</code> を入力</li>
+  <li><strong>Bearer トークン</strong> に Step 6-2 で生成したトークンを入力</li>
+  <li>「接続テスト」ボタンで疎通確認 → 緑の「接続済み」表示になれば成功</li>
+</ol>
+
+<div class="info">接続情報はブラウザの localStorage に保存されます。トークンは暗号化されずに保存されるため、共有 PC での利用には注意してください。</div>
+
+<!-- ===== 8. ワークフロー ===== -->
+<h2 id="workflow">8. ワークフロー解説</h2>
+
+<p>QE 計算ランチャーは以下の 4 段階パイプラインで計算を実行します：</p>
+
+<table>
+<tr><th>ステップ</th><th>内容</th><th>QE コマンド</th></tr>
+<tr><td>1. Relax</td><td>構造最適化（原子位置 + セルパラメータ）</td><td>pw.x (calculation='vc-relax')</td></tr>
+<tr><td>2. SCF</td><td>自己無撞着場計算</td><td>pw.x (calculation='scf')</td></tr>
+<tr><td>3. NSCF</td><td>非自己無撞着場計算（バンド k 点）</td><td>pw.x (calculation='nscf')</td></tr>
+<tr><td>4. Bands</td><td>バンド構造の後処理</td><td>bands.x</td></tr>
+</table>
+
+<h3>CIF ファイルの投入</h3>
+<p>TMD 結晶構造ビューアで作成した CIF ファイルをドラッグ＆ドロップまたはファイル選択で投入します。CIF から以下の情報を自動抽出します：</p>
+<ul>
+  <li>格子定数（a, b, c, α, β, γ）</li>
+  <li>空間群</li>
+  <li>原子座標（fractional coordinates）</li>
+  <li>元素種</li>
+</ul>
+
+<h3>計算設定</h3>
+<ul>
+  <li><strong>擬ポテンシャル</strong>: SSSP Efficiency / Precision（サーバーにインストール済みのもの）</li>
+  <li><strong>カットオフエネルギー</strong>: ecutwfc（波動関数）/ ecutrho（電荷密度）</li>
+  <li><strong>k 点メッシュ</strong>: Monkhorst-Pack グリッド</li>
+  <li><strong>スメアリング</strong>: Marzari-Vanderbilt / Methfessel-Paxton</li>
+  <li><strong>収束閾値</strong>: conv_thr（SCF 収束判定）</li>
+</ul>
+
+<h3>高度な設定（オプション）</h3>
+<ul>
+  <li><strong>スピン分極</strong>: nspin=2 で磁性計算</li>
+  <li><strong>スピン軌道相互作用（SOC）</strong>: fully-relativistic 擬ポテンシャル使用</li>
+  <li><strong>Hubbard U</strong>: DFT+U 補正</li>
+  <li><strong>vdW 補正</strong>: DFT-D3 / vdW-DF2（層状物質に重要）</li>
+</ul>
+
+<!-- ===== 9. トラブルシューティング ===== -->
+<h2 id="troubleshoot">9. トラブルシューティング</h2>
+
+<h3>接続テストが失敗する</h3>
+<ul>
+  <li><code>CORS エラー</code>: nginx の CORS 設定で Origin が正しいか確認</li>
+  <li><code>401 Unauthorized</code>: トークンが正しいか確認（<code>Bearer </code> プレフィックス不要 — UI が自動付与）</li>
+  <li><code>502 Bad Gateway</code>: AiiDA REST API が起動しているか <code>sudo systemctl status aiida-rest</code> で確認</li>
+  <li><code>タイムアウト</code>: ファイアウォールでポート 443 が開いているか確認</li>
+</ul>
+
+<h3>計算が開始されない</h3>
+<ul>
+  <li>AiiDA デーモンが動作しているか: <code>verdi daemon status</code></li>
+  <li>RabbitMQ が起動しているか: <code>sudo systemctl status rabbitmq-server</code></li>
+  <li>計算機が正しく登録されているか: <code>verdi computer test localhost</code></li>
+</ul>
+
+<h3>計算が失敗する</h3>
+<ul>
+  <li>ログ確認: <code>verdi process report &lt;PK&gt;</code></li>
+  <li>出力ファイル確認: <code>verdi calcjob outputcat &lt;PK&gt;</code></li>
+  <li>擬ポテンシャルが存在するか: <code>aiida-pseudo list</code></li>
+  <li>メモリ不足: k 点を減らすか ecutwfc を下げてテスト</li>
+</ul>
+
+<h3>Docker 環境の再起動</h3>
+<pre>
+docker restart aiidalab
+# ログ確認
+docker logs -f aiidalab --tail 50
+</pre>
+
+</div>
+</body>
+</html>
