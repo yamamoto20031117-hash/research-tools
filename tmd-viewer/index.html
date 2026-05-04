@@ -1321,15 +1321,28 @@ function buildStructure() {
     const offI=(Na-(numI-1)*sp)/2;  // 中心に対称なオフセット
     const offJ=(Nb-(numJ-1)*sp)/2;
     const placePts=[];
+    // 1T'/triclinic uses rectangular/sheared grid, not hex fracToXZ
+    const _placeCoord=(fi,fj)=>{
+      if(phase==='1Tp'){
+        const aU=aEff||(a*2), bU=bEff||a;
+        if(info.triclinic){
+          const gR=(info.gamma||119)*Math.PI/180;
+          const bSx=bU*Math.cos(gR), bSz=bU*Math.sin(gR);
+          return [fi*aU+fj*bSx, fj*bSz];
+        }
+        return [fi*aU, fj*bU];
+      }
+      return fracToXZ(fi,fj,a);
+    };
     for(let ni=0;ni<numI;ni++) for(let nj=0;nj<numJ;nj++){
       const fi=offI+ni*sp, fj=offJ+nj*sp;
-      const[bx,bz]=fracToXZ(fi,fj,a);
+      const[bx,bz]=_placeCoord(fi,fj);
       if(bx<dXMin||bx>dXMax||bz<dZMin||bz>dZMax) continue;
       placePts.push({bx,bz});
     }
     // 配置点がなければスーパーセル中心に1つ配置
     if(placePts.length===0){
-      const[cbx,cbz]=fracToXZ(Na/2,Nb/2,a);
+      const[cbx,cbz]=_placeCoord(Na/2,Nb/2);
       placePts.push({bx:cbx,bz:cbz});
     }
 
