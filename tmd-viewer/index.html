@@ -1129,7 +1129,7 @@ function buildStructure() {
       dXMin=Math.min(cx0,cx1,cx2,cx3)-pad; dXMax=Math.max(cx0,cx1,cx2,cx3)+pad;
       dZMin=-pad; dZMax=Nb*_bSz+pad;
     } else {
-    dXMin=-aU*0.5-pad; dXMax=Na*aU+pad;
+    dXMin=-aU*0.5-pad; dXMax=Na*aU+aU*0.5+pad;
     dZMin=-pad; dZMax=Nb*bU+pad;
     inB=p=>p.x>=dXMin&&p.x<=dXMax&&p.z>=dZMin&&p.z<=dZMax;
     }
