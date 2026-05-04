@@ -1031,7 +1031,9 @@ function buildStructure() {
   const geoX=new THREE.SphereGeometry(0.36*scaleX,20,20);
 
   const Na=parseInt(document.getElementById('sl-na').value);
-  const Nb=parseInt(document.getElementById('sl-nb').value);
+  const Nb_raw=parseInt(document.getElementById('sl-nb').value);
+  // Triclinic cells are 2×2 hex supercells (b≈2×standard), so halve Nb for comparable display
+  const Nb=(phase==='1Tp'&&info.triclinic)?Math.max(2,Math.ceil(Nb_raw/2)):Nb_raw;
   const mAtoms=[], xAtoms=[];
 
   // For triclinic cells, sheared grid needs extra cells in i-direction
