@@ -1130,7 +1130,7 @@ function buildStructure() {
   }
 
   // Bonds
-  const bCut=bond+0.2, bCut2=bCut*bCut;
+  const bCut=bond+(phase==='1Tp'?0.35:0.2), bCut2=bCut*bCut;
   visM.forEach(mp=>{
     const nb=[];
     visX.forEach(xp=>{
