@@ -738,12 +738,13 @@ function exportCIF(){
         atomList.push({el:info.x, fx:(baseX-xOff2)/cellA, fy:(yC-d_xm)/cellC, fz:(baseZ+bU*0.75/Na)/cellB});
         atomList.push({el:info.x, fx:(baseX+xOff1)/cellA, fy:(yC-d_xm)/cellC, fz:(baseZ+bU*0.25/Na)/cellB});
       } else if(phase==='3R'){
+        // 3R ABC stacking: each layer translates by (+1/3, +1/3) in fractional coords
         const shift=l%3;
-        const mf=[1/3+shift/3, 2/3-shift/3];
-        const xf=[2/3-shift/3, 1/3+shift/3];
-        const[mx,mz]=fracToXZ(i+mf[0]%1,j+mf[1]%1,a);
+        const mf1=(1/3+shift/3)%1, mf2=(2/3+shift/3)%1;
+        const xf1=(2/3+shift/3)%1, xf2=(1/3+shift/3)%1;
+        const[mx,mz]=fracToXZ(i+mf1,j+mf2,a);
         atomList.push({el:info.m, fx:mx/cellA, fy:yC/cellC, fz:mz/cellB});
-        const[xx,xz]=fracToXZ(i+xf[0]%1,j+xf[1]%1,a);
+        const[xx,xz]=fracToXZ(i+xf1,j+xf2,a);
         atomList.push({el:info.x, fx:xx/cellA, fy:(yC+d_xm)/cellC, fz:xz/cellB});
         atomList.push({el:info.x, fx:xx/cellA, fy:(yC-d_xm)/cellC, fz:xz/cellB});
       } else {
@@ -1037,12 +1038,13 @@ function buildStructure() {
         xAtoms.push(new THREE.Vector3(baseX-xOff2, yC-d_xm, baseZ+bU*0.75));
         xAtoms.push(new THREE.Vector3(baseX+xOff1, yC-d_xm, baseZ+bU*0.25));
       } else if(phase==='3R'){
-        // 3R: same trigonal prismatic as 2H but with ABC stacking (shift by 1/3 each layer)
+        // 3R: same trigonal prismatic as 2H but with ABC stacking
+        // Each layer shifted by (1/3, 1/3) in fractional coords → translational, not rotational
         const shift=l%3; // 0,1,2 → A,B,C
-        const mf=[1/3+shift/3, 2/3-shift/3];
-        const xf=[2/3-shift/3, 1/3+shift/3];
-        const[mx,mz]=fracToXZ(i+mf[0]%1,j+mf[1]%1,a); mAtoms.push(new THREE.Vector3(mx,yC,mz));
-        const[xx,xz]=fracToXZ(i+xf[0]%1,j+xf[1]%1,a);
+        const mf1=(1/3+shift/3)%1, mf2=(2/3+shift/3)%1;
+        const xf1=(2/3+shift/3)%1, xf2=(1/3+shift/3)%1;
+        const[mx,mz]=fracToXZ(i+mf1,j+mf2,a); mAtoms.push(new THREE.Vector3(mx,yC,mz));
+        const[xx,xz]=fracToXZ(i+xf1,j+xf2,a);
         xAtoms.push(new THREE.Vector3(xx,yC+d_xm,xz));
         xAtoms.push(new THREE.Vector3(xx,yC-d_xm,xz));
       } else {
