@@ -62,6 +62,7 @@ const httpServer = http.createServer((req, res) => {
       viewers: countByRole('viewer'),
       totalClients: clients.size,
       lastDataTime: lastData ? lastData.time : null,
+      historySize: dataHistory.length,
       latencyStats: getLatencyStats(),
     };
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -87,6 +88,11 @@ let lastData = null;         // 最新データ (新規接続者に即送信)
 let lastDataBinary = null;   // バイナリ版
 let dataCount = 0;
 let broadcastLatencies = []; // 直近のブロードキャスト時間
+
+// ===== データ履歴バッファ (全端末同期用) =====
+const MAX_HISTORY = 20000;      // 最大保持ポイント数
+const dataHistory = [];          // [{time, voltage, current}, ...]
+let lastOutputStatus = null;     // 最新のoutput状態 JSON
 
 function countByRole(role) {
   let n = 0;
@@ -208,7 +214,8 @@ function handleJsonMessage(ws, msg, info) {
     case 'status': {
       // sender → all viewers
       if (info.role !== 'sender') return;
-      broadcast(JSON.stringify(msg), ws, false);
+      lastOutputStatus = JSON.stringify(msg);
+      broadcast(lastOutputStatus, ws, false);
       break;
     }
 
@@ -226,6 +233,12 @@ function handleJsonMessage(ws, msg, info) {
       lastDataBinary = binary;
       dataCount++;
 
+      // 履歴バッファに追加
+      dataHistory.push({ time: t, voltage: v, current: i });
+      if (dataHistory.length > MAX_HISTORY) {
+        dataHistory.splice(0, dataHistory.length - MAX_HISTORY);
+      }
+
       broadcast(binary, ws, true);
       if (VERBOSE && dataCount % 10 === 0) {
         log(`[D] #${dataCount} V=${v.toFixed(6)} I=${i.toFixed(9)}`);
@@ -234,17 +247,34 @@ function handleJsonMessage(ws, msg, info) {
     }
 
     case 'sync_request': {
-      // 新規 viewer が全履歴を要求 → sender に転送
-      for (const [client, clientInfo] of clients) {
-        if (clientInfo.role === 'sender' && client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify({ type: 'sync_request', viewerId: info.id }));
+      // サーバーが直接履歴データを返す（senderに転送不要）
+      if (dataHistory.length > 0) {
+        // チャンク分割送信（大量データでもWebSocketフレームが溢れないように）
+        const CHUNK = 2000;
+        for (let start = 0; start < dataHistory.length; start += CHUNK) {
+          const chunk = dataHistory.slice(start, start + CHUNK);
+          const isLast = (start + CHUNK >= dataHistory.length);
+          ws.send(JSON.stringify({
+            type: 'sync_response',
+            data: chunk,
+            total: dataHistory.length,
+            offset: start,
+            done: isLast,
+          }));
         }
+      } else {
+        ws.send(JSON.stringify({ type: 'sync_response', data: [], total: 0, offset: 0, done: true }));
       }
+      // 最新の出力状態も送信
+      if (lastOutputStatus) {
+        ws.send(lastOutputStatus);
+      }
+      log(`[SYNC] Sent ${dataHistory.length} points to viewer #${info.id}`);
       break;
     }
 
     case 'sync_response': {
-      // sender → 特定 viewer へ履歴データ
+      // (後方互換: sender → 特定 viewer へ転送)
       const targetId = msg.viewerId;
       for (const [client, clientInfo] of clients) {
         if (clientInfo.id === targetId && client.readyState === WebSocket.OPEN) {
@@ -280,6 +310,12 @@ function handleBinaryData(ws, data, info) {
   const view = new Float64Array(buf.buffer, buf.byteOffset, 3);
   lastData = { time: view[0], voltage: view[1], current: view[2] };
   dataCount++;
+
+  // 履歴バッファに追加
+  dataHistory.push({ time: view[0], voltage: view[1], current: view[2] });
+  if (dataHistory.length > MAX_HISTORY) {
+    dataHistory.splice(0, dataHistory.length - MAX_HISTORY);
+  }
 
   // 全 viewer にバイナリで即時ブロードキャスト
   const t0 = performance.now();

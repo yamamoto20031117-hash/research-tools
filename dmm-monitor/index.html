@@ -416,6 +416,8 @@ function connectWebSocket(){
     wsConnected=true;
     wsReconnectDelay=1000;
     ws.send(JSON.stringify({type:'hello',role:'viewer'}));
+    // サーバーに履歴データを要求（全端末で同じグラフを表示）
+    ws.send(JSON.stringify({type:'sync_request'}));
     document.getElementById('wsStatus').textContent='接続済み';
     document.getElementById('wsStatus').style.color='#22c55e';
     const badge=document.getElementById('syncBadge');
@@ -465,6 +467,33 @@ function handleWsMessage(msg){
       document.getElementById('wsClients').textContent=
         `Sender: ${msg.senders||0}, Viewer: ${msg.viewers||0}`;
       break;
+    case 'sync_response':{
+      // サーバーから履歴データを受信 → グラフに反映
+      const pts=msg.data||[];
+      let added=false;
+      for(const p of pts){
+        let v=parseFloat(p.voltage)||0;
+        let i=parseFloat(p.current)||0;
+        if(Math.abs(v)>1e6) v=0;
+        if(Math.abs(i)>1e6) i=0;
+        const t=p.time||0;
+        if(t>0 && !dataLog.some(x=>x.time===t)){
+          dataLog.push({time:t, voltage:v, current:i});
+          added=true;
+        }
+      }
+      if(added){
+        dataLog.sort((a,b)=>a.time-b.time);
+        if(dataLog.length>0) lastUpdate=dataLog[dataLog.length-1].time;
+        updateStats();redrawChart();updateLogTable();
+      }
+      if(msg.done){
+        console.log(`[Sync] 履歴同期完了: ${msg.total}ポイント`);
+        document.getElementById('statusDot').className='status-dot live';
+        document.getElementById('statusText').textContent='リアルタイム監視中 (同期済み)';
+      }
+      break;
+    }
     case 'pong_measure':{
       const rtt=Date.now()-msg.clientTime;
       wsLatencyHistory.push(rtt);
