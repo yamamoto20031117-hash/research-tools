@@ -494,6 +494,59 @@ function handleWsMessage(msg){
       }
       break;
     }
+    case 'session_update':{
+      // サーバーからセッション状態を受信 → タイマー同期
+      console.log('[Session] update:', msg);
+      if(msg.active){
+        setOutputUI(true);
+        // セッション開始: タイマーを同期
+        if(msg.endTime>0){
+          timerEndTime=msg.endTime;
+          startTimer();
+        } else {
+          document.getElementById('timerDisplay').textContent='∞';
+        }
+        // モード表示を同期
+        if(msg.mode) setSrcMode(msg.mode);
+        // アクティブランがなければ作成
+        if(activeRunId===null){
+          const runId=msg.startTime||Date.now();
+          const modeStr=msg.mode==='CURR'?'CC':'CV';
+          const vu=getAutoUnitStr(msg.value||0, msg.mode==='CURR'?'A':'V');
+          const dispVal=((msg.value||0)*vu.scale).toFixed(4)+' '+vu.str;
+          const run={
+            id:runId, startTime:runId, endTime:null,
+            label:modeStr+' '+dispVal, data:dataLog.slice(),
+            mode:msg.mode, value:msg.value, compliance:msg.compliance
+          };
+          runs=[run];
+          activeRunId=runId;
+          viewingRunId=null;
+          document.getElementById('timeRange').value='0';
+          zoomXMin=null;zoomXMax=null;
+          renderRuns();
+        }
+      } else {
+        // セッション終了
+        setOutputUI(false);
+        stopTimer();
+        document.getElementById('timerDisplay').textContent='00:00';
+        // 測定ラン終了 & レポート生成
+        if(activeRunId!==null){
+          const run=runs.find(r=>r.id===activeRunId);
+          if(run){
+            run.endTime=msg.actualEndTime||Date.now();
+            run.data=dataLog.slice();
+            run.dataCount=run.data.length;
+            // 自動レポート生成
+            if(run.data.length>0) generateHTMLReport(run);
+          }
+          activeRunId=null;
+          renderRuns();
+        }
+      }
+      break;
+    }
     case 'pong_measure':{
       const rtt=Date.now()-msg.clientTime;
       wsLatencyHistory.push(rtt);
@@ -588,6 +641,38 @@ function startListening(){
   document.getElementById('statusText').textContent='リアルタイム監視中';
 }
 
+// ===== レンダリングスロットル（長時間測定のフリーズ防止） =====
+let chartRedrawScheduled=false;
+let tableUpdateScheduled=false;
+let statsUpdateScheduled=false;
+
+function scheduleChartRedraw(){
+  if(chartRedrawScheduled) return;
+  chartRedrawScheduled=true;
+  requestAnimationFrame(()=>{
+    chartRedrawScheduled=false;
+    redrawChart();
+  });
+}
+
+function scheduleTableUpdate(){
+  if(tableUpdateScheduled) return;
+  tableUpdateScheduled=true;
+  setTimeout(()=>{
+    tableUpdateScheduled=false;
+    updateLogTable();
+  },1000); // テーブルは1秒に1回まで
+}
+
+function scheduleStatsUpdate(){
+  if(statsUpdateScheduled) return;
+  statsUpdateScheduled=true;
+  setTimeout(()=>{
+    statsUpdateScheduled=false;
+    updateStats();
+  },500);
+}
+
 function onNewData(d){
   const now=d.time||Date.now();
   let v=parseFloat(d.voltage)||0;
@@ -609,7 +694,11 @@ function onNewData(d){
   }
 
   updateCurrentValues(v, i, now);
-  if(viewingRunId===null){ updateStats();redrawChart();updateLogTable(); }
+  if(viewingRunId===null){
+    scheduleStatsUpdate();
+    scheduleChartRedraw();
+    scheduleTableUpdate();
+  }
   checkAlerts(v, i);
 }
 
@@ -1140,8 +1229,10 @@ function finalizeActiveRun(){
   const run=runs.find(r=>r.id===activeRunId);
   if(run){
     run.endTime=Date.now();
-    // 測定終了時にCSVを自動ダウンロード
-    if(run.data.length>0) exportRunCSV(run.id);
+    run.data=dataLog.slice(); // 全データを保存
+    run.dataCount=run.data.length;
+    // 測定終了時にHTMLレポートを自動生成（クリックでグラフ確認可能）
+    if(run.data.length>0) generateHTMLReport(run);
     // Firebaseにラン情報を保存（データ本体は大きいので概要のみ）
     if(firebaseReady){
       db.ref('dmm/runs/'+run.id).set({
@@ -1613,6 +1704,177 @@ function initChartInteraction(){
   canvas.addEventListener('touchend',()=>{isTouchPan=false;lastPinchDist=0;});
 
   canvas.style.cursor='grab';
+}
+
+// ===== 自動HTMLレポート生成 =====
+function generateHTMLReport(run){
+  const data=run.data;
+  if(!data||data.length===0) return;
+
+  const key=run.mode==='CURR'?'voltage':'current';
+  const unitBase=run.mode==='CURR'?'V':'A';
+  const modeLabel=run.mode==='CURR'?'定電流 (CC)':'定電圧 (CV)';
+  const color=run.mode==='CURR'?'#58a6ff':'#f97316';
+
+  const startDate=new Date(run.startTime);
+  const endDate=new Date(run.endTime);
+  const durationSec=Math.round((run.endTime-run.startTime)/1000);
+
+  // 統計計算
+  let yMin=Infinity,yMax=-Infinity,ySum=0;
+  for(const d of data){
+    const v=d[key];
+    if(v<yMin) yMin=v;
+    if(v>yMax) yMax=v;
+    ySum+=v;
+  }
+  const yAvg=ySum/data.length;
+  const au=getAutoUnit(Math.max(Math.abs(yMin),Math.abs(yMax)),unitBase);
+
+  // データをJSON化（レポート内に埋め込み）
+  // 大量データの場合は間引き
+  let reportData=data;
+  if(data.length>5000){
+    const step=Math.ceil(data.length/5000);
+    reportData=data.filter((_,idx)=>idx%step===0);
+  }
+  const dataJSON=JSON.stringify(reportData.map(d=>({t:d.time,v:d[key]})));
+
+  const html=`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>DMM測定レポート — ${run.label} — ${startDate.toLocaleDateString('ja-JP')}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,sans-serif;padding:24px}
+h1{color:#fff;font-size:1.4rem;margin-bottom:8px}
+.meta{color:#888;font-size:.82rem;margin-bottom:20px;line-height:1.8}
+.meta span{display:inline-block;margin-right:20px}
+.stats{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.stat{background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:14px 20px;min-width:140px;text-align:center}
+.stat .label{font-size:.72rem;color:#888;margin-bottom:4px}
+.stat .val{font-size:1.3rem;font-weight:bold;color:${color};font-family:'Courier New',monospace}
+canvas{display:block;width:100%;max-width:1200px;background:rgba(15,18,28,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:8px;margin:20px 0}
+.footer{color:#555;font-size:.7rem;margin-top:20px;text-align:center}
+table{width:100%;max-width:800px;border-collapse:collapse;font-size:.75rem;margin-top:16px}
+th{background:rgba(88,166,255,0.08);color:#58a6ff;font-weight:600}
+th,td{padding:5px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,0.04)}
+td:first-child,th:first-child{text-align:left}
+.table-wrap{max-height:400px;overflow-y:auto}
+</style>
+</head>
+<body>
+<h1>DMM 測定レポート</h1>
+<div class="meta">
+  <span><b>モード:</b> ${modeLabel}</span>
+  <span><b>設定値:</b> ${run.label}</span><br>
+  <span><b>開始:</b> ${startDate.toLocaleString('ja-JP')}</span>
+  <span><b>終了:</b> ${endDate.toLocaleString('ja-JP')}</span>
+  <span><b>測定時間:</b> ${formatDuration(durationSec)}</span>
+  <span><b>データ点数:</b> ${data.length}点</span>
+</div>
+<div class="stats">
+  <div class="stat"><div class="label">最小値</div><div class="val">${(yMin*au.scale).toFixed(4)} ${au.prefix}${unitBase}</div></div>
+  <div class="stat"><div class="label">最大値</div><div class="val">${(yMax*au.scale).toFixed(4)} ${au.prefix}${unitBase}</div></div>
+  <div class="stat"><div class="label">平均値</div><div class="val">${(yAvg*au.scale).toFixed(4)} ${au.prefix}${unitBase}</div></div>
+  <div class="stat"><div class="label">レンジ</div><div class="val">${((yMax-yMin)*au.scale).toFixed(4)} ${au.prefix}${unitBase}</div></div>
+</div>
+<canvas id="chart" height="400"></canvas>
+<h3 style="color:#fff;font-size:.9rem;margin-top:24px">データテーブル（先頭200件）</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>経過時間</th><th>${unitBase==='V'?'電圧':'電流'} (${au.prefix}${unitBase})</th></tr></thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
+<div class="footer">Generated by DMM Monitor — ${new Date().toLocaleString('ja-JP')}</div>
+<script>
+const DATA=${dataJSON};
+const SCALE=${au.scale};
+const COLOR='${color}';
+const UNIT='${au.prefix}${unitBase}';
+
+// グラフ描画
+const canvas=document.getElementById('chart');
+const dpr=window.devicePixelRatio||1;
+const w=canvas.parentElement.clientWidth;
+const h=400;
+canvas.width=w*dpr;canvas.height=h*dpr;
+canvas.style.height=h+'px';
+const ctx=canvas.getContext('2d');
+ctx.scale(dpr,dpr);
+
+const margin={top:20,right:20,bottom:40,left:70};
+const pw=w-margin.left-margin.right;
+const ph=h-margin.top-margin.bottom;
+
+const tMin=DATA[0].t,tMax=DATA[DATA.length-1].t;
+let yMin=Infinity,yMax=-Infinity;
+for(const d of DATA){if(d.v<yMin)yMin=d.v;if(d.v>yMax)yMax=d.v;}
+const yRange=yMax-yMin||0.001;
+const yPad=yRange*0.05;
+yMin-=yPad;yMax+=yPad;
+
+const xPx=t=>margin.left+((t-tMin)/(tMax-tMin||1))*pw;
+const yPx=v=>margin.top+ph-((v-yMin)/(yMax-yMin||1))*ph;
+
+// グリッド
+ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.5;
+for(let i=0;i<=5;i++){
+  const y=margin.top+ph*i/5;
+  ctx.beginPath();ctx.moveTo(margin.left,y);ctx.lineTo(w-margin.right,y);ctx.stroke();
+  const val=(yMax-(yMax-yMin)*i/5)*SCALE;
+  ctx.fillStyle='#888';ctx.font='11px sans-serif';ctx.textAlign='right';
+  ctx.fillText(val.toFixed(3)+' '+UNIT,margin.left-6,y+4);
+}
+
+// X軸
+ctx.fillStyle='#666';ctx.font='10px sans-serif';ctx.textAlign='center';
+const totalSec=(tMax-tMin)/1000;
+for(let i=0;i<=6;i++){
+  const t=tMin+(tMax-tMin)*i/6;
+  const elapsed=(t-tMin)/1000;
+  let label;
+  if(totalSec<120) label=elapsed.toFixed(0)+'s';
+  else if(totalSec<7200){const m=Math.floor(elapsed/60);const s=Math.round(elapsed%60);label=m+':'+String(s).padStart(2,'0');}
+  else{const hh=Math.floor(elapsed/3600);const mm=Math.floor((elapsed%3600)/60);label=hh+'h'+String(mm).padStart(2,'0')+'m';}
+  ctx.fillText(label,xPx(t),h-margin.bottom+16);
+}
+
+// データ線
+ctx.strokeStyle=COLOR;ctx.lineWidth=1.5;
+ctx.beginPath();
+ctx.moveTo(xPx(DATA[0].t),yPx(DATA[0].v));
+for(let i=1;i<DATA.length;i++) ctx.lineTo(xPx(DATA[i].t),yPx(DATA[i].v));
+ctx.stroke();
+
+// 枠
+ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=1;
+ctx.strokeRect(margin.left,margin.top,pw,ph);
+
+// テーブル
+const tbody=document.getElementById('tbody');
+const t0=DATA[0].t;
+const rows=DATA.slice(0,200).map(d=>{
+  const elapsed=((d.t-t0)/1000).toFixed(1)+'s';
+  return '<tr><td>'+elapsed+'</td><td>'+(d.v*SCALE).toFixed(4)+'</td></tr>';
+}).join('');
+tbody.innerHTML=rows;
+<\/script>
+</body>
+</html>`;
+
+  // HTMLファイルとしてダウンロード
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  const dateStr=startDate.toISOString().slice(0,19).replace(/[:-]/g,'');
+  a.download='DMM_Report_'+run.label.replace(/\s+/g,'_')+'_'+dateStr+'.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  console.log('[Report] HTML report generated and downloaded');
 }
 
 // ===== 初期化 =====

@@ -94,6 +94,9 @@ const MAX_HISTORY = 20000;      // 最大保持ポイント数
 const dataHistory = [];          // [{time, voltage, current}, ...]
 let lastOutputStatus = null;     // 最新のoutput状態 JSON
 
+// ===== 測定セッション状態 (タイマー同期用) =====
+let currentSession = null;       // {active, startTime, endTime, mode, value, compliance, duration}
+
 function countByRole(role) {
   let n = 0;
   for (const info of clients.values()) {
@@ -207,6 +210,39 @@ function handleJsonMessage(ws, msg, info) {
           client.send(cmdStr);
         }
       }
+
+      // セッション状態をトラッキング（全端末でタイマー同期）
+      if (msg.action === 'SOURCE_START') {
+        const dur = parseFloat(msg.duration) || 0;
+        const now = Date.now();
+        currentSession = {
+          active: true,
+          startTime: now,
+          endTime: dur > 0 ? now + dur * 1000 : 0,
+          mode: msg.mode || 'CURR',
+          value: parseFloat(msg.value) || 0,
+          compliance: parseFloat(msg.compliance) || 21,
+          duration: dur,
+        };
+        // 新しい測定開始: 履歴をクリアして今回の測定だけバッファ
+        dataHistory.length = 0;
+        dataCount = 0;
+        const sessionMsg = JSON.stringify({ type: 'session_update', ...currentSession });
+        broadcast(sessionMsg, null, false);
+        log(`[SESSION] Started: ${currentSession.mode} ${currentSession.value}, dur=${dur}s`);
+      } else if (msg.action === 'OUTPUT_OFF') {
+        if (currentSession && currentSession.active) {
+          currentSession.active = false;
+          currentSession.actualEndTime = Date.now();
+          const sessionMsg = JSON.stringify({ type: 'session_update', ...currentSession });
+          broadcast(sessionMsg, null, false);
+          log(`[SESSION] Stopped (${dataHistory.length} points buffered)`);
+        }
+      } else if (msg.action === 'SET_INTERVAL') {
+        // 測定間隔変更も全端末に通知
+        broadcast(JSON.stringify({ type: 'interval_update', interval: msg.interval }), ws, false);
+      }
+
       if (VERBOSE) log(`[CMD] ${msg.action} from viewer #${info.id}`);
       break;
     }
@@ -269,7 +305,11 @@ function handleJsonMessage(ws, msg, info) {
       if (lastOutputStatus) {
         ws.send(lastOutputStatus);
       }
-      log(`[SYNC] Sent ${dataHistory.length} points to viewer #${info.id}`);
+      // 現在のセッション状態を送信（タイマー同期用）
+      if (currentSession) {
+        ws.send(JSON.stringify({ type: 'session_update', ...currentSession }));
+      }
+      log(`[SYNC] Sent ${dataHistory.length} points + session state to viewer #${info.id}`);
       break;
     }
 
