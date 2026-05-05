@@ -1033,7 +1033,7 @@ function buildStructure() {
   const Na=parseInt(document.getElementById('sl-na').value);
   const Nb_raw=parseInt(document.getElementById('sl-nb').value);
   // Triclinic cells are 2×2 hex supercells (b≈2×standard), so halve Nb for comparable display
-  const Nb=(phase==='1Tp'&&info.triclinic)?Math.max(2,Math.ceil(Nb_raw/2)):Nb_raw;
+  const Nb=(phase==='1Tp'&&info.triclinic)?Math.max(1,Math.ceil(Nb_raw/2)):Nb_raw;
   const mAtoms=[], xAtoms=[];
 
   // For triclinic cells, sheared grid needs extra cells in i-direction
@@ -1129,7 +1129,7 @@ function buildStructure() {
       dXMin=Math.min(cx0,cx1,cx2,cx3)-pad; dXMax=Math.max(cx0,cx1,cx2,cx3)+pad;
       dZMin=-pad; dZMax=Nb*_bSz+pad;
     } else {
-    dXMin=-aU*0.5-pad; dXMax=Na*aU+aU*0.5+pad;
+    dXMin=-pad; dXMax=Na*aU+pad;
     dZMin=-pad; dZMax=Nb*bU+pad;
     inB=p=>p.x>=dXMin&&p.x<=dXMax&&p.z>=dZMin&&p.z<=dZMax;
     }
