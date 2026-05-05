@@ -1619,12 +1619,9 @@ async function exportXLSX(){
   function escXml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
   // 軸範囲: Webビューアと同じ値を使用（入力フィールドから取得）
-  const xMinRaw=parseFloat(document.getElementById('xMin').value)||0;
-  const xMaxRaw=parseFloat(document.getElementById('xMax').value)||90;
-  const xMajorUnit=calcStep(xMaxRaw-xMinRaw);
-  // 軸端をmajorUnitの倍数に丸め（10,20,30...のラベルを保証）
-  const xMin=Math.floor(xMinRaw/xMajorUnit)*xMajorUnit;
-  const xMax=Math.ceil(xMaxRaw/xMajorUnit)*xMajorUnit;
+  const xMin=parseFloat(document.getElementById('xMin').value)||0;
+  const xMax=parseFloat(document.getElementById('xMax').value)||90;
+  const xMajorUnit=calcStep(xMax-xMin);
 
   // チャートシリーズ構築
   const chartColors=['1F4E79','CC0000','228B22','FF8C00','8B008B','008B8B','B22222','4169E1','DAA520','2E8B57'];
