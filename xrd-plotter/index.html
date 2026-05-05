@@ -1618,10 +1618,13 @@ async function exportXLSX(){
   }
   function escXml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-  // 軸範囲: Webビューアと同じ値を使用（入力フィールドから取得）
-  const xMin=parseFloat(document.getElementById('xMin').value)||0;
-  const xMax=parseFloat(document.getElementById('xMax').value)||90;
-  const xMajorUnit=calcStep(xMax-xMin);
+  // 軸範囲: Webビューアの入力フィールドから取得
+  const xMinRaw=parseFloat(document.getElementById('xMin').value)||0;
+  const xMaxRaw=parseFloat(document.getElementById('xMax').value)||90;
+  const xMajorUnit=calcStep(xMaxRaw-xMinRaw);
+  // Excelは目盛りをmin値から刻むため、minをmajorUnit倍数に丸めて10,20,30...を保証
+  const xMin=Math.floor(xMinRaw/xMajorUnit)*xMajorUnit;
+  const xMax=Math.ceil(xMaxRaw/xMajorUnit)*xMajorUnit;
 
   // チャートシリーズ構築
   const chartColors=['1F4E79','CC0000','228B22','FF8C00','8B008B','008B8B','B22222','4169E1','DAA520','2E8B57'];
@@ -1748,7 +1751,7 @@ async function exportXLSX(){
       </c:scatterChart>
       <c:valAx>
         <c:axId val="111111111"/>
-        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:scaling><c:orientation val="minMax"/><c:max val="${xMax}"/><c:min val="${xMin}"/></c:scaling>
         <c:delete val="0"/><c:axPos val="b"/>
         <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000">${arialFont}</a:defRPr></a:pPr>
           <a:r><a:rPr lang="en-US" sz="1000" i="1">${arialFont}</a:rPr><a:t>2&#x3B8;</a:t></a:r>
