@@ -65,9 +65,10 @@
 
   <h2>概要</h2>
   <p>TMD結晶構造ビューアは、遷移金属ダイカルコゲナイド（TMD）の結晶構造をインタラクティブに
-    3D表示するWebツールです。1T型（八面体配位）と2H型（三角柱配位）の両方に対応し、
-    インターカレーション分子の挿入、層間距離の調整、原子間距離測定、CIFファイルの入出力などが可能です。
-    PC・スマートフォン・タブレットいずれでも動作します。</p>
+    3D表示するWebツールです。1T型（八面体配位）、2H型（三角柱配位）、1T'型（歪み八面体 / ジグザグ鎖）、
+    Td型（直方晶 / WTe₂）、三斜晶型（ReS₂ / ReSe₂）、3R型（菱面体積層）の6つの構造タイプに対応し、
+    計24物質を表示できます。インターカレーション分子の挿入、層間距離の調整、原子間距離測定、
+    CIFファイルの入出力などが可能です。PC・スマートフォン・タブレットいずれでも動作します。</p>
 
   <h2>基本操作</h2>
   <div class="card">
@@ -90,10 +91,34 @@
     </div>
     <div class="mat-card">
       <h4>2H型（三角柱配位）</h4>
-      <p>MoS₂、MoSe₂、MoTe₂、WS₂、WSe₂、NbSe₂、NbS₂</p>
+      <p>MoS₂、MoSe₂、MoTe₂、WS₂、WSe₂、WTe₂、NbSe₂、NbS₂</p>
+    </div>
+    <div class="mat-card">
+      <h4>1T'/Td型（歪み八面体）</h4>
+      <p>MoTe₂ (1T')、WTe₂ (1T'/Td)、MoS₂ (1T')、ReS₂ (三斜)、ReSe₂ (三斜)</p>
+    </div>
+    <div class="mat-card">
+      <h4>3R型（菱面体積層）</h4>
+      <p>MoS₂、NbS₂、NbSe₂、TaS₂</p>
     </div>
   </div>
-  <p>各物質の格子定数 (a, c) および結合長は文献値に基づいています。物質を選択すると右上の結晶データパネルに詳細が表示されます。</p>
+  <p>各物質の格子定数（a, b, c）、結合長、ダイマー距離などは文献値に基づいています。
+    物質を選択すると右上の結晶データパネルに詳細が表示されます。</p>
+
+  <h2>構造タイプの解説</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>構造タイプ</th><th>空間群</th><th>配位</th><th>特徴</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1T</strong></td><td>P-3m1 (No.164)</td><td>八面体 6配位</td><td>上下カルコゲンが重なるABC積層</td></tr>
+        <tr><td><strong>2H</strong></td><td>P6₃/mmc (No.194)</td><td>三角柱 6配位</td><td>上下カルコゲンが互い違い、AB'積層</td></tr>
+        <tr><td><strong>1T'</strong></td><td>P2₁/m (No.11)</td><td>歪み八面体 6配位</td><td>金属ダイマー鎖（ジグザグ鎖）、単斜晶</td></tr>
+        <tr><td><strong>Td</strong></td><td>Pmn2₁ (No.31)</td><td>歪み八面体 6配位</td><td>WTe₂の直方晶型（β=90°の1T'）</td></tr>
+        <tr><td><strong>三斜晶</strong></td><td>P-1 (No.2)</td><td>歪み八面体 6配位</td><td>Re₄ダイヤモンドクラスター、ReS₂/ReSe₂</td></tr>
+        <tr><td><strong>3R</strong></td><td>R3m (No.160)</td><td>三角柱 6配位</td><td>2Hと同じ層内構造、ABC積層（3層周期）</td></tr>
+      </tbody>
+    </table>
+  </div>
 
   <h2>ツールバーの各機能</h2>
 
@@ -101,7 +126,7 @@
   <table>
     <thead><tr><th>設定</th><th>説明</th></tr></thead>
     <tbody>
-      <tr><td><span class="tag">物質</span></td><td>表示する TMD を選択。1T / 2H がグループ分けされています。</td></tr>
+      <tr><td><span class="tag">物質</span></td><td>表示する TMD を選択。1T / 2H / 1T' / 3R がグループ分けされています。</td></tr>
       <tr><td><span class="tag">層間</span></td><td>層間距離の倍率（1.0〜5.0×）。右の Å 入力欄に直接金属間距離を入力することも可能。</td></tr>
       <tr><td><span class="tag">層数</span></td><td>表示する層の数（2〜5）。増やすとカメラが自動でズームアウトします。</td></tr>
       <tr><td><span class="tag">a₁幅 / a₂幅</span></td><td>a₁方向・a₂方向のユニットセル繰り返し数（1〜10）。</td></tr>
@@ -114,8 +139,8 @@
     <p>層間にゲスト種を挿入する機能です。以下のプリセットが利用可能：</p>
     <table>
       <tbody>
-        <tr><td><strong>イオン</strong></td><td>Li⁺、Na⁺、K⁺</td></tr>
-        <tr><td><strong>分子</strong></td><td>H₂O、NH₃、ピリジン、CTA⁺（CTAB）、TBA⁺、ヒドラジン</td></tr>
+        <tr><td><strong>イオン</strong></td><td>Li⁺、Na⁺、K⁺、Rb⁺</td></tr>
+        <tr><td><strong>分子</strong></td><td>EMIm⁺（1-エチル-3-メチルイミダゾリウム）、TBMA⁺（トリブチルメチルアンモニウム）、TBA⁺（テトラブチルアンモニウム）、ヘリセン</td></tr>
         <tr><td><strong>カスタム</strong></td><td>CIF / XYZ ファイルから任意の分子を読み込み可能</td></tr>
       </tbody>
     </table>
@@ -134,10 +159,10 @@
     <table>
       <thead><tr><th>設定</th><th>説明</th></tr></thead>
       <tbody>
-        <tr><td><span class="tag">M径</span></td><td>金属原子（Mo, W, Ti など）の球の大きさ（0.1〜2.0×）</td></tr>
         <tr><td><span class="tag">X径</span></td><td>カルコゲン原子（S, Se, Te）の球の大きさ（0.1〜2.0×）</td></tr>
         <tr><td><span class="tag">分子径</span></td><td>挿入分子の原子の球の大きさ（0.1〜2.0×）</td></tr>
         <tr><td><span class="tag">結合太さ</span></td><td>すべての結合（層内・分子内）の棒の太さ（0.1〜2.0×）</td></tr>
+        <tr><td><span class="tag">M径</span></td><td>金属原子（Mo, W, Ti, Re など）の球の大きさ（0.1〜2.0×）</td></tr>
       </tbody>
     </table>
     <p><span class="key">↺ サイズリセット</span> ボタンで全項目を一括で初期値（1.0×）に戻せます。</p>
@@ -151,6 +176,7 @@
       <tr><td><span class="tag">多面体</span></td><td>金属原子周りの配位多面体（八面体/三角柱）を半透明で表示。</td></tr>
       <tr><td><span class="tag">単位胞</span></td><td>単位胞の枠線を表示。</td></tr>
       <tr><td><span class="tag">層間距離</span></td><td>層間距離を数値付きで表示（初期: ON）。</td></tr>
+      <tr><td><span class="tag">M-M結合</span></td><td>1T'相の金属–金属ダイマー結合（赤色）を表示/非表示。1T'物質選択時のみ表示されるオプション。初期: ON。</td></tr>
     </tbody>
   </table>
 
@@ -182,11 +208,12 @@
     <div class="card-title">スクリーンショットとCIF出力</div>
     <div class="step">
       <div class="step-num">&#128247;</div>
-      <div class="step-text"><span class="key">撮影</span> ボタンで現在の表示をPNG画像として保存。</div>
+      <div class="step-text"><span class="key">撮影</span> ボタンで現在の表示をPNG画像として保存。背景は暗色で出力されます。</div>
     </div>
     <div class="step">
       <div class="step-num">&#128196;</div>
-      <div class="step-text"><span class="key">CIF出力</span> ボタンで現在の構造（物質＋インターカレーション分子を含む）を CIF ファイルとしてダウンロード。他の結晶構造ソフトで読み込み可能。</div>
+      <div class="step-text"><span class="key">CIF出力</span> ボタンで現在の構造（物質＋インターカレーション分子を含む）を CIF ファイルとしてダウンロード。
+        三斜晶系の場合は格子角（α, β, γ）も正しくエクスポートされます。VESTA や Mercury などの結晶構造ソフトで読み込み可能。</div>
     </div>
   </div>
 
@@ -217,7 +244,8 @@
 
   <h2>色のカスタマイズ</h2>
   <div class="card">
-    <p>ツールバー右端のカラーピッカーで金属原子と配位子（カルコゲン）の色を個別に変更できます。
+    <p>ツールバー右端のカラーピッカーで金属原子とカルコゲン原子の色を個別に変更できます。
+      各元素にはデフォルト色が設定されています（例: Mo=紫、W=青、S=黄、Se=橙、Te=茶）。
       画面下部の凡例パネルに現在の色が反映されます。</p>
   </div>
 
@@ -226,15 +254,39 @@
     <p>画面右上の「結晶データ」パネルには以下の情報が表示されます：</p>
     <table>
       <tbody>
-        <tr><td>化学式・相構造</td><td>MoS₂ 2H など</td></tr>
-        <tr><td>空間群</td><td>P6₃/mmc (No.194) など</td></tr>
-        <tr><td>格子定数</td><td>a (Å)、c (Å)</td></tr>
-        <tr><td>結合長</td><td>M–X 結合長 (Å)</td></tr>
-        <tr><td>層間距離</td><td>現在の層間距離（倍率適用後）</td></tr>
+        <tr><td>化学式・相構造</td><td>例: MoS₂ — 2H、ReS₂ — 1T'</td></tr>
+        <tr><td>空間群</td><td>例: P6₃/mmc (No.194)、P-1 (No.2)</td></tr>
+        <tr><td>構造型</td><td>三角柱、八面体、歪み八面体、Re₄クラスターなど</td></tr>
+        <tr><td>格子定数</td><td>a, b, c (Å) および角度（β、またはα, β, γ）</td></tr>
+        <tr><td>M–X 結合長</td><td>金属–カルコゲン結合長 (Å)</td></tr>
+        <tr><td>配位</td><td>三角柱 / 八面体 / 歪み八面体（6配位）</td></tr>
+        <tr><td>層間 (vdW gap)</td><td>ファンデルワールスギャップ (Å)</td></tr>
+        <tr><td>M–M ダイマー距離</td><td>1T'相のみ: 金属ダイマー結合長 (Å)</td></tr>
+        <tr><td>Wyckoff 位置</td><td>結晶学的位置（例: Mo 2e(x,¼,z), S 4f(x,y,z)）</td></tr>
         <tr><td>挿入分子情報</td><td>分子名、圧縮率（該当時）</td></tr>
       </tbody>
     </table>
     <p>パネルは「結晶データ」ボタンで折りたたみ/展開できます。</p>
+  </div>
+
+  <h2>層間 M–M 距離パネル</h2>
+  <div class="card">
+    <p>画面左下に表示される「層間 M–M 距離」パネルには、各層間の金属原子間距離が自動計算されて表示されます。
+      層間倍率を変えるとリアルタイムで更新されます。</p>
+  </div>
+
+  <h2>1T' / Td / 三斜晶系の特殊機能</h2>
+  <div class="card">
+    <div class="card-title">金属ダイマー結合（M-M結合）</div>
+    <p>1T'相の物質（MoTe₂, WTe₂, MoS₂, ReS₂, ReSe₂）では、金属–金属のダイマー結合が赤色の太い線で表示されます。
+      ツールバーの <span class="tag">M-M結合</span> チェックボックスで表示/非表示を切り替えられます。
+      このオプションは1T'物質を選択したときだけ表示されます。</p>
+  </div>
+  <div class="card">
+    <div class="card-title">三斜晶系（ReS₂ / ReSe₂）の表示</div>
+    <p>ReS₂とReSe₂は三斜晶系（P-1）に属し、2×2六方超格子のPeierls歪みによってRe₄ダイヤモンドクラスターを形成します。
+      c軸方向から見ると、γ≈119°のせん断格子により平行四辺形状のパターンが表示されます。
+      これは三斜晶系の物理的性質を正確に反映しており、他の1T'物質（MoTe₂等の直交格子）と見た目が異なるのは正常です。</p>
   </div>
 
   <h2>スマートフォン対応</h2>
@@ -261,6 +313,7 @@
         <tr><td>挿入分子が見えない</td><td>層間距離を広げるか、「向き最適化」を実行してください。分子径スライダーで大きくすることもできます。</td></tr>
         <tr><td>ズームが足りない</td><td>スクロールホイールまたはピンチで最大80倍までズームアウト可能です。</td></tr>
         <tr><td>構造が画面からはみ出る</td><td>層数や幅を変更すると自動でカメラが調整されます。手動でスクロールしてズームアウトも可能。</td></tr>
+        <tr><td>三斜晶が傾いて見える</td><td>三斜晶系（ReS₂/ReSe₂）はγ≈119°のせん断格子を持つため、c軸方向から見ると平行四辺形状になります。これは正常です。</td></tr>
       </tbody>
     </table>
   </div>
