@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Temudraw — 化学構造エディタ</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#1a1d23;--bg2:#22262e;--bg3:#2a2f38;--border:#3a3f4a;
+  --text:#e0e0e0;--text2:#aaa;--accent:#58a6ff;--accent2:#79c0ff;
+  --warn:#ffcc44;--err:#ff6b6b;--ok:#6ccc6c;
+  --bond-color:#e0e0e0;--atom-c:#e0e0e0;--atom-n:#4444ff;--atom-o:#ff4444;
+  --atom-s:#cccc00;--atom-p:#ff8800;--atom-f:#00cc00;--atom-cl:#00cc00;
+  --atom-br:#882200;--atom-i:#6600aa;
+  --toolbar-w:44px;--menubar-h:32px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:'Segoe UI','Helvetica Neue','Meiryo',sans-serif;font-size:13px}
+
+/* === メニューバー === */
+#menubar{height:var(--menubar-h);background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 8px;gap:2px;z-index:100;position:relative}
+.menu-item{padding:4px 10px;border-radius:4px;cursor:pointer;color:var(--text2);
+  font-size:12px;position:relative;user-select:none}
+.menu-item:hover{background:var(--bg3);color:var(--text)}
+.menu-dropdown{display:none;position:absolute;top:100%;left:0;background:var(--bg2);
+  border:1px solid var(--border);border-radius:6px;padding:4px 0;min-width:180px;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:200}
+.menu-item.open .menu-dropdown{display:block}
+.menu-dropdown .md-item{padding:6px 16px;cursor:pointer;display:flex;justify-content:space-between;
+  align-items:center;font-size:12px;color:var(--text2)}
+.menu-dropdown .md-item:hover{background:var(--bg3);color:var(--text)}
+.menu-dropdown .md-item .shortcut{color:#666;font-size:11px;margin-left:20px}
+.menu-dropdown .md-sep{height:1px;background:var(--border);margin:4px 0}
+
+/* === ツールバー（左） === */
+#toolbar{position:absolute;top:var(--menubar-h);left:0;width:var(--toolbar-w);
+  height:calc(100% - var(--menubar-h));background:var(--bg2);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:2px;
+  overflow-y:auto;z-index:50}
+.tool-btn{width:36px;height:36px;border-radius:6px;border:none;background:transparent;
+  color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:.12s;position:relative}
+.tool-btn:hover{background:var(--bg3);color:var(--text)}
+.tool-btn.active{background:rgba(88,166,255,.15);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.tool-btn svg{width:20px;height:20px}
+.tool-sep{width:28px;height:1px;background:var(--border);margin:4px 0}
+.tool-btn .tool-tip{display:none;position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);
+  background:#111;color:#eee;padding:4px 8px;border-radius:4px;font-size:11px;white-space:nowrap;z-index:300}
+.tool-btn:hover .tool-tip{display:block}
+
+/* === キャンバスエリア === */
+#canvas-area{position:absolute;top:var(--menubar-h);left:var(--toolbar-w);
+  right:0;bottom:0;overflow:hidden;background:#ffffff;cursor:crosshair}
+#canvas-area svg{width:100%;height:100%}
+
+/* === ステータスバー === */
+#statusbar{position:fixed;bottom:0;left:var(--toolbar-w);right:0;height:24px;
+  background:var(--bg2);border-top:1px solid var(--border);display:flex;align-items:center;
+  padding:0 12px;font-size:11px;color:var(--text2);gap:16px;z-index:50}
+
+/* === プロパティパネル（右） === */
+#props-panel{position:absolute;top:var(--menubar-h);right:0;width:0;
+  height:calc(100% - var(--menubar-h) - 24px);background:var(--bg2);
+  border-left:1px solid var(--border);overflow:hidden;transition:width .2s;z-index:40}
+#props-panel.open{width:220px}
+#props-panel .pp-header{padding:8px 12px;font-size:12px;font-weight:600;color:var(--accent);
+  border-bottom:1px solid var(--border)}
+#props-panel .pp-body{padding:8px 12px;font-size:11px}
+
+/* === コンテキストメニュー === */
+#context-menu{display:none;position:fixed;background:var(--bg2);border:1px solid var(--border);
+  border-radius:6px;padding:4px 0;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:500}
+#context-menu .cm-item{padding:6px 14px;cursor:pointer;font-size:12px;color:var(--text2)}
+#context-menu .cm-item:hover{background:var(--bg3);color:var(--text)}
+
+/* === ダイアログ === */
+.dialog-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;
+  align-items:center;justify-content:center}
+.dialog-overlay.show{display:flex}
+.dialog{background:var(--bg2);border:1px solid var(--border);border-radius:10px;
+  padding:20px;min-width:300px;max-width:500px;box-shadow:0 12px 40px rgba(0,0,0,.6)}
+.dialog h3{color:var(--accent);margin-bottom:12px;font-size:14px}
+.dialog input,.dialog select{background:var(--bg3);border:1px solid var(--border);
+  color:var(--text);padding:6px 10px;border-radius:4px;font-size:12px;width:100%;margin:4px 0}
+.dialog .btn-row{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+.dialog button{padding:6px 16px;border-radius:4px;border:1px solid var(--border);
+  background:var(--bg3);color:var(--text);cursor:pointer;font-size:12px}
+.dialog button.primary{background:var(--accent);color:#000;border-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<!-- メニューバー -->
+<div id="menubar">
+  <div class="menu-item" data-menu="file">ファイル
+    <div class="menu-dropdown">
+      <div class="md-item" data-action="new">新規 <span class="shortcut">Ctrl+N</span></div>
+      <div class="md-item" data-action="open">開く <span class="shortcut">Ctrl+O</span></div>
+      <div class="md-sep"></div>
+      <div class="md-item" data-action="save">保存 (JSON) <span class="shortcut">Ctrl+S</span></div>
+      <div class="md-item" data-action="export-mol">MOLエクスポート <span class="shortcut">Ctrl+E</span></div>
+      <div class="md-item" data-action="import-mol">MOLインポート</div>
+      <div class="md-sep"></div>
+      <div class="md-item" data-action="export-svg">SVGエクスポート</div>
+      <div class="md-item" data-action="export-png">PNGエクスポート</div>
+    </div>
+  </div>
+  <div class="menu-item" data-menu="edit">編集
+    <div class="menu-dropdown">
+      <div class="md-item" data-action="undo">元に戻す <span class="shortcut">Ctrl+Z</span></div>
+      <div class="md-item" data-action="redo">やり直し <span class="shortcut">Ctrl+Y</span></div>
+      <div class="md-sep"></div>
+      <div class="md-item" data-action="select-all">全選択 <span class="shortcut">Ctrl+A</span></div>
+      <div class="md-item" data-action="delete">削除 <span class="shortcut">Del</span></div>
+      <div class="md-sep"></div>
+      <div class="md-item" data-action="copy">コピー <span class="shortcut">Ctrl+C</span></div>
+      <div class="md-item" data-action="paste">貼り付け <span class="shortcut">Ctrl+V</span></div>
+    </div>
+  </div>
+  <div class="menu-item" data-menu="view">表示
+    <div class="menu-dropdown">
+      <div class="md-item" data-action="zoom-in">拡大 <span class="shortcut">Ctrl++</span></div>
+      <div class="md-item" data-action="zoom-out">縮小 <span class="shortcut">Ctrl+-</span></div>
+      <div class="md-item" data-action="zoom-fit">全体表示 <span class="shortcut">Ctrl+0</span></div>
+      <div class="md-sep"></div>
+      <div class="md-item" data-action="toggle-grid">グリッド表示</div>
+      <div class="md-item" data-action="toggle-hcount">水素数表示</div>
+    </div>
+  </div>
+  <div class="menu-item" data-menu="template">テンプレート
+    <div class="menu-dropdown">
+      <div class="md-item" data-action="ring-3">シクロプロパン (3員環)</div>
+      <div class="md-item" data-action="ring-4">シクロブタン (4員環)</div>
+      <div class="md-item" data-action="ring-5">シクロペンタン (5員環)</div>
+      <div class="md-item" data-action="ring-6">シクロヘキサン (6員環)</div>
+      <div class="md-item" data-action="benzene">ベンゼン</div>
+      <div class="md-item" data-action="ring-7">シクロヘプタン (7員環)</div>
+      <div class="md-item" data-action="ring-8">シクロオクタン (8員環)</div>
+      <div class="md-sep"></div>
+      <div class="md-item" data-action="naphthalene">ナフタレン</div>
+      <div class="md-item" data-action="pyridine">ピリジン</div>
+      <div class="md-item" data-action="pyrrole">ピロール</div>
+      <div class="md-item" data-action="furan">フラン</div>
+      <div class="md-item" data-action="thiophene">チオフェン</div>
+    </div>
+  </div>
+  <div class="menu-item" data-menu="help">ヘルプ
+    <div class="menu-dropdown">
+      <div class="md-item" data-action="shortcuts">ショートカット一覧</div>
+      <div class="md-item" data-action="about">Temudrawについて</div>
+    </div>
+  </div>
+</div>
+
+<!-- ツールバー -->
+<div id="toolbar">
+  <button class="tool-btn active" data-tool="select" title="選択">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+    <span class="tool-tip">選択 (V)</span>
+  </button>
+  <button class="tool-btn" data-tool="bond" title="結合">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"/></svg>
+    <span class="tool-tip">単結合 (1)</span>
+  </button>
+  <button class="tool-btn" data-tool="double" title="二重結合">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="18" x2="20" y2="2"/><line x1="4" y1="22" x2="20" y2="6"/></svg>
+    <span class="tool-tip">二重結合 (2)</span>
+  </button>
+  <button class="tool-btn" data-tool="triple" title="三重結合">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="16" x2="20" y2="0"/><line x1="4" y1="20" x2="20" y2="4"/><line x1="4" y1="24" x2="20" y2="8"/></svg>
+    <span class="tool-tip">三重結合 (3)</span>
+  </button>
+  <button class="tool-btn" data-tool="wedge" title="楔形結合">
+    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="4,20 20,2 22,6"/></svg>
+    <span class="tool-tip">楔形結合 (W)</span>
+  </button>
+  <button class="tool-btn" data-tool="dash" title="破線結合">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"><line x1="4" y1="20" x2="20" y2="4"/></svg>
+    <span class="tool-tip">破線結合 (D)</span>
+  </button>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" data-tool="ring6" title="6員環">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12,2 22,7 22,17 12,22 2,17 2,7"/></svg>
+    <span class="tool-tip">6員環 (6)</span>
+  </button>
+  <button class="tool-btn" data-tool="ring5" title="5員環">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12,2 23,10 19,22 5,22 1,10"/></svg>
+    <span class="tool-tip">5員環 (5)</span>
+  </button>
+  <button class="tool-btn" data-tool="benzene" title="ベンゼン">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12,2 22,7 22,17 12,22 2,17 2,7"/><circle cx="12" cy="12" r="5"/></svg>
+    <span class="tool-tip">ベンゼン (B)</span>
+  </button>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" data-tool="eraser" title="消しゴム">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16l10-10 8 8-4 4"/><path d="M6.5 17.5l4-4"/></svg>
+    <span class="tool-tip">消しゴム (E)</span>
+  </button>
+  <button class="tool-btn" data-tool="atom" title="原子">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><text x="12" y="16" text-anchor="middle" fill="currentColor" stroke="none" font-size="10" font-weight="bold">A</text></svg>
+    <span class="tool-tip">原子ラベル (A)</span>
+  </button>
+  <button class="tool-btn" data-tool="charge" title="電荷">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>
+    <span class="tool-tip">電荷 (+/-)</span>
+  </button>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" data-tool="move" title="移動">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20M5 5l-3 7M5 19l-3-7M19 5l3 7M19 19l3-7"/></svg>
+    <span class="tool-tip">キャンバス移動 (スペース)</span>
+  </button>
+  <button class="tool-btn" data-tool="zoom" title="ズーム">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="7"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="7" y1="10" x2="13" y2="10"/><line x1="10" y1="7" x2="10" y2="13"/></svg>
+    <span class="tool-tip">ズーム (Z)</span>
+  </button>
+</div>
+
+<!-- キャンバス -->
+<div id="canvas-area">
+  <svg id="mol-svg" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e8e8e8" stroke-width="0.5"/>
+      </pattern>
+    </defs>
+    <rect id="grid-bg" width="100%" height="100%" fill="url(#grid)" opacity="0.5"/>
+    <g id="mol-layer" transform="translate(0,0) scale(1)"></g>
+    <g id="preview-layer"></g>
+    <rect id="sel-rect" fill="rgba(88,166,255,0.1)" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 2" display="none"/>
+  </svg>
+</div>
+
+<!-- ステータスバー -->
+<div id="statusbar">
+  <span id="status-tool">ツール: 選択</span>
+  <span id="status-atoms">原子: 0</span>
+  <span id="status-bonds">結合: 0</span>
+  <span id="status-zoom">100%</span>
+  <span id="status-pos" style="margin-left:auto">x: 0, y: 0</span>
+</div>
+
+<!-- コンテキストメニュー -->
+<div id="context-menu">
+  <div class="cm-item" data-action="delete">削除</div>
+  <div class="cm-item" data-action="copy">コピー</div>
+  <div class="cm-item" data-action="change-atom">原子変更...</div>
+  <div class="cm-item" data-action="change-bond">結合次数変更</div>
+  <div class="cm-item" data-action="add-h">水素付加</div>
+</div>
+
+<!-- 原子入力ダイアログ -->
+<div class="dialog-overlay" id="atom-dialog">
+  <div class="dialog">
+    <h3>原子ラベル</h3>
+    <input id="atom-input" placeholder="元素記号 (C, N, O, S...)" autocomplete="off"/>
+    <div class="btn-row">
+      <button onclick="closeAtomDialog()">キャンセル</button>
+      <button class="primary" onclick="confirmAtomDialog()">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ============================
+// データモデル
+// ============================
+const BOND_LENGTH = 40; // ピクセル単位の標準結合長
+const SNAP_ANGLE = 30;  // 度
+const ATOM_RADIUS = 8;
+const HIT_RADIUS = 10;
+
+let atoms = [];  // {id, x, y, symbol, charge, hCount, label}
+let bonds = [];  // {id, from, to, order, stereo} stereo: 'none','wedge','dash'
+let nextAtomId = 1;
+let nextBondId = 1;
+
+// 表示状態
+let viewX = 0, viewY = 0, viewScale = 1;
+let showGrid = true;
+let showHCount = true;
+
+// ツール状態
+let currentTool = 'select';
+let isDrawing = false;
+let drawStart = null;       // {atomId} or {x, y}
+let selectedAtoms = new Set();
+let selectedBonds = new Set();
+let dragOffset = null;
+let selRectStart = null;
+
+// Undo/Redo
+let undoStack = [];
+let redoStack = [];
+const MAX_UNDO = 100;
+
+// 原子色マップ
+const ATOM_COLORS = {
+  C:'#333333', N:'#3333ff', O:'#ff0000', S:'#ccaa00', P:'#ff8800',
+  F:'#00aa00', Cl:'#00aa00', Br:'#882200', I:'#6600aa', H:'#666666',
+  Si:'#886688', B:'#ff6688', Se:'#ff8800', Te:'#cc6600'
+};
+function atomColor(sym){ return ATOM_COLORS[sym]||'#333333'; }
+
+// 標準原子価
+const VALENCE = {H:1,B:3,C:4,N:3,O:2,F:1,Si:4,P:3,S:2,Cl:1,Br:1,I:1,Se:2,Te:2};
+
+// ============================
+// SVG参照
+// ============================
+const svg = document.getElementById('mol-svg');
+const molLayer = document.getElementById('mol-layer');
+const previewLayer = document.getElementById('preview-layer');
+const gridBg = document.getElementById('grid-bg');
+const selRect = document.getElementById('sel-rect');
+const canvasArea = document.getElementById('canvas-area');
+
+// ============================
+// ユーティリティ
+// ============================
+function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+function deg2rad(d){ return d*Math.PI/180; }
+function rad2deg(r){ return r*180/Math.PI; }
+
+function snapAngle(angle){
+  const step = deg2rad(SNAP_ANGLE);
+  return Math.round(angle/step)*step;
+}
+
+function screenToWorld(sx, sy){
+  const rect = canvasArea.getBoundingClientRect();
+  return { x:(sx-rect.left-viewX)/viewScale, y:(sy-rect.top-viewY)/viewScale };
+}
+
+function worldToScreen(wx, wy){
+  const rect = canvasArea.getBoundingClientRect();
+  return { x: wx*viewScale+viewX+rect.left, y: wy*viewScale+viewY+rect.top };
+}
+
+function findAtomAt(wx, wy, excludeId){
+  let best=null, bestD=HIT_RADIUS/viewScale;
+  for(const a of atoms){
+    if(a.id===excludeId) continue;
+    const d=dist({x:wx,y:wy}, a);
+    if(d<bestD){ bestD=d; best=a; }
+  }
+  return best;
+}
+
+function findBondAt(wx, wy){
+  let best=null, bestD=6/viewScale;
+  for(const b of bonds){
+    const a1=atoms.find(a=>a.id===b.from);
+    const a2=atoms.find(a=>a.id===b.to);
+    if(!a1||!a2) continue;
+    const d=pointToSegDist({x:wx,y:wy}, a1, a2);
+    if(d<bestD){ bestD=d; best=b; }
+  }
+  return best;
+}
+
+function pointToSegDist(p, a, b){
+  const dx=b.x-a.x, dy=b.y-a.y;
+  const len2=dx*dx+dy*dy;
+  if(len2===0) return dist(p,a);
+  let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/len2;
+  t=Math.max(0,Math.min(1,t));
+  return dist(p, {x:a.x+t*dx, y:a.y+t*dy});
+}
+
+function getBondsOfAtom(atomId){
+  return bonds.filter(b=>b.from===atomId||b.to===atomId);
+}
+
+function bondOrderSum(atomId){
+  return getBondsOfAtom(atomId).reduce((s,b)=>s+b.order,0);
+}
+
+function calcHCount(atom){
+  const v = VALENCE[atom.symbol];
+  if(v===undefined) return 0;
+  const bo = bondOrderSum(atom.id);
+  const ch = Math.abs(atom.charge||0);
+  return Math.max(0, v - bo - ch);
+}
+
+// ============================
+// Undo/Redo
+// ============================
+function saveState(){
+  undoStack.push(JSON.stringify({atoms,bonds,nextAtomId,nextBondId}));
+  if(undoStack.length>MAX_UNDO) undoStack.shift();
+  redoStack=[];
+}
+
+function undo(){
+  if(undoStack.length===0) return;
+  redoStack.push(JSON.stringify({atoms,bonds,nextAtomId,nextBondId}));
+  const st=JSON.parse(undoStack.pop());
+  atoms=st.atoms; bonds=st.bonds; nextAtomId=st.nextAtomId; nextBondId=st.nextBondId;
+  selectedAtoms.clear(); selectedBonds.clear();
+  render();
+}
+
+function redo(){
+  if(redoStack.length===0) return;
+  undoStack.push(JSON.stringify({atoms,bonds,nextAtomId,nextBondId}));
+  const st=JSON.parse(redoStack.pop());
+  atoms=st.atoms; bonds=st.bonds; nextAtomId=st.nextAtomId; nextBondId=st.nextBondId;
+  selectedAtoms.clear(); selectedBonds.clear();
+  render();
+}
+
+// ============================
+// レンダリング
+// ============================
+function render(){
+  molLayer.innerHTML='';
+  // 結合を描画
+  for(const b of bonds){
+    const a1=atoms.find(a=>a.id===b.from);
+    const a2=atoms.find(a=>a.id===b.to);
+    if(!a1||!a2) continue;
+    renderBond(b, a1, a2);
+  }
+  // 原子を描画
+  for(const a of atoms){
+    renderAtom(a);
+  }
+  updateStatus();
+  updateTransform();
+}
+
+function renderBond(b, a1, a2){
+  const sel = selectedBonds.has(b.id);
+  const color = sel ? '#58a6ff' : '#333333';
+  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.dataset.bondId=b.id;
+
+  const dx=a2.x-a1.x, dy=a2.y-a1.y;
+  const len=Math.hypot(dx,dy);
+  const ux=dx/len, uy=dy/len; // unit along bond
+  const px=-uy, py=ux;        // perpendicular
+
+  // 原子ラベル分のオフセット
+  const off1 = (a1.symbol!=='C'||getBondsOfAtom(a1.id).length===0) ? 10 : 0;
+  const off2 = (a2.symbol!=='C'||getBondsOfAtom(a2.id).length===0) ? 10 : 0;
+  const x1=a1.x+ux*off1, y1=a1.y+uy*off1;
+  const x2=a2.x-ux*off2, y2=a2.y-uy*off2;
+
+  if(b.stereo==='wedge'){
+    // 楔形: 三角形
+    const w=4;
+    const poly=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    poly.setAttribute('points',`${x1},${y1} ${x2+px*w},${y2+py*w} ${x2-px*w},${y2-py*w}`);
+    poly.setAttribute('fill',color);
+    poly.setAttribute('stroke','none');
+    g.appendChild(poly);
+  } else if(b.stereo==='dash'){
+    // 破線楔形: 複数の短い線
+    const n=7;
+    for(let i=0;i<n;i++){
+      const t=(i+0.5)/n;
+      const cx=x1+(x2-x1)*t, cy=y1+(y2-y1)*t;
+      const w=3*t;
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1',cx+px*w);line.setAttribute('y1',cy+py*w);
+      line.setAttribute('x2',cx-px*w);line.setAttribute('y2',cy-py*w);
+      line.setAttribute('stroke',color);line.setAttribute('stroke-width','1.5');
+      g.appendChild(line);
+    }
+  } else if(b.order===1){
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',x1);line.setAttribute('y1',y1);
+    line.setAttribute('x2',x2);line.setAttribute('y2',y2);
+    line.setAttribute('stroke',color);line.setAttribute('stroke-width','2');
+    g.appendChild(line);
+  } else if(b.order===2){
+    const sep=3;
+    for(let s of [-1,1]){
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1',x1+px*sep*s);line.setAttribute('y1',y1+py*sep*s);
+      line.setAttribute('x2',x2+px*sep*s);line.setAttribute('y2',y2+py*sep*s);
+      line.setAttribute('stroke',color);line.setAttribute('stroke-width','1.5');
+      g.appendChild(line);
+    }
+  } else if(b.order===3){
+    const sep=3.5;
+    for(let s of [-1,0,1]){
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1',x1+px*sep*s);line.setAttribute('y1',y1+py*sep*s);
+      line.setAttribute('x2',x2+px*sep*s);line.setAttribute('y2',y2+py*sep*s);
+      line.setAttribute('stroke',color);line.setAttribute('stroke-width','1.5');
+      g.appendChild(line);
+    }
+  }
+  molLayer.appendChild(g);
+}
+
+function renderAtom(a){
+  const sel = selectedAtoms.has(a.id);
+  const numBonds = getBondsOfAtom(a.id).length;
+  const showLabel = a.symbol!=='C' || numBonds===0 || sel;
+
+  if(showLabel){
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.dataset.atomId=a.id;
+
+    // 背景（白い四角で結合を隠す）
+    const bg=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    let labelText = a.symbol;
+    const hc = calcHCount(a);
+    if(showHCount && hc>0){
+      labelText += (hc===1)?'H':`H${hc}`;
+    }
+    if(a.charge){
+      if(a.charge===1) labelText+='+';
+      else if(a.charge===-1) labelText+='-';
+      else if(a.charge>1) labelText+=a.charge+'+';
+      else labelText+=Math.abs(a.charge)+'-';
+    }
+    const textW = labelText.length*7+4;
+    bg.setAttribute('x',a.x-textW/2);
+    bg.setAttribute('y',a.y-8);
+    bg.setAttribute('width',textW);
+    bg.setAttribute('height',16);
+    bg.setAttribute('fill','white');
+    bg.setAttribute('stroke', sel?'#58a6ff':'none');
+    bg.setAttribute('stroke-width', sel?'1.5':'0');
+    bg.setAttribute('rx','2');
+    g.appendChild(bg);
+
+    const text=document.createElementNS('http://www.w3.org/2000/svg','text');
+    text.setAttribute('x',a.x);
+    text.setAttribute('y',a.y+4);
+    text.setAttribute('text-anchor','middle');
+    text.setAttribute('font-size','13');
+    text.setAttribute('font-family','Arial, sans-serif');
+    text.setAttribute('font-weight','bold');
+    text.setAttribute('fill', atomColor(a.symbol));
+    text.textContent=labelText;
+    g.appendChild(text);
+    molLayer.appendChild(g);
+  } else if(sel){
+    // Carbon選択時の丸いハイライト
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx',a.x);circle.setAttribute('cy',a.y);circle.setAttribute('r','5');
+    circle.setAttribute('fill','rgba(88,166,255,0.3)');circle.setAttribute('stroke','#58a6ff');
+    circle.setAttribute('stroke-width','1.5');
+    circle.dataset.atomId=a.id;
+    molLayer.appendChild(circle);
+  }
+}
+
+function updateTransform(){
+  molLayer.setAttribute('transform',`translate(${viewX},${viewY}) scale(${viewScale})`);
+  previewLayer.setAttribute('transform',`translate(${viewX},${viewY}) scale(${viewScale})`);
+  // グリッドパターンもスケールに合わせる
+  const gridPat=document.getElementById('grid');
+  const gs=20*viewScale;
+  gridPat.setAttribute('width',gs);gridPat.setAttribute('height',gs);
+  gridPat.setAttribute('patternTransform',`translate(${viewX%gs},${viewY%gs})`);
+  gridPat.firstElementChild.setAttribute('d',`M ${gs} 0 L 0 0 0 ${gs}`);
+  gridBg.style.display=showGrid?'block':'none';
+}
+
+function updateStatus(){
+  document.getElementById('status-atoms').textContent=`原子: ${atoms.length}`;
+  document.getElementById('status-bonds').textContent=`結合: ${bonds.length}`;
+  document.getElementById('status-zoom').textContent=`${Math.round(viewScale*100)}%`;
+}
+
+// ============================
+// 原子・結合の追加
+// ============================
+function addAtom(x, y, symbol='C'){
+  const a={id:nextAtomId++, x, y, symbol, charge:0};
+  atoms.push(a);
+  return a;
+}
+
+function addBond(fromId, toId, order=1, stereo='none'){
+  // 既存チェック
+  const existing = bonds.find(b=>(b.from===fromId&&b.to===toId)||(b.from===toId&&b.to===fromId));
+  if(existing) return existing;
+  const b={id:nextBondId++, from:fromId, to:toId, order, stereo};
+  bonds.push(b);
+  return b;
+}
+
+function deleteAtom(atomId){
+  bonds = bonds.filter(b=>b.from!==atomId&&b.to!==atomId);
+  atoms = atoms.filter(a=>a.id!==atomId);
+}
+
+function deleteBond(bondId){
+  bonds = bonds.filter(b=>b.id!==bondId);
+  // 孤立原子を消す（結合0の原子を残すか → 残す）
+}
+
+// ============================
+// 環構造テンプレート
+// ============================
+function makeRing(n, cx, cy, aromatic=false){
+  saveState();
+  const r = BOND_LENGTH / (2*Math.sin(Math.PI/n));
+  const ringAtoms=[];
+  for(let i=0;i<n;i++){
+    const angle = -Math.PI/2 + (2*Math.PI*i)/n;
+    const x = cx + r*Math.cos(angle);
+    const y = cy + r*Math.sin(angle);
+    ringAtoms.push(addAtom(x,y,'C'));
+  }
+  for(let i=0;i<n;i++){
+    const order = (aromatic && i%2===0) ? 2 : 1;
+    addBond(ringAtoms[i].id, ringAtoms[(i+1)%n].id, order);
+  }
+  render();
+}
+
+function makeTemplate(type, cx, cy){
+  switch(type){
+    case 'ring-3': makeRing(3,cx,cy); break;
+    case 'ring-4': makeRing(4,cx,cy); break;
+    case 'ring-5': makeRing(5,cx,cy); break;
+    case 'ring-6': makeRing(6,cx,cy); break;
+    case 'ring-7': makeRing(7,cx,cy); break;
+    case 'ring-8': makeRing(8,cx,cy); break;
+    case 'benzene': makeRing(6,cx,cy,true); break;
+    case 'naphthalene': makeNaphthalene(cx,cy); break;
+    case 'pyridine': makePyridine(cx,cy); break;
+    case 'pyrrole': makePyrrole(cx,cy); break;
+    case 'furan': makeFuran(cx,cy); break;
+    case 'thiophene': makeThiophene(cx,cy); break;
+  }
+}
+
+function makeNaphthalene(cx, cy){
+  saveState();
+  const n=6;
+  const r = BOND_LENGTH / (2*Math.sin(Math.PI/n));
+  const offset = r*Math.cos(Math.PI/6);
+  // 左環
+  const ring1=[];
+  for(let i=0;i<6;i++){
+    const angle = -Math.PI/2 + (2*Math.PI*i)/6;
+    ring1.push(addAtom(cx - offset + r*Math.cos(angle), cy + r*Math.sin(angle), 'C'));
+  }
+  for(let i=0;i<6;i++) addBond(ring1[i].id, ring1[(i+1)%6].id, (i%2===0)?2:1);
+  // 右環（共有辺：ring1[1]-ring1[2]）
+  const ring2=[];
+  const cx2=cx+offset;
+  for(let i=0;i<6;i++){
+    const angle = -Math.PI/2 + (2*Math.PI*i)/6;
+    ring2.push(addAtom(cx2 + r*Math.cos(angle), cy + r*Math.sin(angle), 'C'));
+  }
+  // 共有原子を統合：ring2[4]=ring1[2], ring2[5]=ring1[1]
+  deleteAtom(ring2[4].id); deleteAtom(ring2[5].id);
+  ring2[4]=ring1[2]; ring2[5]=ring1[1];
+  for(let i=0;i<6;i++){
+    if((i===4)||(i===5&&ring2[(i+1)%6]===ring1[2])) continue;
+    const from=ring2[i].id, to=ring2[(i+1)%6].id;
+    if(!bonds.find(b=>(b.from===from&&b.to===to)||(b.from===to&&b.to===from))){
+      addBond(from, to, (i%2===1)?2:1);
+    }
+  }
+  render();
+}
+
+function makeHeteroRing5(cx, cy, heteroPos, heteroSym, aromatic){
+  saveState();
+  const n=5;
+  const r = BOND_LENGTH / (2*Math.sin(Math.PI/n));
+  const ringAtoms=[];
+  for(let i=0;i<n;i++){
+    const angle = -Math.PI/2 + (2*Math.PI*i)/n;
+    const sym = (i===heteroPos) ? heteroSym : 'C';
+    ringAtoms.push(addAtom(cx + r*Math.cos(angle), cy + r*Math.sin(angle), sym));
+  }
+  for(let i=0;i<n;i++){
+    const order = aromatic ? ((i===1||i===3)?2:1) : 1;
+    addBond(ringAtoms[i].id, ringAtoms[(i+1)%n].id, order);
+  }
+  render();
+}
+
+function makePyridine(cx, cy){
+  saveState();
+  const n=6;
+  const r = BOND_LENGTH / (2*Math.sin(Math.PI/n));
+  const ringAtoms=[];
+  for(let i=0;i<n;i++){
+    const angle = -Math.PI/2 + (2*Math.PI*i)/n;
+    const sym = (i===0) ? 'N' : 'C';
+    ringAtoms.push(addAtom(cx + r*Math.cos(angle), cy + r*Math.sin(angle), sym));
+  }
+  for(let i=0;i<n;i++) addBond(ringAtoms[i].id, ringAtoms[(i+1)%n].id, (i%2===0)?2:1);
+  render();
+}
+function makePyrrole(cx,cy){ makeHeteroRing5(cx,cy,0,'N',true); }
+function makeFuran(cx,cy){ makeHeteroRing5(cx,cy,0,'O',true); }
+function makeThiophene(cx,cy){ makeHeteroRing5(cx,cy,0,'S',true); }
+
+// ============================
+// マウスイベント
+// ============================
+let isPanning = false;
+let panStart = null;
+let lastMouse = {x:0,y:0};
+
+canvasArea.addEventListener('mousedown', onMouseDown);
+canvasArea.addEventListener('mousemove', onMouseMove);
+canvasArea.addEventListener('mouseup', onMouseUp);
+canvasArea.addEventListener('wheel', onWheel, {passive:false});
+canvasArea.addEventListener('contextmenu', onContextMenu);
+
+function onMouseDown(e){
+  if(e.button===1 || (e.button===0 && (currentTool==='move'||e.shiftKey))){
+    isPanning=true; panStart={x:e.clientX-viewX, y:e.clientY-viewY};
+    canvasArea.style.cursor='grabbing'; return;
+  }
+  if(e.button!==0) return;
+
+  const w=screenToWorld(e.clientX, e.clientY);
+  lastMouse=w;
+
+  switch(currentTool){
+    case 'select': startSelect(w, e); break;
+    case 'bond': case 'double': case 'triple': case 'wedge': case 'dash':
+      startBondDraw(w, e); break;
+    case 'ring5': makeTemplate('ring-5',w.x,w.y); break;
+    case 'ring6': makeTemplate('ring-6',w.x,w.y); break;
+    case 'benzene': makeTemplate('benzene',w.x,w.y); break;
+    case 'eraser': doErase(w); break;
+    case 'atom': startAtomPlace(w); break;
+    case 'charge': doCharge(w, e); break;
+    case 'zoom': doZoom(w, e.shiftKey?-1:1); break;
+  }
+}
+
+function onMouseMove(e){
+  const w=screenToWorld(e.clientX, e.clientY);
+  document.getElementById('status-pos').textContent=`x: ${Math.round(w.x)}, y: ${Math.round(w.y)}`;
+  lastMouse=w;
+
+  if(isPanning){
+    viewX=e.clientX-panStart.x; viewY=e.clientY-panStart.y;
+    updateTransform(); return;
+  }
+
+  if(isDrawing && (currentTool==='bond'||currentTool==='double'||currentTool==='triple'||currentTool==='wedge'||currentTool==='dash')){
+    previewBond(w);
+  }
+  if(currentTool==='select' && selRectStart){
+    updateSelRect(w);
+  }
+  if(currentTool==='select' && dragOffset){
+    dragSelected(w);
+  }
+}
+
+function onMouseUp(e){
+  if(isPanning){ isPanning=false; canvasArea.style.cursor='crosshair'; return; }
+
+  const w=screenToWorld(e.clientX, e.clientY);
+
+  if(isDrawing && (currentTool==='bond'||currentTool==='double'||currentTool==='triple'||currentTool==='wedge'||currentTool==='dash')){
+    finishBondDraw(w);
+  }
+  if(currentTool==='select' && selRectStart){
+    finishSelRect(w);
+  }
+  if(currentTool==='select' && dragOffset){
+    dragOffset=null;
+  }
+  isDrawing=false;
+  previewLayer.innerHTML='';
+}
+
+function onWheel(e){
+  e.preventDefault();
+  const factor = e.deltaY>0 ? 0.9 : 1.1;
+  const rect = canvasArea.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  viewX = mx - (mx-viewX)*factor;
+  viewY = my - (my-viewY)*factor;
+  viewScale *= factor;
+  viewScale = Math.max(0.1, Math.min(5, viewScale));
+  updateTransform();
+  updateStatus();
+}
+
+function onContextMenu(e){
+  e.preventDefault();
+  const w=screenToWorld(e.clientX, e.clientY);
+  const atom=findAtomAt(w.x,w.y);
+  const bond=atom?null:findBondAt(w.x,w.y);
+  if(!atom && !bond) return;
+
+  const cm=document.getElementById('context-menu');
+  cm.style.display='block';
+  cm.style.left=e.clientX+'px';
+  cm.style.top=e.clientY+'px';
+  cm.dataset.targetAtom=atom?atom.id:'';
+  cm.dataset.targetBond=bond?bond.id:'';
+}
+
+// ============================
+// 選択ツール
+// ============================
+function startSelect(w, e){
+  const atom=findAtomAt(w.x,w.y);
+  const bond=atom?null:findBondAt(w.x,w.y);
+
+  if(atom){
+    if(!e.ctrlKey && !selectedAtoms.has(atom.id)){
+      selectedAtoms.clear(); selectedBonds.clear();
+    }
+    selectedAtoms.add(atom.id);
+    dragOffset={x:w.x, y:w.y};
+    render();
+  } else if(bond){
+    if(!e.ctrlKey){ selectedAtoms.clear(); selectedBonds.clear(); }
+    selectedBonds.add(bond.id);
+    render();
+  } else {
+    if(!e.ctrlKey){ selectedAtoms.clear(); selectedBonds.clear(); render(); }
+    selRectStart=w;
+  }
+}
+
+function updateSelRect(w){
+  const x=Math.min(selRectStart.x,w.x)*viewScale+viewX;
+  const y=Math.min(selRectStart.y,w.y)*viewScale+viewY;
+  const ww=Math.abs(w.x-selRectStart.x)*viewScale;
+  const hh=Math.abs(w.y-selRectStart.y)*viewScale;
+  selRect.setAttribute('x',x);selRect.setAttribute('y',y);
+  selRect.setAttribute('width',ww);selRect.setAttribute('height',hh);
+  selRect.setAttribute('display','block');
+}
+
+function finishSelRect(w){
+  selRect.setAttribute('display','none');
+  if(!selRectStart) return;
+  const x1=Math.min(selRectStart.x,w.x), x2=Math.max(selRectStart.x,w.x);
+  const y1=Math.min(selRectStart.y,w.y), y2=Math.max(selRectStart.y,w.y);
+  for(const a of atoms){
+    if(a.x>=x1 && a.x<=x2 && a.y>=y1 && a.y<=y2) selectedAtoms.add(a.id);
+  }
+  for(const b of bonds){
+    const a1=atoms.find(a=>a.id===b.from), a2=atoms.find(a=>a.id===b.to);
+    if(a1&&a2&&a1.x>=x1&&a1.x<=x2&&a1.y>=y1&&a1.y<=y2&&a2.x>=x1&&a2.x<=x2&&a2.y>=y1&&a2.y<=y2){
+      selectedBonds.add(b.id);
+    }
+  }
+  selRectStart=null;
+  render();
+}
+
+function dragSelected(w){
+  const dx=w.x-dragOffset.x, dy=w.y-dragOffset.y;
+  for(const id of selectedAtoms){
+    const a=atoms.find(at=>at.id===id);
+    if(a){ a.x+=dx; a.y+=dy; }
+  }
+  dragOffset={x:w.x, y:w.y};
+  render();
+}
+
+// ============================
+// 結合描画
+// ============================
+function startBondDraw(w, e){
+  isDrawing=true;
+  const atom=findAtomAt(w.x,w.y);
+  if(atom){
+    drawStart={atomId:atom.id, x:atom.x, y:atom.y};
+  } else {
+    drawStart={atomId:null, x:w.x, y:w.y};
+  }
+}
+
+function previewBond(w){
+  previewLayer.innerHTML='';
+  const sx=drawStart.x, sy=drawStart.y;
+  let ex=w.x, ey=w.y;
+
+  // スナップ
+  const snapAtom=findAtomAt(ex,ey, drawStart.atomId);
+  if(snapAtom){ ex=snapAtom.x; ey=snapAtom.y; }
+  else {
+    const angle=snapAngle(Math.atan2(ey-sy, ex-sx));
+    const d=dist({x:sx,y:sy},{x:ex,y:ey});
+    const len=Math.max(BOND_LENGTH, d);
+    ex=sx+Math.cos(angle)*BOND_LENGTH;
+    ey=sy+Math.sin(angle)*BOND_LENGTH;
+  }
+
+  const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+  line.setAttribute('x1',sx);line.setAttribute('y1',sy);
+  line.setAttribute('x2',ex);line.setAttribute('y2',ey);
+  line.setAttribute('stroke','#58a6ff');line.setAttribute('stroke-width','2');
+  line.setAttribute('stroke-dasharray','4 2');line.setAttribute('opacity','0.7');
+  previewLayer.appendChild(line);
+}
+
+function finishBondDraw(w){
+  const sx=drawStart.x, sy=drawStart.y;
+  let ex=w.x, ey=w.y;
+
+  const snapAtom=findAtomAt(ex,ey, drawStart.atomId);
+  if(snapAtom){ ex=snapAtom.x; ey=snapAtom.y; }
+  else {
+    const angle=snapAngle(Math.atan2(ey-sy, ex-sx));
+    ex=sx+Math.cos(angle)*BOND_LENGTH;
+    ey=sy+Math.sin(angle)*BOND_LENGTH;
+  }
+
+  // 距離が短すぎたら無視
+  if(dist({x:sx,y:sy},{x:ex,y:ey})<5) return;
+
+  saveState();
+
+  // 始点原子
+  let fromAtom;
+  if(drawStart.atomId){
+    fromAtom=atoms.find(a=>a.id===drawStart.atomId);
+  } else {
+    fromAtom=addAtom(sx, sy, 'C');
+  }
+
+  // 終点原子
+  let toAtom;
+  if(snapAtom){
+    toAtom=snapAtom;
+  } else {
+    toAtom=addAtom(ex, ey, 'C');
+  }
+
+  // 結合次数・立体
+  let order=1, stereo='none';
+  if(currentTool==='double') order=2;
+  else if(currentTool==='triple') order=3;
+  else if(currentTool==='wedge'){ stereo='wedge'; }
+  else if(currentTool==='dash'){ stereo='dash'; }
+
+  // 既存結合がある場合は次数を上げる
+  const existing=bonds.find(b=>(b.from===fromAtom.id&&b.to===toAtom.id)||(b.from===toAtom.id&&b.to===fromAtom.id));
+  if(existing){
+    existing.order = Math.min(3, existing.order+1);
+  } else {
+    addBond(fromAtom.id, toAtom.id, order, stereo);
+  }
+
+  render();
+  drawStart=null;
+}
+
+// ============================
+// 消しゴム
+// ============================
+function doErase(w){
+  const atom=findAtomAt(w.x,w.y);
+  if(atom){ saveState(); deleteAtom(atom.id); render(); return; }
+  const bond=findBondAt(w.x,w.y);
+  if(bond){ saveState(); deleteBond(bond.id); render(); }
+}
+
+// ============================
+// 原子配置
+// ============================
+function startAtomPlace(w){
+  const existing=findAtomAt(w.x,w.y);
+  if(existing){
+    // 既存原子のラベル変更
+    openAtomDialog(existing);
+  } else {
+    openAtomDialog(null, w.x, w.y);
+  }
+}
+
+let atomDialogTarget=null;
+let atomDialogPos=null;
+
+function openAtomDialog(atom, x, y){
+  atomDialogTarget=atom;
+  atomDialogPos=atom?null:{x,y};
+  const dlg=document.getElementById('atom-dialog');
+  const inp=document.getElementById('atom-input');
+  inp.value=atom?atom.symbol:'';
+  dlg.classList.add('show');
+  setTimeout(()=>inp.focus(),50);
+}
+
+function closeAtomDialog(){
+  document.getElementById('atom-dialog').classList.remove('show');
+  atomDialogTarget=null; atomDialogPos=null;
+}
+
+function confirmAtomDialog(){
+  const sym=document.getElementById('atom-input').value.trim();
+  if(!sym){ closeAtomDialog(); return; }
+  // 元素記号を整形（先頭大文字）
+  const formatted=sym.charAt(0).toUpperCase()+sym.slice(1).toLowerCase();
+  saveState();
+  if(atomDialogTarget){
+    atomDialogTarget.symbol=formatted;
+  } else if(atomDialogPos){
+    addAtom(atomDialogPos.x, atomDialogPos.y, formatted);
+  }
+  closeAtomDialog();
+  render();
+}
+
+// ============================
+// 電荷
+// ============================
+function doCharge(w, e){
+  const atom=findAtomAt(w.x,w.y);
+  if(!atom) return;
+  saveState();
+  if(e.shiftKey) atom.charge=(atom.charge||0)-1;
+  else atom.charge=(atom.charge||0)+1;
+  render();
+}
+
+// ============================
+// ズーム
+// ============================
+function doZoom(w, dir){
+  const factor = dir>0 ? 1.3 : 1/1.3;
+  const rect = canvasArea.getBoundingClientRect();
+  const mx=w.x*viewScale+viewX, my=w.y*viewScale+viewY;
+  viewX = mx - (mx-viewX)*factor;
+  viewY = my - (my-viewY)*factor;
+  viewScale *= factor;
+  viewScale = Math.max(0.1, Math.min(5, viewScale));
+  updateTransform(); updateStatus();
+}
+
+// ============================
+// メニュー
+// ============================
+document.querySelectorAll('.menu-item').forEach(mi=>{
+  mi.addEventListener('click',(e)=>{
+    const wasOpen=mi.classList.contains('open');
+    document.querySelectorAll('.menu-item').forEach(m=>m.classList.remove('open'));
+    if(!wasOpen) mi.classList.add('open');
+    e.stopPropagation();
+  });
+});
+document.addEventListener('click',()=>{
+  document.querySelectorAll('.menu-item').forEach(m=>m.classList.remove('open'));
+  document.getElementById('context-menu').style.display='none';
+});
+
+document.querySelectorAll('.md-item').forEach(item=>{
+  item.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    const action=item.dataset.action;
+    document.querySelectorAll('.menu-item').forEach(m=>m.classList.remove('open'));
+    handleMenuAction(action);
+  });
+});
+
+function handleMenuAction(action){
+  switch(action){
+    case 'new': newDocument(); break;
+    case 'save': saveJSON(); break;
+    case 'open': openJSON(); break;
+    case 'export-mol': exportMOL(); break;
+    case 'import-mol': importMOL(); break;
+    case 'export-svg': exportSVG(); break;
+    case 'export-png': exportPNG(); break;
+    case 'undo': undo(); break;
+    case 'redo': redo(); break;
+    case 'select-all': selectAll(); break;
+    case 'delete': deleteSelected(); break;
+    case 'copy': copySelected(); break;
+    case 'paste': pasteClipboard(); break;
+    case 'zoom-in': doZoom(lastMouse,1); break;
+    case 'zoom-out': doZoom(lastMouse,-1); break;
+    case 'zoom-fit': zoomFit(); break;
+    case 'toggle-grid': showGrid=!showGrid; updateTransform(); break;
+    case 'toggle-hcount': showHCount=!showHCount; render(); break;
+    case 'ring-3': case 'ring-4': case 'ring-5': case 'ring-6': case 'ring-7': case 'ring-8':
+    case 'benzene': case 'naphthalene': case 'pyridine': case 'pyrrole': case 'furan': case 'thiophene':
+      pendingTemplate=action; setTool('select');
+      canvasArea.style.cursor='cell';
+      canvasArea.addEventListener('click', placeTemplate, {once:true});
+      break;
+    case 'about': alert('Temudraw v0.1\n化学構造エディタ\nSVGベース / 日本語UI'); break;
+    case 'shortcuts': showShortcuts(); break;
+  }
+}
+
+let pendingTemplate=null;
+function placeTemplate(e){
+  if(!pendingTemplate) return;
+  const w=screenToWorld(e.clientX,e.clientY);
+  makeTemplate(pendingTemplate, w.x, w.y);
+  pendingTemplate=null;
+  canvasArea.style.cursor='crosshair';
+}
+
+// ============================
+// ツールバー
+// ============================
+document.querySelectorAll('.tool-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const tool=btn.dataset.tool;
+    if(tool) setTool(tool);
+  });
+});
+
+function setTool(tool){
+  currentTool=tool;
+  document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
+  const btn=document.querySelector(`.tool-btn[data-tool="${tool}"]`);
+  if(btn) btn.classList.add('active');
+
+  const toolNames={select:'選択',bond:'単結合',double:'二重結合',triple:'三重結合',
+    wedge:'楔形結合',dash:'破線結合',ring5:'5員環',ring6:'6員環',benzene:'ベンゼン',
+    eraser:'消しゴム',atom:'原子ラベル',charge:'電荷',move:'キャンバス移動',zoom:'ズーム'};
+  document.getElementById('status-tool').textContent=`ツール: ${toolNames[tool]||tool}`;
+
+  canvasArea.style.cursor = (tool==='move')?'grab':(tool==='eraser')?'pointer':'crosshair';
+}
+
+// ============================
+// キーボードショートカット
+// ============================
+document.addEventListener('keydown',(e)=>{
+  // ダイアログ中は無視
+  if(document.querySelector('.dialog-overlay.show')){
+    if(e.key==='Enter') confirmAtomDialog();
+    if(e.key==='Escape') closeAtomDialog();
+    return;
+  }
+
+  if(e.ctrlKey||e.metaKey){
+    switch(e.key.toLowerCase()){
+      case 'z': e.preventDefault(); undo(); break;
+      case 'y': e.preventDefault(); redo(); break;
+      case 's': e.preventDefault(); saveJSON(); break;
+      case 'o': e.preventDefault(); openJSON(); break;
+      case 'e': e.preventDefault(); exportMOL(); break;
+      case 'a': e.preventDefault(); selectAll(); break;
+      case 'c': e.preventDefault(); copySelected(); break;
+      case 'v': e.preventDefault(); pasteClipboard(); break;
+      case '=': case '+': e.preventDefault(); doZoom(lastMouse,1); break;
+      case '-': e.preventDefault(); doZoom(lastMouse,-1); break;
+      case '0': e.preventDefault(); zoomFit(); break;
+    }
+    return;
+  }
+
+  switch(e.key){
+    case 'v': case 'V': setTool('select'); break;
+    case '1': setTool('bond'); break;
+    case '2': setTool('double'); break;
+    case '3': setTool('triple'); break;
+    case 'w': case 'W': setTool('wedge'); break;
+    case 'd': case 'D': setTool('dash'); break;
+    case '5': setTool('ring5'); break;
+    case '6': setTool('ring6'); break;
+    case 'b': case 'B': setTool('benzene'); break;
+    case 'e': case 'E': setTool('eraser'); break;
+    case 'a': case 'A': setTool('atom'); break;
+    case 'z': case 'Z': setTool('zoom'); break;
+    case 'Delete': case 'Backspace': deleteSelected(); break;
+    case 'Escape': selectedAtoms.clear(); selectedBonds.clear(); render(); break;
+  }
+});
+
+// ============================
+// 編集操作
+// ============================
+function selectAll(){
+  atoms.forEach(a=>selectedAtoms.add(a.id));
+  bonds.forEach(b=>selectedBonds.add(b.id));
+  render();
+}
+
+function deleteSelected(){
+  if(selectedAtoms.size===0 && selectedBonds.size===0) return;
+  saveState();
+  for(const id of selectedBonds) deleteBond(id);
+  for(const id of selectedAtoms) deleteAtom(id);
+  selectedAtoms.clear(); selectedBonds.clear();
+  render();
+}
+
+let clipboard=null;
+function copySelected(){
+  if(selectedAtoms.size===0) return;
+  const selA=atoms.filter(a=>selectedAtoms.has(a.id));
+  const selB=bonds.filter(b=>selectedAtoms.has(b.from)&&selectedAtoms.has(b.to));
+  clipboard={atoms:JSON.parse(JSON.stringify(selA)), bonds:JSON.parse(JSON.stringify(selB))};
+}
+
+function pasteClipboard(){
+  if(!clipboard) return;
+  saveState();
+  const idMap={};
+  const offset=20;
+  for(const a of clipboard.atoms){
+    const na=addAtom(a.x+offset, a.y+offset, a.symbol);
+    na.charge=a.charge;
+    idMap[a.id]=na.id;
+  }
+  for(const b of clipboard.bonds){
+    addBond(idMap[b.from], idMap[b.to], b.order, b.stereo);
+  }
+  // 新しくペーストしたものを選択
+  selectedAtoms.clear(); selectedBonds.clear();
+  for(const old of clipboard.atoms) selectedAtoms.add(idMap[old.id]);
+  // クリップボードのオフセットを更新
+  clipboard.atoms.forEach(a=>{a.x+=offset;a.y+=offset;});
+  render();
+}
+
+function newDocument(){
+  if(atoms.length>0 && !confirm('現在の内容を破棄して新規作成しますか？')) return;
+  saveState();
+  atoms=[]; bonds=[]; nextAtomId=1; nextBondId=1;
+  selectedAtoms.clear(); selectedBonds.clear();
+  viewX=0; viewY=0; viewScale=1;
+  render(); updateTransform();
+}
+
+function zoomFit(){
+  if(atoms.length===0){ viewX=0; viewY=0; viewScale=1; updateTransform(); updateStatus(); return; }
+  const xs=atoms.map(a=>a.x), ys=atoms.map(a=>a.y);
+  const minX=Math.min(...xs)-40, maxX=Math.max(...xs)+40;
+  const minY=Math.min(...ys)-40, maxY=Math.max(...ys)+40;
+  const rect=canvasArea.getBoundingClientRect();
+  const scaleX=rect.width/(maxX-minX), scaleY=rect.height/(maxY-minY);
+  viewScale=Math.min(scaleX, scaleY, 3);
+  viewX=rect.width/2 - (minX+maxX)/2*viewScale;
+  viewY=rect.height/2 - (minY+maxY)/2*viewScale;
+  updateTransform(); updateStatus();
+}
+
+// ============================
+// ファイルI/O: JSON
+// ============================
+function saveJSON(){
+  const data={version:1, atoms, bonds, nextAtomId, nextBondId};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='molecule.temu.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function openJSON(){
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='.json,.temu.json';
+  inp.onchange=()=>{
+    const f=inp.files[0]; if(!f) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const data=JSON.parse(reader.result);
+        saveState();
+        atoms=data.atoms||[]; bonds=data.bonds||[];
+        nextAtomId=data.nextAtomId||atoms.length+1;
+        nextBondId=data.nextBondId||bonds.length+1;
+        selectedAtoms.clear(); selectedBonds.clear();
+        render(); zoomFit();
+      }catch(err){ alert('JSONの読み込みに失敗: '+err.message); }
+    };
+    reader.readAsText(f);
+  };
+  inp.click();
+}
+
+// ============================
+// ファイルI/O: MOL V2000
+// ============================
+function exportMOL(){
+  const lines=[];
+  lines.push('Temudraw Export'); // molecule name
+  lines.push('  Temudraw  v0.1');
+  lines.push('');
+  // counts line
+  const na=atoms.length, nb=bonds.length;
+  lines.push(`${pad(na,3)}${pad(nb,3)}  0  0  0  0  0  0  0  0999 V2000`);
+  // atom block
+  const atomIdx={};
+  atoms.forEach((a,i)=>{
+    atomIdx[a.id]=i+1;
+    const x=(a.x/40).toFixed(4);
+    const y=(-a.y/40).toFixed(4); // Y反転
+    const z='0.0000';
+    lines.push(`${pad10(x)}${pad10(y)}${pad10(z)} ${padR(a.symbol,3)} 0  0  0  0  0  0  0  0  0  0  0  0`);
+  });
+  // bond block
+  for(const b of bonds){
+    const i1=atomIdx[b.from], i2=atomIdx[b.to];
+    let stereoCode=0;
+    if(b.stereo==='wedge') stereoCode=1;
+    else if(b.stereo==='dash') stereoCode=6;
+    lines.push(`${pad(i1,3)}${pad(i2,3)}${pad(b.order,3)}${pad(stereoCode,3)}  0  0  0`);
+  }
+  lines.push('M  END');
+
+  const blob=new Blob([lines.join('\n')],{type:'chemical/x-mdl-molfile'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='molecule.mol'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function pad(n,w){ return String(n).padStart(w,' '); }
+function pad10(s){ return s.padStart(10,' '); }
+function padR(s,w){ return s.padEnd(w,' '); }
+
+function importMOL(){
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='.mol,.sdf';
+  inp.onchange=()=>{
+    const f=inp.files[0]; if(!f) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{ parseMOL(reader.result); }
+      catch(err){ alert('MOL読み込みエラー: '+err.message); }
+    };
+    reader.readAsText(f);
+  };
+  inp.click();
+}
+
+function parseMOL(text){
+  const lines=text.split('\n');
+  // counts line is line index 3
+  const countsLine=lines[3].trim();
+  const na=parseInt(countsLine.substring(0,3));
+  const nb=parseInt(countsLine.substring(3,6));
+
+  saveState();
+  atoms=[]; bonds=[]; nextAtomId=1; nextBondId=1;
+  selectedAtoms.clear(); selectedBonds.clear();
+
+  const atomMap={};
+  for(let i=0;i<na;i++){
+    const line=lines[4+i];
+    const x=parseFloat(line.substring(0,10))*40;
+    const y=-parseFloat(line.substring(10,20))*40; // Y反転
+    const sym=line.substring(31,34).trim();
+    const a=addAtom(x,y,sym);
+    atomMap[i+1]=a.id;
+  }
+  for(let i=0;i<nb;i++){
+    const line=lines[4+na+i];
+    const i1=parseInt(line.substring(0,3));
+    const i2=parseInt(line.substring(3,6));
+    const order=parseInt(line.substring(6,9));
+    const st=parseInt(line.substring(9,12));
+    let stereo='none';
+    if(st===1) stereo='wedge';
+    else if(st===6) stereo='dash';
+    addBond(atomMap[i1], atomMap[i2], order, stereo);
+  }
+  render(); zoomFit();
+}
+
+// ============================
+// SVG/PNGエクスポート
+// ============================
+function exportSVG(){
+  // 全体表示用のSVGを生成
+  if(atoms.length===0) return;
+  const xs=atoms.map(a=>a.x), ys=atoms.map(a=>a.y);
+  const minX=Math.min(...xs)-50, maxX=Math.max(...xs)+50;
+  const minY=Math.min(...ys)-50, maxY=Math.max(...ys)+50;
+
+  const clone=molLayer.cloneNode(true);
+  clone.setAttribute('transform',`translate(${-minX},${-minY})`);
+
+  const svgStr=`<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${maxX-minX}" height="${maxY-minY}" viewBox="0 0 ${maxX-minX} ${maxY-minY}">
+<rect width="100%" height="100%" fill="white"/>
+${clone.outerHTML}
+</svg>`;
+
+  const blob=new Blob([svgStr],{type:'image/svg+xml'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='molecule.svg'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportPNG(){
+  if(atoms.length===0) return;
+  const xs=atoms.map(a=>a.x), ys=atoms.map(a=>a.y);
+  const minX=Math.min(...xs)-50, maxX=Math.max(...xs)+50;
+  const minY=Math.min(...ys)-50, maxY=Math.max(...ys)+50;
+  const w=maxX-minX, h=maxY-minY;
+
+  // 一時的にSVGを生成してCanvasに描画
+  const clone=molLayer.cloneNode(true);
+  clone.setAttribute('transform',`translate(${-minX},${-minY})`);
+  const svgStr=`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">`+
+    `<rect width="100%" height="100%" fill="white"/>${clone.outerHTML}</svg>`;
+
+  const img=new Image();
+  const blob=new Blob([svgStr],{type:'image/svg+xml'});
+  const url=URL.createObjectURL(blob);
+  img.onload=()=>{
+    const canvas=document.createElement('canvas');
+    canvas.width=w*2; canvas.height=h*2;
+    const ctx=canvas.getContext('2d');
+    ctx.scale(2,2);
+    ctx.drawImage(img,0,0);
+    canvas.toBlob(b=>{
+      const u2=URL.createObjectURL(b);
+      const a=document.createElement('a'); a.href=u2; a.download='molecule.png'; a.click();
+      URL.revokeObjectURL(u2);
+    });
+    URL.revokeObjectURL(url);
+  };
+  img.src=url;
+}
+
+// ============================
+// コンテキストメニュー操作
+// ============================
+document.querySelectorAll('#context-menu .cm-item').forEach(item=>{
+  item.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    const cm=document.getElementById('context-menu');
+    const action=item.dataset.action;
+    const atomId=parseInt(cm.dataset.targetAtom)||null;
+    const bondId=parseInt(cm.dataset.targetBond)||null;
+    cm.style.display='none';
+
+    switch(action){
+      case 'delete':
+        saveState();
+        if(atomId) deleteAtom(atomId);
+        if(bondId) deleteBond(bondId);
+        render(); break;
+      case 'change-atom':
+        if(atomId){ const a=atoms.find(at=>at.id===atomId); if(a) openAtomDialog(a); }
+        break;
+      case 'change-bond':
+        if(bondId){
+          saveState();
+          const b=bonds.find(bo=>bo.id===bondId);
+          if(b) b.order = (b.order%3)+1;
+          render();
+        } break;
+      case 'add-h':
+        if(atomId){
+          saveState();
+          const atom=atoms.find(a=>a.id===atomId);
+          if(atom){
+            const hc=calcHCount(atom);
+            const existingBonds=getBondsOfAtom(atomId);
+            // 水素を明示的に付加
+            for(let i=0;i<hc;i++){
+              const angle = -Math.PI/2 + (2*Math.PI*i)/Math.max(hc,1) + (existingBonds.length>0?Math.PI/4:0);
+              const hAtom=addAtom(atom.x+Math.cos(angle)*BOND_LENGTH*0.7, atom.y+Math.sin(angle)*BOND_LENGTH*0.7, 'H');
+              addBond(atomId, hAtom.id, 1);
+            }
+          }
+          render();
+        } break;
+    }
+  });
+});
+
+// ============================
+// ショートカット一覧表示
+// ============================
+function showShortcuts(){
+  alert(`【ショートカット一覧】
+V: 選択ツール
+1: 単結合
+2: 二重結合
+3: 三重結合
+W: 楔形結合
+D: 破線結合
+5: 5員環
+6: 6員環
+B: ベンゼン
+E: 消しゴム
+A: 原子ラベル
+Z: ズーム
+Del: 削除
+Esc: 選択解除
+スペース+ドラッグ: パン
+ホイール: ズーム
+Ctrl+Z: 元に戻す
+Ctrl+Y: やり直し
+Ctrl+S: 保存
+Ctrl+O: 開く
+Ctrl+A: 全選択
+Ctrl+C/V: コピー/貼り付け`);
+}
+
+// ============================
+// 初期化
+// ============================
+render();
+updateTransform();
+
+// スペースキーでパンモード
+let spaceHeld=false;
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'&&!spaceHeld&&!document.querySelector('.dialog-overlay.show')){
+    spaceHeld=true; canvasArea.style.cursor='grab';
+  }
+});
+document.addEventListener('keyup',e=>{
+  if(e.code==='Space'){ spaceHeld=false; setTool(currentTool); }
+});
+// スペース押下中のドラッグをパンとして処理
+const origMouseDown=onMouseDown;
+canvasArea.removeEventListener('mousedown',onMouseDown);
+canvasArea.addEventListener('mousedown',(e)=>{
+  if(spaceHeld && e.button===0){
+    isPanning=true; panStart={x:e.clientX-viewX, y:e.clientY-viewY};
+    canvasArea.style.cursor='grabbing'; return;
+  }
+  origMouseDown(e);
+});
+
+</script>
+</body>
+</html>
