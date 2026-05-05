@@ -21,10 +21,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 
 /* ====== ヘッダー ====== */
 #header{height:44px;background:var(--surface);border-bottom:1px solid var(--border);
-  display:flex;align-items:center;padding:0 16px;gap:8px;position:relative;z-index:100;
+  display:flex;align-items:center;padding:0 12px;gap:4px;position:relative;z-index:100;
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-#header .logo{display:flex;align-items:center;gap:8px;margin-right:12px}
+#header .logo{display:flex;align-items:center;gap:6px;margin-right:8px;flex-shrink:0}
 #header .logo svg{width:22px;height:22px}
+.home-btn{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);
+  background:transparent;color:var(--text2);cursor:pointer;display:flex;
+  align-items:center;justify-content:center;transition:.15s;flex-shrink:0;margin-right:4px}
+.home-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
 #header .logo span{font-size:14px;font-weight:600;color:var(--text);letter-spacing:-0.02em}
 #header .wip{font-size:10px;padding:2px 7px;background:rgba(245,166,35,0.12);
   border:1px solid rgba(245,166,35,0.3);border-radius:20px;color:var(--warn);font-weight:500}
@@ -130,15 +134,28 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* ====== 検索バー ====== */
-#search-wrap{margin-left:auto;display:flex;align-items:center;gap:6px}
-#search-input{width:220px;background:var(--surface3);border:1px solid var(--border);
-  color:var(--text);padding:6px 12px 6px 32px;border-radius:20px;font-size:12px;
-  outline:none;transition:border-color .2s,width .2s}
-#search-input:focus{border-color:var(--accent);width:280px}
+#search-wrap{margin-left:auto;display:flex;align-items:center;gap:6px;flex-shrink:0}
+#search-input{width:200px;background:var(--surface3);border:1px solid var(--border);
+  color:var(--text);padding:6px 12px 6px 30px;border-radius:20px;font-size:12px;
+  outline:none;transition:border-color .2s,width .25s}
+#search-input:focus{border-color:var(--accent);width:260px}
 #search-input::placeholder{color:var(--text3)}
-#search-wrap .search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);
+#search-wrap .search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);
   color:var(--text3);pointer-events:none}
 #search-wrap .s-inner{position:relative;display:flex;align-items:center}
+#autocomplete{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;
+  background:var(--surface2);border:1px solid var(--border-hover);border-radius:var(--radius);
+  max-height:240px;overflow-y:auto;z-index:300;box-shadow:var(--shadow);
+  backdrop-filter:blur(16px);padding:4px}
+#autocomplete.show{display:block}
+#autocomplete .ac-item{padding:7px 12px;border-radius:var(--radius-sm);cursor:pointer;
+  font-size:12px;color:var(--text2);transition:.1s;display:flex;align-items:center;gap:8px}
+#autocomplete .ac-item:hover,#autocomplete .ac-item.active{background:var(--accent-glow);color:var(--text)}
+#autocomplete .ac-item .ac-type{font-size:10px;color:var(--text3);background:var(--surface3);
+  padding:1px 5px;border-radius:3px;flex-shrink:0}
+#autocomplete .ac-didyoumean{padding:8px 12px;font-size:11px;color:var(--warn);
+  border-bottom:1px solid var(--border);margin-bottom:2px}
+#autocomplete .ac-didyoumean span{color:var(--accent);cursor:pointer;text-decoration:underline;margin-left:4px}
 #search-loading{display:none;width:14px;height:14px;border:2px solid var(--border);
   border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;margin-left:-26px;margin-right:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -185,6 +202,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
     </svg>
     <span>Temudraw</span>
   </div>
+  <a class="home-btn" href="/" title="ホームに戻る">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  </a>
   <span class="wip">作成中</span>
 
   <div class="h-menu" data-menu="file">ファイル
@@ -244,7 +264,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   <div id="search-wrap">
     <div class="s-inner">
       <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="7"/><line x1="15.5" y1="15.5" x2="21" y2="21"/></svg>
-      <input id="search-input" type="text" placeholder="物質名を入力 (例: aspirin, caffeine...)" spellcheck="false"/>
+      <input id="search-input" type="text" placeholder="物質名を入力 (例: aspirin, caffeine...)" spellcheck="false" autocomplete="off"/>
+      <div id="autocomplete"></div>
     </div>
     <div id="search-loading"></div>
     <button id="btn-3d" onclick="toggle3D()">3D</button>
@@ -932,11 +953,19 @@ function onUp(e){
 
 function onWheel(e){
   e.preventDefault();
-  const f=e.deltaY>0?0.9:1.1;
+  // deltaYのみ使用（トラックパッドの横スクロールを無視）
+  const dy=e.deltaY;
+  if(Math.abs(dy)<0.5)return;
+  const f=dy>0?0.92:1/0.92;
+  const newScale=clamp(vScale*f,0.15,5);
+  const realF=newScale/vScale;
   const r=canvasWrap.getBoundingClientRect();
-  const mx=e.clientX-r.left,my=e.clientY-r.top;
-  viewX=mx-(mx-viewX)*f;viewY=my-(my-viewY)*f;
-  vScale*=f;vScale=clamp(vScale,0.15,5);
+  // マウス位置をピボットにズーム
+  const mx=e.clientX-r.left;
+  const my=e.clientY-r.top;
+  viewX=mx-realF*(mx-viewX);
+  viewY=my-realF*(my-viewY);
+  vScale=newScale;
   applyView();updateStatus();
 }
 
@@ -1302,9 +1331,12 @@ function newDoc(){
 // ============================================================
 function zoomBy(f){
   const r=canvasWrap.getBoundingClientRect();
+  const newScale=clamp(vScale*f,0.15,5);
+  const realF=newScale/vScale;
   const mx=r.width/2,my=r.height/2;
-  viewX=mx-(mx-viewX)*f;viewY=my-(my-viewY)*f;
-  vScale*=f;vScale=clamp(vScale,0.15,5);
+  viewX=mx-realF*(mx-viewX);
+  viewY=my-realF*(my-viewY);
+  vScale=newScale;
   applyView();updateStatus();
 }
 function zoomFit(){
@@ -1427,16 +1459,120 @@ function toast(msg){
 // ============================================================
 const searchInput=document.getElementById('search-input');
 const searchLoading=document.getElementById('search-loading');
+const acEl=document.getElementById('autocomplete');
 let searchTimeout=null;
+let acTimeout=null;
 let current3DData=null; // {atoms3d, bonds3d, name, formula}
+let acItems=[];
+let acIndex=-1;
+
+// === 予測変換 (Autocomplete) ===
+searchInput.addEventListener('input',()=>{
+  clearTimeout(acTimeout);
+  const q=searchInput.value.trim();
+  if(q.length<2){hideAC();return;}
+  acTimeout=setTimeout(()=>fetchAutocomplete(q),250);
+});
 
 searchInput.addEventListener('keydown',e=>{
+  if(acEl.classList.contains('show')){
+    if(e.key==='ArrowDown'){e.preventDefault();acNav(1);return;}
+    if(e.key==='ArrowUp'){e.preventDefault();acNav(-1);return;}
+    if(e.key==='Enter'&&acIndex>=0){
+      e.preventDefault();selectAC(acItems[acIndex]);return;
+    }
+    if(e.key==='Escape'){hideAC();return;}
+  }
   if(e.key==='Enter'){
-    e.preventDefault();
+    e.preventDefault();hideAC();
     const name=searchInput.value.trim();
     if(name) fetchCompound(name);
   }
 });
+
+searchInput.addEventListener('blur',()=>{setTimeout(hideAC,200);});
+
+async function fetchAutocomplete(query){
+  try{
+    const res=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(query)}/json?limit=8`);
+    if(!res.ok){hideAC();return;}
+    const data=await res.json();
+    const dict=data.dictionary_terms;
+    if(!dict||!dict.compound||dict.compound.length===0){hideAC();return;}
+    acItems=dict.compound;
+    acIndex=-1;
+    renderAC();
+  }catch(e){hideAC();}
+}
+
+function renderAC(){
+  acEl.innerHTML='';
+  for(let i=0;i<acItems.length;i++){
+    const div=document.createElement('div');
+    div.className='ac-item';
+    div.innerHTML=`<span>${highlightMatch(acItems[i],searchInput.value)}</span>`;
+    div.addEventListener('mousedown',ev=>{ev.preventDefault();selectAC(acItems[i]);});
+    div.addEventListener('mouseenter',()=>{acIndex=i;updateACActive();});
+    acEl.appendChild(div);
+  }
+  acEl.classList.add('show');
+}
+
+function highlightMatch(text,query){
+  const idx=text.toLowerCase().indexOf(query.toLowerCase());
+  if(idx<0)return text;
+  return text.slice(0,idx)+'<b style="color:var(--text)">'+text.slice(idx,idx+query.length)+'</b>'+text.slice(idx+query.length);
+}
+
+function acNav(dir){
+  acIndex+=dir;
+  if(acIndex<0)acIndex=acItems.length-1;
+  if(acIndex>=acItems.length)acIndex=0;
+  updateACActive();
+  searchInput.value=acItems[acIndex];
+}
+
+function updateACActive(){
+  acEl.querySelectorAll('.ac-item').forEach((el,i)=>el.classList.toggle('active',i===acIndex));
+}
+
+function selectAC(name){
+  searchInput.value=name;
+  hideAC();
+  fetchCompound(name);
+}
+
+function hideAC(){acEl.classList.remove('show');acIndex=-1;}
+
+// === 「もしかして」機能 ===
+async function fetchSuggestions(failedName){
+  try{
+    // Use autocomplete API to find close matches
+    const res=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(failedName)}/json?limit=5`);
+    if(!res.ok)return[];
+    const data=await res.json();
+    if(!data.dictionary_terms||!data.dictionary_terms.compound)return[];
+    return data.dictionary_terms.compound;
+  }catch(e){return[];}
+}
+
+function showDidYouMean(suggestions){
+  acEl.innerHTML='';
+  if(suggestions.length===0){hideAC();return;}
+  const header=document.createElement('div');
+  header.className='ac-didyoumean';
+  header.textContent='もしかして:';
+  acEl.appendChild(header);
+  for(const s of suggestions){
+    const div=document.createElement('div');
+    div.className='ac-item';
+    div.textContent=s;
+    div.addEventListener('mousedown',ev=>{ev.preventDefault();selectAC(s);});
+    acEl.appendChild(div);
+  }
+  acEl.classList.add('show');
+  acItems=suggestions;acIndex=-1;
+}
 
 async function fetchCompound(name){
   searchLoading.style.display='block';
@@ -1444,7 +1580,18 @@ async function fetchCompound(name){
   try{
     // Fetch 2D SDF for editor
     const res2d=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/SDF?record_type=2d`);
-    if(!res2d.ok) throw new Error('化合物が見つかりません');
+    if(!res2d.ok){
+      // 見つからない → 「もしかして」を表示
+      const suggestions=await fetchSuggestions(name);
+      if(suggestions.length>0){
+        toast(`"${name}" が見つかりません。候補を表示中...`);
+        showDidYouMean(suggestions);
+      } else {
+        toast(`"${name}" が見つかりません`);
+      }
+      searchLoading.style.display='none';
+      return;
+    }
     const sdf2d=await res2d.text();
 
     // Parse into editor
