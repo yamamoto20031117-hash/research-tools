@@ -128,6 +128,45 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   padding:10px 18px;font-size:12px;color:var(--text);box-shadow:var(--shadow);z-index:600;
   opacity:0;transition:all .3s;pointer-events:none}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ====== 検索バー ====== */
+#search-wrap{margin-left:auto;display:flex;align-items:center;gap:6px}
+#search-input{width:220px;background:var(--surface3);border:1px solid var(--border);
+  color:var(--text);padding:6px 12px 6px 32px;border-radius:20px;font-size:12px;
+  outline:none;transition:border-color .2s,width .2s}
+#search-input:focus{border-color:var(--accent);width:280px}
+#search-input::placeholder{color:var(--text3)}
+#search-wrap .search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);
+  color:var(--text3);pointer-events:none}
+#search-wrap .s-inner{position:relative;display:flex;align-items:center}
+#search-loading{display:none;width:14px;height:14px;border:2px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;margin-left:-26px;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#btn-3d{padding:5px 12px;background:var(--surface3);border:1px solid var(--border);
+  border-radius:20px;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;
+  transition:.15s;white-space:nowrap}
+#btn-3d:hover{border-color:var(--accent);color:var(--accent)}
+#btn-3d.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
+
+/* ====== 3Dビューア ====== */
+#viewer-3d{display:none;position:fixed;inset:44px 0 0 0;z-index:70;background:#0a0d14}
+#viewer-3d.show{display:block}
+#viewer-3d canvas{width:100%!important;height:100%!important;display:block}
+#viewer-3d-info{position:absolute;top:12px;left:12px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;
+  font-size:11px;color:var(--text2);line-height:1.7;backdrop-filter:blur(12px)}
+#viewer-3d-info .v3-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+#viewer-3d-close{position:absolute;top:12px;right:12px;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:8px 14px;
+  color:var(--text2);font-size:12px;cursor:pointer;transition:.15s;backdrop-filter:blur(12px)}
+#viewer-3d-close:hover{border-color:var(--accent);color:var(--accent)}
+#viewer-3d-style{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+  display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);
+  border-radius:20px;padding:4px;backdrop-filter:blur(12px)}
+.v3-style-btn{padding:5px 12px;border-radius:16px;border:none;background:transparent;
+  color:var(--text2);font-size:11px;cursor:pointer;transition:.15s}
+.v3-style-btn.active{background:var(--accent-glow);color:var(--accent)}
+.v3-style-btn:hover{color:var(--text)}
 </style>
 </head>
 <body>
@@ -200,6 +239,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
       <div class="hd-item" data-act="thiophene">チオフェン</div>
       <div class="hd-item" data-act="imidazole">イミダゾール</div>
     </div>
+  </div>
+
+  <div id="search-wrap">
+    <div class="s-inner">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="7"/><line x1="15.5" y1="15.5" x2="21" y2="21"/></svg>
+      <input id="search-input" type="text" placeholder="物質名を入力 (例: aspirin, caffeine...)" spellcheck="false"/>
+    </div>
+    <div id="search-loading"></div>
+    <button id="btn-3d" onclick="toggle3D()">3D</button>
   </div>
 </div>
 
@@ -274,6 +322,21 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
     <button class="ap-btn" data-sym="H" style="color:#888">H</button>
     <button class="ap-btn" data-sym="Si" style="color:#868">Si</button>
     <button class="ap-btn" data-sym="..." style="color:var(--text3)">…</button>
+  </div>
+</div>
+
+<!-- 3Dビューア -->
+<div id="viewer-3d">
+  <div id="viewer-3d-info">
+    <div class="v3-name" id="v3-name">-</div>
+    <div id="v3-formula">-</div>
+    <div id="v3-atoms-info">-</div>
+  </div>
+  <button id="viewer-3d-close" onclick="close3D()">✕ 閉じる</button>
+  <div id="viewer-3d-style">
+    <button class="v3-style-btn active" data-style="ball-stick" onclick="set3DStyle('ball-stick')">ボール＆スティック</button>
+    <button class="v3-style-btn" data-style="space-fill" onclick="set3DStyle('space-fill')">空間充填</button>
+    <button class="v3-style-btn" data-style="wireframe" onclick="set3DStyle('wireframe')">ワイヤーフレーム</button>
   </div>
 </div>
 
@@ -429,7 +492,7 @@ function ptSegDist(p,a,b){
   return dist(p,{x:a.x+t*dx,y:a.y+t*dy});
 }
 function bondsOf(id){return bonds.filter(b=>b.from===id||b.to===id)}
-function bondSum(id){return bondsOf(id).reduce((s,b)=>s+b.order,0)}
+function bondSum(id){return bondsOf(id).reduce((s,b)=>s+(b.order===1.5?1:b.order),0)}
 function hCount(a){const v=VALENCE[a.symbol];if(v==null)return 0;return Math.max(0,v-bondSum(a.id)-Math.abs(a.charge||0))}
 function atomColor(s){return ATOM_COLORS[s]||'#333'}
 
@@ -440,7 +503,58 @@ function addAtom(x,y,sym='C'){const a={id:nxA++,x,y,symbol:sym,charge:0};atoms.p
 function addBond(f,t,ord=1,st='none'){
   const ex=bonds.find(b=>(b.from===f&&b.to===t)||(b.from===t&&b.to===f));
   if(ex)return ex;
-  const b={id:nxB++,from:f,to:t,order:ord,stereo:st};bonds.push(b);return b;
+  const b={id:nxB++,from:f,to:t,order:ord,stereo:st,ring:null};bonds.push(b);return b;
+}
+// 芳香環データ: [{atomIds:[], center:{x,y}, radius}]
+let aromaticRings=[];
+function detectRings(){
+  aromaticRings=[];
+  const aroBonds=bonds.filter(b=>b.order===1.5);
+  if(!aroBonds.length)return;
+  // Build adjacency for aromatic atoms only
+  const aroAtomSet=new Set();
+  aroBonds.forEach(b=>{aroAtomSet.add(b.from);aroAtomSet.add(b.to);});
+  const adj=new Map();
+  for(const id of aroAtomSet) adj.set(id,[]);
+  for(const b of aroBonds){
+    adj.get(b.from).push(b.to);
+    adj.get(b.to).push(b.from);
+  }
+  // Find all small rings (size 3-7) using DFS from each atom
+  const foundRings=[];
+  const ringSet=new Set(); // deduplicate by sorted atom id string
+  for(const startId of aroAtomSet){
+    // DFS to find cycles back to startId
+    const stack=[[startId,[startId]]];
+    while(stack.length){
+      const[cur,path]=stack.pop();
+      if(path.length>7)continue;
+      const neighbors=adj.get(cur)||[];
+      for(const next of neighbors){
+        if(next===startId&&path.length>=3){
+          // Found a ring
+          const sorted=[...path].sort((a,b)=>a-b).join(',');
+          if(!ringSet.has(sorted)){
+            ringSet.add(sorted);
+            foundRings.push([...path]);
+          }
+        } else if(!path.includes(next)&&next>startId){
+          // Only go to atoms > startId to avoid duplicate paths
+          stack.push([next,[...path,next]]);
+        }
+      }
+    }
+  }
+  // For each ring, compute center and radius
+  for(const ring of foundRings){
+    if(ring.length<3||ring.length>7)continue;
+    const rAtoms=ring.map(id=>atoms.find(a=>a.id===id)).filter(Boolean);
+    if(rAtoms.length!==ring.length)continue;
+    const cx=rAtoms.reduce((s,a)=>s+a.x,0)/rAtoms.length;
+    const cy=rAtoms.reduce((s,a)=>s+a.y,0)/rAtoms.length;
+    const avgR=rAtoms.reduce((s,a)=>s+Math.hypot(a.x-cx,a.y-cy),0)/rAtoms.length;
+    aromaticRings.push({atomIds:ring,center:{x:cx,y:cy},radius:avgR*0.58});
+  }
 }
 function delAtom(id){bonds=bonds.filter(b=>b.from!==id&&b.to!==id);atoms=atoms.filter(a=>a.id!==id)}
 function delBond(id){bonds=bonds.filter(b=>b.id!==id)}
@@ -456,12 +570,69 @@ function clearSel(){selAtoms.clear();selBonds.clear()}
 // ============================================================
 function render(){
   molG.innerHTML='';
+  detectRings();
   // bonds
   for(const b of bonds) drawBond(b);
+  // aromatic ring circles
+  for(const ring of aromaticRings) drawAromaticCircle(ring);
   // atoms
   for(const a of atoms) drawAtom(a);
   updateStatus();
   applyView();
+}
+
+function drawAromaticCircle(ring){
+  const c=createSVG('circle');
+  c.setAttribute('cx',ring.center.x);c.setAttribute('cy',ring.center.y);
+  c.setAttribute('r',ring.radius);
+  c.setAttribute('fill','none');c.setAttribute('stroke','#444');
+  c.setAttribute('stroke-width','1.4');
+  molG.appendChild(c);
+}
+
+function findRingCenterForBond(b){
+  // Find if this bond is part of a small ring, return center of that ring
+  // Simple approach: find atoms that are neighbors of both endpoints (triangle detection for ring)
+  const a1id=b.from,a2id=b.to;
+  const n1=new Set(bondsOf(a1id).map(bo=>bo.from===a1id?bo.to:bo.from));
+  const n2=new Set(bondsOf(a2id).map(bo=>bo.from===a2id?bo.to:bo.from));
+  // Find common neighbors (indicates ring of size 3-6)
+  const common=[];
+  for(const id of n1) if(n2.has(id)&&id!==a1id&&id!==a2id) common.push(id);
+  if(common.length>0){
+    // Use the first common neighbor to determine ring center direction
+    const cn=atoms.find(a=>a.id===common[0]);
+    if(cn) return{x:cn.x, y:cn.y};
+  }
+  // For larger rings: detect via path from a1 to a2 not using this bond
+  const ringAtoms=findSmallRing(a1id,a2id,b.id);
+  if(ringAtoms){
+    const rA=ringAtoms.map(id=>atoms.find(a=>a.id===id)).filter(Boolean);
+    const cx=rA.reduce((s,a)=>s+a.x,0)/rA.length;
+    const cy=rA.reduce((s,a)=>s+a.y,0)/rA.length;
+    return{x:cx,y:cy};
+  }
+  return null;
+}
+
+function findSmallRing(startId,endId,excludeBondId){
+  // BFS from startId to endId without using excludeBondId, max path length 7
+  const queue=[[startId,[startId]]];
+  const visited=new Set([startId]);
+  while(queue.length){
+    const[cur,path]=queue.shift();
+    if(path.length>7)continue;
+    for(const bo of bondsOf(cur)){
+      if(bo.id===excludeBondId)continue;
+      const next=bo.from===cur?bo.to:bo.from;
+      if(next===endId&&path.length>=2) return[...path,endId];
+      if(!visited.has(next)){
+        visited.add(next);
+        queue.push([next,[...path,next]]);
+      }
+    }
+  }
+  return null;
 }
 
 function drawBond(b){
@@ -497,18 +668,37 @@ function drawBond(b){
       l.setAttribute('stroke-linecap','round');
       g.appendChild(l);
     }
+  } else if(b.order===1.5){
+    // Aromatic bond: render as single bond (circle drawn separately)
+    const l=createSVG('line');
+    setLA(l,x1,y1,x2,y2);l.setAttribute('stroke',col);l.setAttribute('stroke-width','2.2');
+    l.setAttribute('stroke-linecap','round');g.appendChild(l);
   } else if(b.order===1){
     const l=createSVG('line');
     setLA(l,x1,y1,x2,y2);l.setAttribute('stroke',col);l.setAttribute('stroke-width','2.2');
     l.setAttribute('stroke-linecap','round');g.appendChild(l);
   } else if(b.order===2){
-    const sep=3.2;
-    for(const s of[-1,1]){
-      const l=createSVG('line');
-      setLA(l,x1+px*sep*s,y1+py*sep*s,x2+px*sep*s,y2+py*sep*s);
-      l.setAttribute('stroke',col);l.setAttribute('stroke-width','1.8');
-      l.setAttribute('stroke-linecap','round');g.appendChild(l);
+    // Double bond: offset second line toward ring center if in a ring
+    const ringCenter=findRingCenterForBond(b);
+    let dir=1;
+    if(ringCenter){
+      // Determine which side of the bond the center is on
+      const midX=(a1.x+a2.x)/2,midY=(a1.y+a2.y)/2;
+      const toCenter={x:ringCenter.x-midX,y:ringCenter.y-midY};
+      const cross=px*toCenter.x+py*toCenter.y;
+      dir=cross>0?1:-1;
     }
+    // Main bond
+    const l1=createSVG('line');
+    setLA(l1,x1,y1,x2,y2);l1.setAttribute('stroke',col);l1.setAttribute('stroke-width','2.2');
+    l1.setAttribute('stroke-linecap','round');g.appendChild(l1);
+    // Second line (shorter, offset toward ring)
+    const sep=4.5;const shrink=4;
+    const l2=createSVG('line');
+    setLA(l2, x1+px*sep*dir+ux*shrink, y1+py*sep*dir+uy*shrink,
+              x2+px*sep*dir-ux*shrink, y2+py*sep*dir-uy*shrink);
+    l2.setAttribute('stroke',col);l2.setAttribute('stroke-width','1.5');
+    l2.setAttribute('stroke-linecap','round');g.appendChild(l2);
   } else if(b.order===3){
     const sep=3.8;
     for(const s of[-1,0,1]){
@@ -597,7 +787,10 @@ function makeRing(n,cx,cy,aromatic=false){
     const ang=-Math.PI/2+(2*Math.PI*i)/n;
     ra.push(addAtom(cx+r*Math.cos(ang),cy+r*Math.sin(ang),'C'));
   }
-  for(let i=0;i<n;i++) addBond(ra[i].id,ra[(i+1)%n].id,(aromatic&&i%2===0)?2:1);
+  for(let i=0;i<n;i++){
+    const ord=aromatic?1.5:1;
+    addBond(ra[i].id,ra[(i+1)%n].id,ord);
+  }
   render();
 }
 
@@ -609,7 +802,7 @@ function makeHetero5(cx,cy,pos,sym){
     const ang=-Math.PI/2+(2*Math.PI*i)/n;
     ra.push(addAtom(cx+r*Math.cos(ang),cy+r*Math.sin(ang),i===pos?sym:'C'));
   }
-  for(let i=0;i<n;i++) addBond(ra[i].id,ra[(i+1)%n].id,(i===1||i===3)?2:1);
+  for(let i=0;i<n;i++) addBond(ra[i].id,ra[(i+1)%n].id,1.5);
   render();
 }
 
@@ -621,7 +814,7 @@ function makeHetero6(cx,cy,pos,sym){
     const ang=-Math.PI/2+(2*Math.PI*i)/n;
     ra.push(addAtom(cx+r*Math.cos(ang),cy+r*Math.sin(ang),i===pos?sym:'C'));
   }
-  for(let i=0;i<n;i++) addBond(ra[i].id,ra[(i+1)%n].id,(i%2===0)?2:1);
+  for(let i=0;i<n;i++) addBond(ra[i].id,ra[(i+1)%n].id,1.5);
   render();
 }
 
@@ -631,7 +824,7 @@ function makeNaphthalene(cx,cy){
   const off=r*Math.cos(Math.PI/6);
   const ra1=[],ra2=[];
   for(let i=0;i<6;i++){const ang=-Math.PI/2+(2*Math.PI*i)/6;ra1.push(addAtom(cx-off+r*Math.cos(ang),cy+r*Math.sin(ang),'C'));}
-  for(let i=0;i<6;i++) addBond(ra1[i].id,ra1[(i+1)%6].id,(i%2===0)?2:1);
+  for(let i=0;i<6;i++) addBond(ra1[i].id,ra1[(i+1)%6].id,1.5);
   for(let i=0;i<6;i++){const ang=-Math.PI/2+(2*Math.PI*i)/6;ra2.push(addAtom(cx+off+r*Math.cos(ang),cy+r*Math.sin(ang),'C'));}
   // merge shared atoms
   const merge=(keep,remove)=>{
@@ -643,7 +836,7 @@ function makeNaphthalene(cx,cy){
   for(let i=0;i<6;i++){
     const f=ra2[i].id,t=ra2[(i+1)%6].id;
     if(!bonds.find(b=>(b.from===f&&b.to===t)||(b.from===t&&b.to===f)))
-      addBond(f,t,(i%2===1)?2:1);
+      addBond(f,t,1.5);
   }
   render();
 }
@@ -657,9 +850,7 @@ function makeImidazole(cx,cy){
     const sym=(i===0)?'N':(i===2)?'N':'C';
     ra.push(addAtom(cx+r*Math.cos(ang),cy+r*Math.sin(ang),sym));
   }
-  addBond(ra[0].id,ra[1].id,1);addBond(ra[1].id,ra[2].id,2);
-  addBond(ra[2].id,ra[3].id,1);addBond(ra[3].id,ra[4].id,2);
-  addBond(ra[4].id,ra[0].id,1);
+  for(let i=0;i<n;i++) addBond(ra[i].id,ra[(i+1)%n].id,1.5);
   render();
 }
 
@@ -871,7 +1062,11 @@ function finishDraw(w){
   else if(curTool==='dash')st='dash';
 
   const ex2=bonds.find(b=>(b.from===fa.id&&b.to===ta.id)||(b.from===ta.id&&b.to===fa.id));
-  if(ex2){ex2.order=Math.min(3,ex2.order+1);}
+  if(ex2){
+    // Cycle: 1 → 2 → 3 → 1.5 → 1
+    const cycle={1:2, 2:3, 3:1.5, 1.5:1};
+    ex2.order=cycle[ex2.order]||2;
+  }
   else addBond(fa.id,ta.id,ord,st);
   render();
   angleGuide.style.display='none';
@@ -1059,8 +1254,8 @@ document.querySelectorAll('#ctx .ctx-item').forEach(item=>{
     const{atom,bond}=ctxTarget;
     switch(act){
       case'ctx-delete':saveState();if(atom)delAtom(atom.id);if(bond)delBond(bond.id);render();break;
-      case'ctx-bond-up':if(bond){saveState();bond.order=Math.min(3,bond.order+1);render();}break;
-      case'ctx-bond-down':if(bond){saveState();bond.order=Math.max(1,bond.order-1);render();}break;
+      case'ctx-bond-up':if(bond){saveState();const cy2={1:1.5,1.5:2,2:3,3:1};bond.order=cy2[bond.order]||2;render();}break;
+      case'ctx-bond-down':if(bond){saveState();const cy3={1:3,1.5:1,2:1.5,3:2};bond.order=cy3[bond.order]||1;render();}break;
       case'ctx-atom':if(atom)openAtomDlg(atom);break;
       case'ctx-charge-p':if(atom){saveState();atom.charge=(atom.charge||0)+1;render();}break;
       case'ctx-charge-m':if(atom){saveState();atom.charge=(atom.charge||0)-1;render();}break;
@@ -1149,7 +1344,8 @@ function exportMOL(){
   });
   for(const b of bonds){
     let st=0;if(b.stereo==='wedge')st=1;else if(b.stereo==='dash')st=6;
-    lines.push(`${pad3(idx[b.from])}${pad3(idx[b.to])}${pad3(b.order)}${pad3(st)}  0  0  0`);
+    const molOrd=b.order===1.5?4:b.order;
+    lines.push(`${pad3(idx[b.from])}${pad3(idx[b.to])}${pad3(molOrd)}${pad3(st)}  0  0  0`);
   }
   lines.push('M  END');
   dl(lines.join('\n'),'molecule.mol','chemical/x-mdl-molfile');
@@ -1175,7 +1371,8 @@ function parseMOL(text){
   for(let i=0;i<nb;i++){
     const l=ls[4+na+i];
     const i1=parseInt(l.substring(0,3)),i2=parseInt(l.substring(3,6));
-    const ord=parseInt(l.substring(6,9)),st=parseInt(l.substring(9,12));
+    const rawOrd=parseInt(l.substring(6,9)),st=parseInt(l.substring(9,12));
+    const ord=rawOrd===4?1.5:rawOrd;
     let stereo='none';if(st===1)stereo='wedge';else if(st===6)stereo='dash';
     addBond(m[i1],m[i2],ord,stereo);
   }
@@ -1223,6 +1420,335 @@ function p10(s){return s.padStart(10,' ')}
 function toast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+// ============================================================
+// PubChem API: 物質名→構造変換
+// ============================================================
+const searchInput=document.getElementById('search-input');
+const searchLoading=document.getElementById('search-loading');
+let searchTimeout=null;
+let current3DData=null; // {atoms3d, bonds3d, name, formula}
+
+searchInput.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const name=searchInput.value.trim();
+    if(name) fetchCompound(name);
+  }
+});
+
+async function fetchCompound(name){
+  searchLoading.style.display='block';
+  toast(`"${name}" を検索中...`);
+  try{
+    // Fetch 2D SDF for editor
+    const res2d=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/SDF?record_type=2d`);
+    if(!res2d.ok) throw new Error('化合物が見つかりません');
+    const sdf2d=await res2d.text();
+
+    // Parse into editor
+    saveState();
+    atoms=[];bonds=[];nxA=1;nxB=1;clearSel();
+    parseMOL(sdf2d);
+    toast(`${name} を読み込みました`);
+
+    // Fetch 3D SDF for viewer
+    try{
+      const res3d=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/SDF?record_type=3d`);
+      if(res3d.ok){
+        const sdf3d=await res3d.text();
+        current3DData=parse3DSDF(sdf3d);
+        current3DData.name=name;
+        document.getElementById('btn-3d').style.borderColor='var(--accent2)';
+        document.getElementById('btn-3d').style.color='var(--accent2)';
+      }
+    }catch(e3d){/* 3D not available for some compounds */}
+
+    // Fetch properties
+    try{
+      const resProp=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/property/MolecularFormula,MolecularWeight/JSON`);
+      if(resProp.ok){
+        const prop=await resProp.json();
+        const p=prop.PropertyTable.Properties[0];
+        if(current3DData){
+          current3DData.formula=p.MolecularFormula;
+          current3DData.mw=p.MolecularWeight;
+        }
+      }
+    }catch(ep){}
+
+  }catch(err){
+    toast(`エラー: ${err.message}`);
+  }finally{
+    searchLoading.style.display='none';
+  }
+}
+
+function parse3DSDF(text){
+  const ls=text.split('\n');
+  const ct=ls[3];
+  const na=parseInt(ct.substring(0,3)),nb=parseInt(ct.substring(3,6));
+  const atoms3d=[],bonds3d=[];
+  for(let i=0;i<na;i++){
+    const l=ls[4+i];
+    const x=parseFloat(l.substring(0,10));
+    const y=parseFloat(l.substring(10,20));
+    const z=parseFloat(l.substring(20,30));
+    const sym=l.substring(31,34).trim();
+    atoms3d.push({x,y,z,symbol:sym});
+  }
+  for(let i=0;i<nb;i++){
+    const l=ls[4+na+i];
+    const i1=parseInt(l.substring(0,3))-1;
+    const i2=parseInt(l.substring(3,6))-1;
+    const ord=parseInt(l.substring(6,9));
+    bonds3d.push({from:i1,to:i2,order:ord});
+  }
+  return{atoms3d,bonds3d,name:'',formula:'',mw:0};
+}
+
+// ============================================================
+// Three.js 3D ビューア
+// ============================================================
+let three_loaded=false;
+let scene,camera,renderer,controls;
+let viewer3dEl=document.getElementById('viewer-3d');
+let currentStyle='ball-stick';
+
+function toggle3D(){
+  if(!current3DData){toast('先に物質名を検索してください');return;}
+  if(viewer3dEl.classList.contains('show')){close3D();return;}
+  open3D();
+}
+
+function open3D(){
+  if(!current3DData)return;
+  viewer3dEl.classList.add('show');
+  document.getElementById('btn-3d').classList.add('active');
+  // Update info panel
+  document.getElementById('v3-name').textContent=current3DData.name||'-';
+  document.getElementById('v3-formula').textContent=current3DData.formula?`分子式: ${current3DData.formula}`:'';
+  document.getElementById('v3-atoms-info').textContent=`原子数: ${current3DData.atoms3d.length}`;
+
+  if(!three_loaded){
+    loadThreeJS(()=>{three_loaded=true;init3D();build3D();});
+  } else {
+    init3D();build3D();
+  }
+}
+
+function close3D(){
+  viewer3dEl.classList.remove('show');
+  document.getElementById('btn-3d').classList.remove('active');
+  if(renderer){renderer.dispose();renderer.domElement.remove();renderer=null;}
+  if(animId){cancelAnimationFrame(animId);animId=null;}
+}
+
+function loadThreeJS(cb){
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  s.onload=()=>{
+    // Load OrbitControls
+    const s2=document.createElement('script');
+    s2.textContent=`
+    // Minimal OrbitControls inline
+    THREE.OrbitControls=function(camera,domElement){
+      this.camera=camera;this.domElement=domElement;this.target=new THREE.Vector3();
+      this.enableDamping=true;this.dampingFactor=0.08;this.rotateSpeed=0.8;
+      this.zoomSpeed=1.2;this.minDistance=2;this.maxDistance=100;
+      let spherical=new THREE.Spherical();let sphericalDelta=new THREE.Spherical();
+      let scale=1;let panOffset=new THREE.Vector3();
+      let rotateStart=new THREE.Vector2();let isDown=false;let isPan=false;
+      const onDown=e=>{
+        if(e.button===2||e.shiftKey){isPan=true;}else{isPan=false;}
+        isDown=true;rotateStart.set(e.clientX,e.clientY);
+      };
+      const onMove=e=>{
+        if(!isDown)return;
+        const dx=e.clientX-rotateStart.x,dy=e.clientY-rotateStart.y;
+        if(isPan){
+          const panX=-dx*0.01;const panY=dy*0.01;
+          const offset=new THREE.Vector3();
+          offset.setFromMatrixColumn(camera.matrix,0);panOffset.addScaledVector(offset,panX);
+          offset.setFromMatrixColumn(camera.matrix,1);panOffset.addScaledVector(offset,panY);
+        }else{
+          sphericalDelta.theta-=dx*0.01*this.rotateSpeed;
+          sphericalDelta.phi-=dy*0.01*this.rotateSpeed;
+        }
+        rotateStart.set(e.clientX,e.clientY);
+      };
+      const onUp=()=>{isDown=false;isPan=false;};
+      const onWheel=e=>{e.preventDefault();scale*=e.deltaY>0?1.1:0.9;};
+      domElement.addEventListener('pointerdown',onDown);
+      domElement.addEventListener('pointermove',onMove);
+      domElement.addEventListener('pointerup',onUp);
+      domElement.addEventListener('wheel',onWheel,{passive:false});
+      domElement.addEventListener('contextmenu',e=>e.preventDefault());
+      this.update=()=>{
+        const offset=new THREE.Vector3().copy(camera.position).sub(this.target);
+        spherical.setFromVector3(offset);
+        spherical.theta+=sphericalDelta.theta;
+        spherical.phi+=sphericalDelta.phi;
+        spherical.phi=Math.max(0.01,Math.min(Math.PI-0.01,spherical.phi));
+        spherical.radius*=scale;
+        spherical.radius=Math.max(this.minDistance,Math.min(this.maxDistance,spherical.radius));
+        this.target.add(panOffset);
+        offset.setFromSpherical(spherical);
+        camera.position.copy(this.target).add(offset);
+        camera.lookAt(this.target);
+        sphericalDelta.theta*=(1-this.dampingFactor);
+        sphericalDelta.phi*=(1-this.dampingFactor);
+        scale=1;panOffset.set(0,0,0);
+      };
+      this.dispose=()=>{
+        domElement.removeEventListener('pointerdown',onDown);
+        domElement.removeEventListener('pointermove',onMove);
+        domElement.removeEventListener('pointerup',onUp);
+        domElement.removeEventListener('wheel',onWheel);
+      };
+    };`;
+    document.head.appendChild(s2);
+    cb();
+  };
+  document.head.appendChild(s);
+}
+
+let animId=null;
+const CPK_COLORS={H:0xffffff,C:0x333333,N:0x3333ff,O:0xcc0000,S:0xccaa00,
+  P:0xff8800,F:0x00cc00,Cl:0x00cc00,Br:0x882200,I:0x6600aa,
+  Si:0x886688,B:0xff6688,Se:0xcc6600,Te:0xaa5500};
+const CPK_RADII={H:0.31,C:0.76,N:0.71,O:0.66,S:1.05,P:1.07,
+  F:0.57,Cl:1.02,Br:1.20,I:1.39,Si:1.11,B:0.87,Se:1.20,Te:1.38};
+
+function init3D(){
+  if(renderer){renderer.dispose();renderer.domElement.remove();}
+  if(animId){cancelAnimationFrame(animId);animId=null;}
+
+  const w=viewer3dEl.clientWidth,h=viewer3dEl.clientHeight;
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x0a0d14);
+
+  camera=new THREE.PerspectiveCamera(50,w/h,0.1,200);
+  camera.position.set(0,0,20);
+
+  renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(w,h);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  viewer3dEl.insertBefore(renderer.domElement,viewer3dEl.firstChild);
+
+  controls=new THREE.OrbitControls(camera,renderer.domElement);
+
+  // Lights
+  const amb=new THREE.AmbientLight(0xffffff,0.5);scene.add(amb);
+  const dir=new THREE.DirectionalLight(0xffffff,0.8);dir.position.set(5,10,7);scene.add(dir);
+  const dir2=new THREE.DirectionalLight(0x6c9fff,0.3);dir2.position.set(-5,-5,-5);scene.add(dir2);
+
+  function anim(){animId=requestAnimationFrame(anim);controls.update();renderer.render(scene,camera);}
+  anim();
+
+  window.addEventListener('resize',()=>{
+    if(!viewer3dEl.classList.contains('show'))return;
+    const w2=viewer3dEl.clientWidth,h2=viewer3dEl.clientHeight;
+    camera.aspect=w2/h2;camera.updateProjectionMatrix();
+    renderer.setSize(w2,h2);
+  });
+}
+
+function build3D(){
+  // Clear existing molecule
+  while(scene.children.length>3) scene.remove(scene.children[scene.children.length-1]);
+
+  if(!current3DData)return;
+  const{atoms3d,bonds3d}=current3DData;
+
+  // Center molecule
+  let cx=0,cy=0,cz=0;
+  atoms3d.forEach(a=>{cx+=a.x;cy+=a.y;cz+=a.z;});
+  cx/=atoms3d.length;cy/=atoms3d.length;cz/=atoms3d.length;
+
+  const molGroup=new THREE.Group();
+
+  if(currentStyle==='ball-stick'||currentStyle==='space-fill'){
+    // Atoms as spheres
+    for(const a of atoms3d){
+      const r=currentStyle==='space-fill'?(CPK_RADII[a.symbol]||0.8)*1.5:(CPK_RADII[a.symbol]||0.5)*0.45;
+      const geo=new THREE.SphereGeometry(r,24,24);
+      const mat=new THREE.MeshPhongMaterial({color:CPK_COLORS[a.symbol]||0x888888,shininess:80});
+      const mesh=new THREE.Mesh(geo,mat);
+      mesh.position.set(a.x-cx,a.y-cy,a.z-cz);
+      molGroup.add(mesh);
+    }
+  }
+
+  if(currentStyle==='ball-stick'||currentStyle==='wireframe'){
+    // Bonds as cylinders
+    for(const b of bonds3d){
+      const a1=atoms3d[b.from],a2=atoms3d[b.to];
+      if(!a1||!a2)continue;
+      const p1=new THREE.Vector3(a1.x-cx,a1.y-cy,a1.z-cz);
+      const p2=new THREE.Vector3(a2.x-cx,a2.y-cy,a2.z-cz);
+      const mid=new THREE.Vector3().addVectors(p1,p2).multiplyScalar(0.5);
+      const dir2=new THREE.Vector3().subVectors(p2,p1);
+      const len=dir2.length();
+      dir2.normalize();
+
+      const bRadius=currentStyle==='wireframe'?0.03:0.08;
+      const nBonds=Math.min(b.order,3);
+
+      if(nBonds===1){
+        addCylinder(molGroup,mid,dir2,len,bRadius,0xaaaaaa);
+      } else {
+        const perp=new THREE.Vector3(1,0,0);
+        if(Math.abs(dir2.dot(perp))>0.9) perp.set(0,1,0);
+        const offset=new THREE.Vector3().crossVectors(dir2,perp).normalize();
+        const sep=currentStyle==='wireframe'?0.08:0.15;
+        for(let i=0;i<nBonds;i++){
+          const off=(i-(nBonds-1)/2)*sep;
+          const shifted=mid.clone().addScaledVector(offset,off);
+          addCylinder(molGroup,shifted,dir2,len,bRadius*0.8,0xaaaaaa);
+        }
+      }
+    }
+  }
+
+  if(currentStyle==='wireframe'){
+    // Add small dots at atoms
+    for(const a of atoms3d){
+      const geo=new THREE.SphereGeometry(0.12,12,12);
+      const mat=new THREE.MeshPhongMaterial({color:CPK_COLORS[a.symbol]||0x888888});
+      const mesh=new THREE.Mesh(geo,mat);
+      mesh.position.set(a.x-cx,a.y-cy,a.z-cz);
+      molGroup.add(mesh);
+    }
+  }
+
+  scene.add(molGroup);
+
+  // Auto-fit camera
+  let maxR=0;
+  atoms3d.forEach(a=>{const d=Math.hypot(a.x-cx,a.y-cy,a.z-cz);if(d>maxR)maxR=d;});
+  camera.position.set(0,0,maxR*2.5+5);
+  controls.target.set(0,0,0);
+}
+
+function addCylinder(parent,pos,dir,len,radius,color){
+  const geo=new THREE.CylinderGeometry(radius,radius,len,8,1);
+  const mat=new THREE.MeshPhongMaterial({color,shininess:40});
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.position.copy(pos);
+  // Align cylinder to direction
+  const up=new THREE.Vector3(0,1,0);
+  const quat=new THREE.Quaternion().setFromUnitVectors(up,dir);
+  mesh.quaternion.copy(quat);
+  parent.add(mesh);
+}
+
+function set3DStyle(style){
+  currentStyle=style;
+  document.querySelectorAll('.v3-style-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.v3-style-btn[data-style="${style}"]`).classList.add('active');
+  if(scene) build3D();
 }
 
 // ============================================================
