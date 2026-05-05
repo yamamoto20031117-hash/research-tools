@@ -1618,17 +1618,10 @@ async function exportXLSX(){
   }
   function escXml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-  // データ範囲を計算（軸スケーリング用）
-  let xMin=Infinity, xMax=-Infinity;
-  for(const f of fileList){
-    for(let i=0;i<f.x.length;i++){
-      if(f.x[i]<xMin) xMin=f.x[i];
-      if(f.x[i]>xMax) xMax=f.x[i];
-    }
-  }
-  // 端を丸める（5刻み）
-  xMin=Math.floor(xMin/5)*5;
-  xMax=Math.ceil(xMax/5)*5;
+  // 軸範囲: Webビューアと同じ値を使用（入力フィールドから取得）
+  const xMin=parseFloat(document.getElementById('xMin').value)||0;
+  const xMax=parseFloat(document.getElementById('xMax').value)||90;
+  const xMajorUnit=calcStep(xMax-xMin);
 
   // チャートシリーズ構築
   const chartColors=['1F4E79','CC0000','228B22','FF8C00','8B008B','008B8B','B22222','4169E1','DAA520','2E8B57'];
@@ -1764,6 +1757,7 @@ async function exportXLSX(){
         <c:majorTickMark val="out"/><c:minorTickMark val="none"/>
         <c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900">${arialFont}</a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>
         <c:crossAx val="222222222"/>
+        <c:majorUnit val="${xMajorUnit}"/>
       </c:valAx>
       <c:valAx>
         <c:axId val="222222222"/>
