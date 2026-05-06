@@ -1460,18 +1460,73 @@ function toast(msg){
 const searchInput=document.getElementById('search-input');
 const searchLoading=document.getElementById('search-loading');
 const acEl=document.getElementById('autocomplete');
-let searchTimeout=null;
 let acTimeout=null;
-let current3DData=null; // {atoms3d, bonds3d, name, formula}
+let current3DData=null;
 let acItems=[];
 let acIndex=-1;
 
-// === 予測変換 (Autocomplete) ===
+// === ローカル辞書（プレフィクスマッチ用） ===
+const COMPOUND_DICT=[
+  'acetone','acetaldehyde','acetic acid','acetylene','acetaminophen','acetonitrile','acrylic acid',
+  'adenine','adenosine','adrenaline','alanine','albumin','aldosterone','alizarin',
+  'ammonia','amphetamine','aniline','anthracene','arginine','ascorbic acid','aspirin','atropine',
+  'benzene','benzoic acid','benzaldehyde','benzyl alcohol','biphenyl','biotin','butane','butanol','butanone','butyric acid',
+  'caffeine','camphor','capsaicin','carbazole','catechol','cellulose','chloroform','cholesterol',
+  'cinnamaldehyde','citric acid','cocaine','codeine','cortisol','creatine','cresol','cyanamide','cyclohexane','cyclopentane','cysteine',
+  'dextrose','diazepam','dichloromethane','diethyl ether','dimethyl sulfoxide','dopamine','dioxane',
+  'ethanol','ethylene','ethyl acetate','ethylamine','ethylene glycol','ethylbenzene','epinephrine',
+  'fentanyl','fluorene','formaldehyde','formic acid','fructose','fumaric acid','furan',
+  'galactose','glucose','glutamic acid','glutamine','glycerol','glycine','guanine','guanosine',
+  'heptane','heroin','hexane','histamine','histidine','hydrazine','hydroquinone',
+  'ibuprofen','imidazole','indole','insulin','iodine','isoleucine','isoprene','isopropanol',
+  'ketamine','lactic acid','lactose','leucine','lidocaine','limonene','linoleic acid','lysine',
+  'maleic acid','maltose','mannose','melatonin','menthol','methane','methanol','methionine',
+  'morphine','myrcene','myristic acid',
+  'naphthalene','nicotine','nitrobenzene','nitroglycerin','norepinephrine','nylon',
+  'oleic acid','oxalic acid','oxygen','ozone',
+  'palmitic acid','paracetamol','penicillin','pentane','phenol','phenylalanine','piperidine',
+  'proline','propane','propanol','propylene','purine','pyridine','pyrimidine','pyrrole',
+  'quercetin','quinoline','quinone',
+  'retinol','ribose','saccharin','salicylic acid','serine','serotonin','stearic acid','styrene','sucrose',
+  'tartaric acid','taurine','testosterone','tetrahydrofuran','thiamine','thiophene','threonine',
+  'thymol','thymine','toluene','tryptophan','tyrosine',
+  'uracil','urea','uric acid',
+  'valine','vanillin','vitamin A','vitamin B12','vitamin C','vitamin D','vitamin E',
+  'warfarin','water','xylene','xylitol','xylose',
+  // 日本語名
+  'アスピリン','アセトン','アニリン','アデニン','アドレナリン','アラニン','アルギニン',
+  'イブプロフェン','インドール','ウラシル','エタノール','エチレン','エピネフリン',
+  'カフェイン','カテコール','グルコース','グリシン','グアニン','クエン酸','クレアチン',
+  'コレステロール','コカイン','サリチル酸','システイン','セリン','セロトニン',
+  'チミン','チロシン','テストステロン','ドーパミン','トリプトファン','トルエン',
+  'ナフタレン','ニコチン','ニトログリセリン','ノルエピネフリン',
+  'バニリン','ヒスタミン','ビタミンC','フェノール','プリン','ベンゼン','ホルムアルデヒド',
+  'メタノール','メラトニン','メントール','モルヒネ',
+  'リモネン','ロイシン'
+];
+
+// === 予測変換 (ローカルプレフィクスマッチ + PubChem補完) ===
 searchInput.addEventListener('input',()=>{
   clearTimeout(acTimeout);
-  const q=searchInput.value.trim();
-  if(q.length<2){hideAC();return;}
-  acTimeout=setTimeout(()=>fetchAutocomplete(q),250);
+  const q=searchInput.value.trim().toLowerCase();
+  if(q.length<1){hideAC();return;}
+
+  // まずローカル辞書で即座にマッチ
+  const localMatches=COMPOUND_DICT.filter(c=>c.toLowerCase().startsWith(q)).slice(0,6);
+  // 部分一致（含む）も追加
+  const partialMatches=COMPOUND_DICT.filter(c=>!c.toLowerCase().startsWith(q)&&c.toLowerCase().includes(q)).slice(0,3);
+  const combined=[...localMatches,...partialMatches];
+
+  if(combined.length>0){
+    acItems=combined;acIndex=-1;renderAC();
+  } else {
+    hideAC();
+  }
+
+  // 2文字以上ならPubChem APIでも補完（非同期で追加候補を取得）
+  if(q.length>=2){
+    acTimeout=setTimeout(()=>fetchRemoteAC(q),400);
+  }
 });
 
 searchInput.addEventListener('keydown',e=>{
@@ -1490,27 +1545,39 @@ searchInput.addEventListener('keydown',e=>{
   }
 });
 
+searchInput.addEventListener('focus',()=>{
+  const q=searchInput.value.trim().toLowerCase();
+  if(q.length>=1){
+    const m=COMPOUND_DICT.filter(c=>c.toLowerCase().startsWith(q)).slice(0,8);
+    if(m.length){acItems=m;acIndex=-1;renderAC();}
+  }
+});
 searchInput.addEventListener('blur',()=>{setTimeout(hideAC,200);});
 
-async function fetchAutocomplete(query){
+async function fetchRemoteAC(query){
   try{
-    const res=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(query)}/json?limit=8`);
-    if(!res.ok){hideAC();return;}
+    const res=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(query)}/json?limit=6`);
+    if(!res.ok)return;
     const data=await res.json();
-    const dict=data.dictionary_terms;
-    if(!dict||!dict.compound||dict.compound.length===0){hideAC();return;}
-    acItems=dict.compound;
-    acIndex=-1;
-    renderAC();
-  }catch(e){hideAC();}
+    const remote=data.dictionary_terms?.compound||[];
+    if(!remote.length)return;
+    // ローカル結果とマージ（重複排除）
+    const existing=new Set(acItems.map(s=>s.toLowerCase()));
+    const newItems=remote.filter(r=>!existing.has(r.toLowerCase()));
+    if(newItems.length){
+      acItems=[...acItems,...newItems].slice(0,10);
+      renderAC();
+    }
+  }catch(e){}
 }
 
 function renderAC(){
   acEl.innerHTML='';
+  const query=searchInput.value.trim();
   for(let i=0;i<acItems.length;i++){
     const div=document.createElement('div');
     div.className='ac-item';
-    div.innerHTML=`<span>${highlightMatch(acItems[i],searchInput.value)}</span>`;
+    div.innerHTML=highlightMatch(acItems[i],query);
     div.addEventListener('mousedown',ev=>{ev.preventDefault();selectAC(acItems[i]);});
     div.addEventListener('mouseenter',()=>{acIndex=i;updateACActive();});
     acEl.appendChild(div);
@@ -1519,9 +1586,10 @@ function renderAC(){
 }
 
 function highlightMatch(text,query){
+  if(!query)return text;
   const idx=text.toLowerCase().indexOf(query.toLowerCase());
   if(idx<0)return text;
-  return text.slice(0,idx)+'<b style="color:var(--text)">'+text.slice(idx,idx+query.length)+'</b>'+text.slice(idx+query.length);
+  return text.slice(0,idx)+'<b style="color:var(--accent)">'+text.slice(idx,idx+query.length)+'</b>'+text.slice(idx+query.length);
 }
 
 function acNav(dir){
@@ -1544,21 +1612,30 @@ function selectAC(name){
 
 function hideAC(){acEl.classList.remove('show');acIndex=-1;}
 
-// === 「もしかして」機能 ===
-async function fetchSuggestions(failedName){
-  try{
-    // Use autocomplete API to find close matches
-    const res=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(failedName)}/json?limit=5`);
-    if(!res.ok)return[];
-    const data=await res.json();
-    if(!data.dictionary_terms||!data.dictionary_terms.compound)return[];
-    return data.dictionary_terms.compound;
-  }catch(e){return[];}
+// === 「もしかして」機能（レーベンシュタイン距離） ===
+function levenshtein(a,b){
+  const m=a.length,n=b.length;
+  const d=Array.from({length:m+1},(_,i)=>Array(n+1).fill(0));
+  for(let i=0;i<=m;i++)d[i][0]=i;
+  for(let j=0;j<=n;j++)d[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++){
+    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+  }
+  return d[m][n];
+}
+
+function findSimilar(query,maxDist=3){
+  const q=query.toLowerCase();
+  const scored=COMPOUND_DICT.map(c=>({name:c,dist:levenshtein(q,c.toLowerCase())}))
+    .filter(x=>x.dist<=maxDist&&x.dist>0)
+    .sort((a,b)=>a.dist-b.dist)
+    .slice(0,5);
+  return scored.map(x=>x.name);
 }
 
 function showDidYouMean(suggestions){
   acEl.innerHTML='';
-  if(suggestions.length===0){hideAC();return;}
+  if(!suggestions.length){hideAC();return;}
   const header=document.createElement('div');
   header.className='ac-didyoumean';
   header.textContent='もしかして:';
@@ -1581,10 +1658,19 @@ async function fetchCompound(name){
     // Fetch 2D SDF for editor
     const res2d=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/SDF?record_type=2d`);
     if(!res2d.ok){
-      // 見つからない → 「もしかして」を表示
-      const suggestions=await fetchSuggestions(name);
+      // 見つからない → ローカル辞書で類似候補 + PubChem補完
+      let suggestions=findSimilar(name);
+      try{
+        const resAC=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(name)}/json?limit=5`);
+        if(resAC.ok){
+          const d=await resAC.json();
+          const remote=d.dictionary_terms?.compound||[];
+          const existing=new Set(suggestions.map(s=>s.toLowerCase()));
+          suggestions=[...suggestions,...remote.filter(r=>!existing.has(r.toLowerCase()))].slice(0,6);
+        }
+      }catch(e){}
       if(suggestions.length>0){
-        toast(`"${name}" が見つかりません。候補を表示中...`);
+        toast(`"${name}" が見つかりません`);
         showDidYouMean(suggestions);
       } else {
         toast(`"${name}" が見つかりません`);
@@ -1601,16 +1687,26 @@ async function fetchCompound(name){
     toast(`${name} を読み込みました`);
 
     // Fetch 3D SDF for viewer
+    let got3D=false;
     try{
       const res3d=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/SDF?record_type=3d`);
       if(res3d.ok){
         const sdf3d=await res3d.text();
         current3DData=parse3DSDF(sdf3d);
         current3DData.name=name;
-        document.getElementById('btn-3d').style.borderColor='var(--accent2)';
-        document.getElementById('btn-3d').style.color='var(--accent2)';
+        got3D=true;
       }
-    }catch(e3d){/* 3D not available for some compounds */}
+    }catch(e3d){}
+    // 3D取得失敗時は2Dデータ(z=0)で代用
+    if(!got3D){
+      current3DData={
+        atoms3d:atoms.map(a=>({x:a.x/40,y:-a.y/40,z:0,symbol:a.symbol})),
+        bonds3d:bonds.map(b=>({from:atoms.findIndex(a=>a.id===b.from),to:atoms.findIndex(a=>a.id===b.to),order:b.order===1.5?1:b.order})),
+        name,formula:'',mw:0
+      };
+    }
+    document.getElementById('btn-3d').style.borderColor='var(--accent2)';
+    document.getElementById('btn-3d').style.color='var(--accent2)';
 
     // Fetch properties
     try{
@@ -1664,7 +1760,18 @@ let viewer3dEl=document.getElementById('viewer-3d');
 let currentStyle='ball-stick';
 
 function toggle3D(){
-  if(!current3DData){toast('先に物質名を検索してください');return;}
+  if(!current3DData){
+    // 手描きの分子があればそれを3D表示
+    if(atoms.length>0){
+      current3DData={
+        atoms3d:atoms.map(a=>({x:a.x/40,y:-a.y/40,z:0,symbol:a.symbol})),
+        bonds3d:bonds.map(b=>({from:atoms.findIndex(a=>a.id===b.from),to:atoms.findIndex(a=>a.id===b.to),order:b.order===1.5?1:b.order})),
+        name:'手描き分子',formula:'',mw:0
+      };
+    } else {
+      toast('分子を描画するか、物質名を検索してください');return;
+    }
+  }
   if(viewer3dEl.classList.contains('show')){close3D();return;}
   open3D();
 }
