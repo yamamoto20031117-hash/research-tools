@@ -1839,15 +1839,14 @@ async function fetchCompound(name){
 }
 
 // ============================================================
-// 2D→3D座標生成: トポロジー駆動3D埋め込み + MMFF力場最適化
-// Phase 1: BFS座標構築 (結合角・二面角から直接3D座標を生成)
-// Phase 2: 力場最小化 (結合伸縮+角度+二面角+VDW+平面性)
+// 2D→3D座標生成
+// 2D座標を基盤に、混成軌道に基づくz変位を付与 + 力場最適化
+// 2Dはリング閉環が正確なのでxy平面を保持しつつ立体化
 // ============================================================
 function generate3DCoords(atomList, bondList){
   const n=atomList.length;
   if(n===0)return{atoms3d:[],bonds3d:[]};
 
-  // --- 隣接リスト・結合マップ構築 ---
   const adj=Array.from({length:n},()=>[]);
   const bondMap=[];
   bondList.forEach(b=>{
@@ -1855,36 +1854,31 @@ function generate3DCoords(atomList, bondList){
     const ti=atomList.findIndex(a=>a.id===b.to);
     if(fi>=0&&ti>=0){
       const ord=b.order===1.5?1.5:b.order;
-      adj[fi].push({to:ti,order:ord,bi:bondMap.length});
-      adj[ti].push({to:fi,order:ord,bi:bondMap.length});
+      adj[fi].push({to:ti,order:ord});
+      adj[ti].push({to:fi,order:ord});
       bondMap.push({from:fi,to:ti,order:ord>=1.5?Math.round(ord):ord});
     }
   });
 
-  // --- 原子パラメータ ---
-  const COVALENT_RADII={C:0.77,N:0.70,O:0.66,S:1.04,P:1.07,F:0.64,Cl:0.99,Br:1.14,I:1.33,H:0.31,B:0.84,Si:1.17};
   const VDW_RADII={C:1.7,N:1.55,O:1.52,S:1.8,P:1.8,F:1.47,Cl:1.75,Br:1.85,I:1.98,H:1.2,B:1.65,Si:2.1};
-  function getCovRadius(sym){return COVALENT_RADII[sym]||0.77;}
-  function getVdwRadius(sym){return VDW_RADII[sym]||1.7;}
+  const COVALENT_RADII={C:0.77,N:0.70,O:0.66,S:1.04,P:1.07,F:0.64,Cl:0.99,Br:1.14,I:1.33,H:0.31,B:0.84,Si:1.17};
+  function getVdw(sym){return VDW_RADII[sym]||1.7;}
+  function getCov(sym){return COVALENT_RADII[sym]||0.77;}
 
-  // --- 混成推定 ---
   function getHybrid(idx){
     const bs=adj[idx];
     if(bs.length===0)return 'sp3';
     const maxOrd=Math.max(...bs.map(b=>b.order));
-    const totalOrd=bs.reduce((s,b)=>s+b.order,0);
-    if(maxOrd>=3||(bs.length===2&&totalOrd>=4))return 'sp';
+    if(maxOrd>=3||(bs.length===2&&bs.reduce((s,b)=>s+b.order,0)>=4))return 'sp';
     if(maxOrd>=2||bs.some(b=>b.order===1.5))return 'sp2';
-    if(bs.length<=3)return bs.length===3?'sp2':'sp3';
+    if(bs.length===3)return 'sp2';
     return 'sp3';
   }
   const hybrid=atomList.map((_,i)=>getHybrid(i));
-  const IDEAL_ANGLE={sp3:109.47*Math.PI/180, sp2:120*Math.PI/180, sp:Math.PI};
 
-  // --- リング検出 ---
-  const rings=[];
-  const atomRings=Array.from({length:n},()=>[]);
-  (function detectRings(){
+  // リング検出
+  const inSmallRing=new Set();// 3-8員環の原子
+  (function(){
     function findCycles(start){
       const stack=[{node:start,parent:-1,path:[start]}];
       const visited=new Set([start]);
@@ -1894,338 +1888,199 @@ function generate3DCoords(atomList, bondList){
           if(e.to===parent)continue;
           if(visited.has(e.to)){
             const ci=path.indexOf(e.to);
-            if(ci>=0){
-              const ring=path.slice(ci);
-              if(ring.length>=3&&ring.length<=8){
-                const key=[...ring].sort().join(',');
-                if(!seenKeys.has(key)){
-                  seenKeys.add(key);
-                  const ri=rings.length;
-                  rings.push(ring);
-                  ring.forEach(a=>atomRings[a].push(ri));
-                }
-              }
-            }
-          } else {
-            visited.add(e.to);
-            stack.push({node:e.to,parent:node,path:[...path,e.to]});
-          }
+            if(ci>=0){const ring=path.slice(ci);if(ring.length>=3&&ring.length<=8)ring.forEach(a=>inSmallRing.add(a));}
+          } else {visited.add(e.to);stack.push({node:e.to,parent:node,path:[...path,e.to]});}
         }
       }
     }
-    const seenKeys=new Set();
-    for(let i=0;i<n;i++) findCycles(i);
+    for(let i=0;i<n;i++)findCycles(i);
   })();
 
-  // 芳香環判定
-  const aromaticRings=new Set();
-  rings.forEach((ring,ri)=>{
-    if(ring.every(a=>hybrid[a]==='sp2'))aromaticRings.add(ri);
-  });
-  const inAromaticRing=new Set();
-  aromaticRings.forEach(ri=>rings[ri].forEach(a=>inAromaticRing.add(a)));
+  // === 2D座標をスケーリングして使用 ===
+  // PubChemのSDF 2D座標は結合長≈1.0単位。実際のÅに変換
+  const scale2d=1.0/40; // editor座標→Å近似
+  const pos=atomList.map(a=>[a.x*scale2d, -a.y*scale2d, 0]);
 
-  // --- 結合長 ---
-  function idealBondLen(i,j,order){
-    const r1=getCovRadius(atomList[i].symbol);
-    const r2=getCovRadius(atomList[j].symbol);
-    let len=r1+r2;
-    if(order>=2)len-=0.15;
-    if(order>=3)len-=0.25;
-    if(order===1.5)len-=0.08;
-    return len;
+  // 中心化
+  let cx=0,cy=0;
+  pos.forEach(p=>{cx+=p[0];cy+=p[1];});
+  cx/=n;cy/=n;
+  pos.forEach(p=>{p[0]-=cx;p[1]-=cy;});
+
+  // === z変位の計算: 混成・環・BFS順で物理的に付与 ===
+  // sp3中心の四面体角による理想z変位: 結合長L, 角度109.47°
+  // z = L * sin(19.47°) ≈ L * 0.333
+  const tetZ=0.52; // 四面体z変位(Å)
+
+  // BFS順で変位を伝搬
+  const zAssigned=new Array(n).fill(false);
+  const bfsQ=[];
+  // 最も結合数の多い原子から開始
+  let s0=0,mxD=0;
+  for(let i=0;i<n;i++){if(adj[i].length>mxD){mxD=adj[i].length;s0=i;}}
+  bfsQ.push(s0);
+  zAssigned[s0]=true;
+  pos[s0][2]=0;
+
+  // 決定的擬似乱数
+  let seed=17;
+  function prand(){seed=(seed*48271)%2147483647;return seed/2147483647;}
+
+  while(bfsQ.length>0){
+    const cur=bfsQ.shift();
+    for(const e of adj[cur]){
+      if(zAssigned[e.to])continue;
+      zAssigned[e.to]=true;
+      const ni=e.to;
+
+      if(hybrid[ni]==='sp2'||inSmallRing.has(ni)){
+        // sp2 or 芳香環内: 平面維持 (親と同じz ± 微小)
+        // ただし6員sp3環(シクロヘキサン等)は椅子型にする
+        if(inSmallRing.has(ni)&&hybrid[ni]==='sp3'){
+          // 環内sp3 → 交互に上下 (椅子型近似)
+          pos[ni][2]=-pos[cur][2]*0.8+(prand()>0.5?0.25:-0.25);
+        } else {
+          // sp2/芳香族 → 隣と同じ平面
+          pos[ni][2]=pos[cur][2];
+        }
+      } else if(hybrid[ni]==='sp3'){
+        // sp3: 四面体変位
+        // 配置済み隣接原子のz平均の反対方向にオフセット
+        const placedNeigh=adj[ni].filter(e2=>zAssigned[e2.to]);
+        if(placedNeigh.length<=1){
+          // 1つの参照→ 交互に上下
+          pos[ni][2]=pos[cur][2]+(prand()>0.5?tetZ:-tetZ);
+        } else {
+          // 複数参照 → 平均の反対
+          let avgZ=0;
+          placedNeigh.forEach(e2=>{avgZ+=pos[e2.to][2];});
+          avgZ/=placedNeigh.length;
+          const dz=pos[cur][2]-avgZ;
+          pos[ni][2]=pos[cur][2]+(Math.abs(dz)<0.1?(prand()>0.5?tetZ:-tetZ):(dz>0?tetZ:-tetZ));
+        }
+      } else {
+        // sp: 直線
+        pos[ni][2]=pos[cur][2];
+      }
+      bfsQ.push(ni);
+    }
   }
 
-  // --- ベクトルユーティリティ ---
+  // === 力場最適化 (z方向重点, xy微調整) ===
+  // 2Dのxy座標はトポロジー的に正しいので大きく動かさない
+  const NITER=n>100?400:250;
+  const IDEAL_ANGLE={sp3:109.47*Math.PI/180,sp2:120*Math.PI/180,sp:Math.PI};
+
+  // ユーティリティ
   function vsub(a,b){return[a[0]-b[0],a[1]-b[1],a[2]-b[2]];}
-  function vadd(a,b){return[a[0]+b[0],a[1]+b[1],a[2]+b[2]];}
   function vscale(a,s){return[a[0]*s,a[1]*s,a[2]*s];}
   function vdot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
   function vcross(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
   function vnorm(a){return Math.sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]);}
   function vnormalize(a){const l=vnorm(a)||1e-10;return[a[0]/l,a[1]/l,a[2]/l];}
 
-  // ===============================================================
-  // Phase 1: BFS トポロジー駆動 3D座標構築
-  // 2D座標に頼らず、結合角・二面角から直接3D座標を構築
-  // ===============================================================
-  const pos=Array.from({length:n},()=>[0,0,0]);
-  const placed=new Array(n).fill(false);
-
-  // 開始原子: 結合が最も多い原子
-  let startIdx=0,maxDeg=0;
-  for(let i=0;i<n;i++){if(adj[i].length>maxDeg){maxDeg=adj[i].length;startIdx=i;}}
-
-  placed[startIdx]=true;
-  pos[startIdx]=[0,0,0];
-
-  // 最初の隣接原子を+x方向に配置
-  if(adj[startIdx].length>0){
-    const first=adj[startIdx][0];
-    const bl=idealBondLen(startIdx,first.to,first.order);
-    pos[first.to]=[bl,0,0];
-    placed[first.to]=true;
+  function idealBondLen(i,j,order){
+    let len=getCov(atomList[i].symbol)+getCov(atomList[j].symbol);
+    if(order>=2)len-=0.15;if(order>=3)len-=0.25;if(order===1.5)len-=0.08;
+    return len;
   }
 
-  // BFS配置: 配置済み原子の隣接を理想幾何で配置
-  const queue=[startIdx];
-  if(adj[startIdx].length>0)queue.push(adj[startIdx][0].to);
-
-  // ランダム要素に決定的シード
-  let rngState=42;
-  function rng(){rngState=(rngState*1103515245+12345)&0x7fffffff;return rngState/0x7fffffff;}
-
-  while(queue.length>0){
-    const cur=queue.shift();
-    const unplaced=adj[cur].filter(e=>!placed[e.to]);
-    if(unplaced.length===0)continue;
-
-    // 配置済み隣接原子を集める
-    const placedNeighbors=adj[cur].filter(e=>placed[e.to]);
-
-    for(const edge of unplaced){
-      const ni=edge.to;
-      const bl=idealBondLen(cur,ni,edge.order);
-      const idealAngle=IDEAL_ANGLE[hybrid[cur]];
-
-      if(placedNeighbors.length===0){
-        // 隣接原子なし → 適当な方向
-        pos[ni]=[pos[cur][0]+bl,pos[cur][1],pos[cur][2]];
-      } else if(placedNeighbors.length===1){
-        // 1つの参照 → 理想角度で配置
-        const ref=placedNeighbors[0].to;
-        const dir=vnormalize(vsub(pos[ref],pos[cur]));
-        // dirに垂直なベクトルを作る
-        let perp;
-        if(Math.abs(dir[0])<0.9)perp=vnormalize(vcross(dir,[1,0,0]));
-        else perp=vnormalize(vcross(dir,[0,1,0]));
-
-        // sp2ならperp方向に平面配置、sp3なら二面角付き
-        const cosA=Math.cos(Math.PI-idealAngle);
-        const sinA=Math.sin(Math.PI-idealAngle);
-
-        // 二面角: sp3→60°(staggered), sp2→0°(flat)
-        let dihedral=hybrid[cur]==='sp3'?(Math.PI/3)*(rng()>0.5?1:-1):0;
-        // 芳香環内なら平面
-        if(inAromaticRing.has(cur)&&inAromaticRing.has(ni))dihedral=0;
-
-        const perp2=vcross(dir,perp);
-        const newDir=vadd(vscale(dir,-cosA),vadd(vscale(perp,sinA*Math.cos(dihedral)),vscale(perp2,sinA*Math.sin(dihedral))));
-        pos[ni]=vadd(pos[cur],vscale(vnormalize(newDir),bl));
-      } else {
-        // 2+の参照 → 利用可能な方向を計算
-        // 既存結合の方向から理想角度で離れた方向を探す
-        const existingDirs=placedNeighbors.map(e=>vnormalize(vsub(pos[e.to],pos[cur])));
-
-        if(hybrid[cur]==='sp2'||inAromaticRing.has(cur)){
-          // 平面: 既存方向の反対側（角度二等分線の反対）
-          let avgDir=[0,0,0];
-          existingDirs.forEach(d=>{avgDir[0]+=d[0];avgDir[1]+=d[1];avgDir[2]+=d[2];});
-          avgDir=vnormalize(avgDir);
-          // 反対方向
-          const newDir=vscale(avgDir,-1);
-          pos[ni]=vadd(pos[cur],vscale(vnormalize(newDir),bl));
-        } else if(hybrid[cur]==='sp3'){
-          if(existingDirs.length===2){
-            // 2つ既存: 四面体の残り方向
-            const avg=vnormalize(vadd(existingDirs[0],existingDirs[1]));
-            const cr=vnormalize(vcross(existingDirs[0],existingDirs[1]));
-            // 四面体角 → avg反対+cross方向
-            const newDir=vadd(vscale(avg,-0.816),vscale(cr,0.577*(rng()>0.5?1:-1)));
-            pos[ni]=vadd(pos[cur],vscale(vnormalize(newDir),bl));
-          } else if(existingDirs.length>=3){
-            // 3つ既存: 残り1方向
-            let avg=[0,0,0];
-            existingDirs.forEach(d=>{avg[0]+=d[0];avg[1]+=d[1];avg[2]+=d[2];});
-            const newDir=vscale(vnormalize(avg),-1);
-            pos[ni]=vadd(pos[cur],vscale(vnormalize(newDir),bl));
-          }
-        } else {
-          // sp: 反対方向
-          const newDir=vscale(existingDirs[0],-1);
-          pos[ni]=vadd(pos[cur],vscale(newDir,bl));
-        }
-      }
-
-      placed[ni]=true;
-      placedNeighbors.push(edge);
-      queue.push(ni);
-    }
-  }
-
-  // 未配置原子のフォールバック（非連結分子）
-  for(let i=0;i<n;i++){
-    if(!placed[i]){
-      pos[i]=[(rng()-0.5)*5,(rng()-0.5)*5,(rng()-0.5)*5];
-      placed[i]=true;
-    }
-  }
-
-  // ===============================================================
-  // Phase 2: MMFF力場最適化
-  // ===============================================================
-
-  // --- 角度リスト ---
+  // 角度リスト
   const angles=[];
   for(let j=0;j<n;j++){
     const neigh=adj[j];
-    for(let a=0;a<neigh.length;a++){
-      for(let b=a+1;b<neigh.length;b++){
-        angles.push({i:neigh[a].to, j, k:neigh[b].to, ideal:IDEAL_ANGLE[hybrid[j]]});
-      }
-    }
+    for(let a=0;a<neigh.length;a++)
+      for(let b=a+1;b<neigh.length;b++)
+        angles.push({i:neigh[a].to,j,k:neigh[b].to,ideal:IDEAL_ANGLE[hybrid[j]]});
   }
 
-  // --- 二面角リスト ---
-  const torsions=[];
-  for(const bnd of bondMap){
-    const j=bnd.from, k=bnd.to;
-    for(const ej of adj[j]){
-      if(ej.to===k)continue;
-      for(const ek of adj[k]){
-        if(ek.to===j||ek.to===ej.to)continue;
-        let idealTorsion=Math.PI/3;
-        let barrier=1.0;
-        if(hybrid[j]==='sp2'&&hybrid[k]==='sp2'){idealTorsion=0;barrier=6.0;}
-        else if(hybrid[j]==='sp2'||hybrid[k]==='sp2'){idealTorsion=0;barrier=2.0;}
-        torsions.push({i:ej.to,j,k,l:ek.to,ideal:idealTorsion,barrier});
-      }
-    }
-  }
-
-  // --- 平面性リスト ---
-  const planarGroups=[];
-  for(let i=0;i<n;i++){
-    if(hybrid[i]==='sp2'&&adj[i].length>=3){
-      planarGroups.push([i,...adj[i].map(e=>e.to)]);
-    }
-  }
-  aromaticRings.forEach(ri=>planarGroups.push([...rings[ri]]));
-
-  // --- 1-2, 1-3ペア (VDW除外用) を事前計算 ---
+  // 1-2, 1-3除外セット
   const excluded=new Set();
   for(let i=0;i<n;i++){
     for(const e of adj[i]){
-      if(e.to>i)excluded.add(i*n+e.to);
+      const lo=Math.min(i,e.to),hi=Math.max(i,e.to);
+      excluded.add(lo*n+hi);
       for(const e2 of adj[e.to]){
-        if(e2.to>i&&e2.to!==i)excluded.add(Math.min(i,e2.to)*n+Math.max(i,e2.to));
+        if(e2.to!==i){const lo2=Math.min(i,e2.to),hi2=Math.max(i,e2.to);excluded.add(lo2*n+hi2);}
       }
     }
   }
 
-  // 二面角計算
-  function calcTorsion(pi,pj,pk,pl){
-    const b1=vsub(pj,pi),b2=vsub(pk,pj),b3=vsub(pl,pk);
-    const n1=vcross(b1,b2),n2=vcross(b2,b3);
-    const ln1=vnorm(n1),ln2=vnorm(n2);
-    if(ln1<1e-8||ln2<1e-8)return 0;
-    let cos=vdot(n1,n2)/(ln1*ln2);
-    cos=Math.max(-1,Math.min(1,cos));
-    let angle=Math.acos(cos);
-    if(vdot(vcross(n1,n2),b2)<0)angle=-angle;
-    return angle;
+  // 平面性グループ
+  const planarGroups=[];
+  for(let i=0;i<n;i++){
+    if(hybrid[i]==='sp2'&&adj[i].length>=3)
+      planarGroups.push([i,...adj[i].map(e=>e.to)]);
   }
 
-  // 大分子用: イテレーション数・VDWカットオフ調整
-  const NITER=n>100?500:350;
-  const vdwCutoff=n>100?3.5:5.0;
-  // VDW: グリッドセル法 (大分子高速化)
-  const useGrid=n>80;
-  let stepSize=0.015;
+  let stepSize=0.012;
 
   for(let iter=0;iter<NITER;iter++){
     const grad=Array.from({length:n},()=>[0,0,0]);
 
-    // 1) 結合伸縮: E=kb*(r-r0)²
-    const kb=350;
+    // 1) 結合伸縮
+    const kb=300;
     for(const b of bondMap){
       const rij=vsub(pos[b.to],pos[b.from]);
       const r=vnorm(rij)||1e-10;
       const r0=idealBondLen(b.from,b.to,b.order);
       const dr=r-r0;
-      const f=2*kb*dr/r;
-      const fv=[rij[0]*f/r,rij[1]*f/r,rij[2]*f/r];
+      const f=2*kb*dr;
+      const fv=[rij[0]*f/(r*r),rij[1]*f/(r*r),rij[2]*f/(r*r)];
       grad[b.from][0]+=fv[0];grad[b.from][1]+=fv[1];grad[b.from][2]+=fv[2];
       grad[b.to][0]-=fv[0];grad[b.to][1]-=fv[1];grad[b.to][2]-=fv[2];
     }
 
-    // 2) 結合角: E=ka*(θ-θ0)²
-    const ka=100;
+    // 2) 結合角
+    const ka=80;
     for(const ang of angles){
       const rji=vsub(pos[ang.i],pos[ang.j]);
       const rjk=vsub(pos[ang.k],pos[ang.j]);
-      const lji=vnorm(rji)||1e-10, ljk=vnorm(rjk)||1e-10;
-      let cosTheta=vdot(rji,rjk)/(lji*ljk);
-      cosTheta=Math.max(-0.999,Math.min(0.999,cosTheta));
-      const theta=Math.acos(cosTheta);
-      const dTheta=theta-ang.ideal;
-      const sinTheta=Math.sin(theta)||1e-10;
-      const dEdTheta=2*ka*dTheta;
-      const uji=vnormalize(rji), ujk=vnormalize(rjk);
-      const fi=vscale(vsub(vscale(ujk,1/lji),vscale(uji,cosTheta/lji)),-dEdTheta/sinTheta);
-      const fk=vscale(vsub(vscale(uji,1/ljk),vscale(ujk,cosTheta/ljk)),-dEdTheta/sinTheta);
+      const lji=vnorm(rji)||1e-10,ljk=vnorm(rjk)||1e-10;
+      let cosT=vdot(rji,rjk)/(lji*ljk);
+      cosT=Math.max(-0.999,Math.min(0.999,cosT));
+      const theta=Math.acos(cosT);
+      const dT=theta-ang.ideal;
+      const sinT=Math.sin(theta)||1e-10;
+      const dE=2*ka*dT;
+      const uji=vnormalize(rji),ujk=vnormalize(rjk);
+      const fi=vscale(vsub(vscale(ujk,1/lji),vscale(uji,cosT/lji)),-dE/sinT);
+      const fk=vscale(vsub(vscale(uji,1/ljk),vscale(ujk,cosT/ljk)),-dE/sinT);
       grad[ang.i][0]-=fi[0];grad[ang.i][1]-=fi[1];grad[ang.i][2]-=fi[2];
       grad[ang.k][0]-=fk[0];grad[ang.k][1]-=fk[1];grad[ang.k][2]-=fk[2];
       grad[ang.j][0]+=fi[0]+fk[0];grad[ang.j][1]+=fi[1]+fk[1];grad[ang.j][2]+=fi[2]+fk[2];
     }
 
-    // 3) 二面角 (数値勾配, 前半フェーズで適用)
-    if(iter<NITER*0.7){
-      const eps=0.0005;
-      const torsionScale=iter<NITER*0.3?4.0:2.0;
-      // 大分子ではサンプリング
-      const torsionList=n>150&&torsions.length>500?
-        torsions.filter((_,idx)=>(idx+iter)%3===0):torsions;
-      for(const t of torsionList){
-        const nfold=(hybrid[t.j]==='sp2'&&hybrid[t.k]==='sp2')?2:3;
-        const phi=calcTorsion(pos[t.i],pos[t.j],pos[t.k],pos[t.l]);
-        const E=t.barrier*torsionScale*(1-Math.cos(nfold*phi-nfold*t.ideal));
-        const atoms4=[t.i,t.j,t.k,t.l];
-        for(const ai of atoms4){
-          for(let d=0;d<3;d++){
-            pos[ai][d]+=eps;
-            const phi2=calcTorsion(pos[t.i],pos[t.j],pos[t.k],pos[t.l]);
-            const E2=t.barrier*torsionScale*(1-Math.cos(nfold*phi2-nfold*t.ideal));
-            pos[ai][d]-=eps;
-            grad[ai][d]+=(E2-E)/eps;
-          }
-        }
-      }
-    }
-
-    // 4) VDW反発 (セルリスト高速化)
-    if(useGrid&&iter%2===0){
-      // セルリスト法
-      const cellSize=vdwCutoff;
+    // 3) VDW反発 (セルリスト)
+    if(iter%2===0){
+      const cutoff=3.5;
       const cells=new Map();
       for(let i=0;i<n;i++){
-        const cx=Math.floor(pos[i][0]/cellSize);
-        const cy=Math.floor(pos[i][1]/cellSize);
-        const cz=Math.floor(pos[i][2]/cellSize);
-        const key=cx+','+cy+','+cz;
-        if(!cells.has(key))cells.set(key,[]);
-        cells.get(key).push(i);
+        const ck=Math.floor(pos[i][0]/cutoff)+','+Math.floor(pos[i][1]/cutoff)+','+Math.floor(pos[i][2]/cutoff);
+        if(!cells.has(ck))cells.set(ck,[]);
+        cells.get(ck).push(i);
       }
-      for(const[key,atomsInCell] of cells){
-        const[cx,cy,cz]=key.split(',').map(Number);
-        const neighbors=[];
+      for(const[key,cell] of cells){
+        const[gx,gy,gz]=key.split(',').map(Number);
+        const nearby=[];
         for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){
-          const nk=(cx+dx)+','+(cy+dy)+','+(cz+dz);
-          if(cells.has(nk))neighbors.push(...cells.get(nk));
+          const nk=(gx+dx)+','+(gy+dy)+','+(gz+dz);
+          if(cells.has(nk))nearby.push(...cells.get(nk));
         }
-        for(const i of atomsInCell){
-          for(const j of neighbors){
+        for(const i of cell){
+          for(const j of nearby){
             if(j<=i)continue;
-            if(excluded.has(i*n+j))continue;
+            const lo=Math.min(i,j),hi=Math.max(i,j);
+            if(excluded.has(lo*n+hi))continue;
             const dx=pos[j][0]-pos[i][0],dy=pos[j][1]-pos[i][1],dz=pos[j][2]-pos[i][2];
             const d2=dx*dx+dy*dy+dz*dz;
-            if(d2>vdwCutoff*vdwCutoff||d2<0.001)continue;
+            if(d2>cutoff*cutoff||d2<0.01)continue;
             const dist=Math.sqrt(d2);
-            const sigma=(getVdwRadius(atomList[i].symbol)+getVdwRadius(atomList[j].symbol))*0.5;
-            if(dist<sigma*1.3){
+            const sigma=(getVdw(atomList[i].symbol)+getVdw(atomList[j].symbol))*0.5;
+            if(dist<sigma*1.2){
               const ratio=sigma/dist;
-              const r6=ratio*ratio*ratio*ratio*ratio*ratio;
-              const f=12*0.08*(r6*r6-r6)/dist;
+              const r6=ratio**6;
+              const f=12*0.06*(r6*r6-r6)/dist;
               const fx=-f*dx/dist,fy=-f*dy/dist,fz=-f*dz/dist;
               grad[i][0]+=fx;grad[i][1]+=fy;grad[i][2]+=fz;
               grad[j][0]-=fx;grad[j][1]-=fy;grad[j][2]-=fz;
@@ -2233,70 +2088,45 @@ function generate3DCoords(atomList, bondList){
           }
         }
       }
-    } else if(!useGrid){
-      for(let i=0;i<n;i++){
-        for(let j=i+1;j<n;j++){
-          if(excluded.has(i*n+j))continue;
-          const dx=pos[j][0]-pos[i][0],dy=pos[j][1]-pos[i][1],dz=pos[j][2]-pos[i][2];
-          const d2=dx*dx+dy*dy+dz*dz;
-          if(d2>25||d2<0.001)continue;
-          const dist=Math.sqrt(d2);
-          const sigma=(getVdwRadius(atomList[i].symbol)+getVdwRadius(atomList[j].symbol))*0.5;
-          if(dist<sigma*1.3){
-            const ratio=sigma/dist;
-            const r6=ratio*ratio*ratio*ratio*ratio*ratio;
-            const f=12*0.08*(r6*r6-r6)/dist;
-            const fx=-f*dx/dist,fy=-f*dy/dist,fz=-f*dz/dist;
-            grad[i][0]+=fx;grad[i][1]+=fy;grad[i][2]+=fz;
-            grad[j][0]-=fx;grad[j][1]-=fy;grad[j][2]-=fz;
-          }
-        }
-      }
     }
 
-    // 5) 平面性拘束 (sp2/芳香環)
-    const kplanar=200;
+    // 4) 平面性拘束
+    const kp=180;
     for(const group of planarGroups){
       if(group.length<3)continue;
-      const centroid=[0,0,0];
-      group.forEach(a=>{centroid[0]+=pos[a][0];centroid[1]+=pos[a][1];centroid[2]+=pos[a][2];});
-      centroid[0]/=group.length;centroid[1]/=group.length;centroid[2]/=group.length;
-      let normal=[0,0,0];
+      const c=[0,0,0];
+      group.forEach(a=>{c[0]+=pos[a][0];c[1]+=pos[a][1];c[2]+=pos[a][2];});
+      c[0]/=group.length;c[1]/=group.length;c[2]/=group.length;
+      let nm=[0,0,0];
       for(let g=0;g<group.length-1;g++){
-        const v1=vsub(pos[group[g]],centroid);
-        const v2=vsub(pos[group[g+1]],centroid);
+        const v1=vsub(pos[group[g]],c),v2=vsub(pos[group[g+1]],c);
         const cr=vcross(v1,v2);
-        normal[0]+=cr[0];normal[1]+=cr[1];normal[2]+=cr[2];
+        nm[0]+=cr[0];nm[1]+=cr[1];nm[2]+=cr[2];
       }
-      normal=vnormalize(normal);
+      nm=vnormalize(nm);
       for(const a of group){
-        const d=vdot(vsub(pos[a],centroid),normal);
-        grad[a][0]+=kplanar*d*normal[0];
-        grad[a][1]+=kplanar*d*normal[1];
-        grad[a][2]+=kplanar*d*normal[2];
+        const d=vdot(vsub(pos[a],c),nm);
+        grad[a][0]+=kp*d*nm[0];grad[a][1]+=kp*d*nm[1];grad[a][2]+=kp*d*nm[2];
       }
     }
 
-    // --- 座標更新 ---
-    let maxGrad=0;
+    // 座標更新
+    let maxG=0;
+    for(let i=0;i<n;i++){const g=Math.sqrt(grad[i][0]**2+grad[i][1]**2+grad[i][2]**2);if(g>maxG)maxG=g;}
+    const step=maxG>0?Math.min(stepSize,0.06/maxG):stepSize;
     for(let i=0;i<n;i++){
-      const g=Math.sqrt(grad[i][0]**2+grad[i][1]**2+grad[i][2]**2);
-      if(g>maxGrad)maxGrad=g;
-    }
-    const actualStep=maxGrad>0?Math.min(stepSize,0.08/maxGrad):stepSize;
-    for(let i=0;i<n;i++){
-      pos[i][0]-=grad[i][0]*actualStep;
-      pos[i][1]-=grad[i][1]*actualStep;
-      pos[i][2]-=grad[i][2]*actualStep;
+      pos[i][0]-=grad[i][0]*step;
+      pos[i][1]-=grad[i][1]*step;
+      pos[i][2]-=grad[i][2]*step;
     }
     if(iter>NITER*0.4)stepSize*=0.997;
   }
 
-  // --- 中心を原点に ---
-  let fcx=0,fcy=0,fcz=0;
-  pos.forEach(p=>{fcx+=p[0];fcy+=p[1];fcz+=p[2];});
-  fcx/=n;fcy/=n;fcz/=n;
-  pos.forEach(p=>{p[0]-=fcx;p[1]-=fcy;p[2]-=fcz;});
+  // 中心化
+  let fx=0,fy=0,fz=0;
+  pos.forEach(p=>{fx+=p[0];fy+=p[1];fz+=p[2];});
+  fx/=n;fy/=n;fz/=n;
+  pos.forEach(p=>{p[0]-=fx;p[1]-=fy;p[2]-=fz;});
 
   return{
     atoms3d:pos.map((p,i)=>({x:p[0],y:p[1],z:p[2],symbol:atomList[i].symbol})),
