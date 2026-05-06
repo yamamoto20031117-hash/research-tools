@@ -542,11 +542,53 @@
     <div class="card-top">
       <div class="icon">🧪</div>
       <div>
-        <h2>Temudraw — 化学構造エディタ</h2>
-        <p>ChemDraw風のSVGベース構造式エディタ。単結合〜三重結合、楔形/破線結合、環テンプレート（3〜8員環＋芳香族複素環）を描画可能。MOL V2000形式のインポート/エクスポートに対応。</p>
-        <div class="tags"><span class="tag">SVG</span><span class="tag">MOL</span><span class="tag">構造描画</span><span class="tag wip">作成中</span></div>
+        <h2>Temudraw — 化学構造エディタ <span class="tag wip">作成中</span></h2>
+        <p>ChemDraw風のSVGベース構造式エディタ。単結合〜三重結合、楔形/破線結合、配位結合、環テンプレート（3〜8員環＋芳香族複素環＋ポルフィリン/フタロシアニン）を描画可能。周期表全元素対応。MOL V2000形式のインポート/エクスポートに対応。物質名検索（日本語対応）＋3Dビューア搭載。</p>
+        <div class="tags">
+          <span class="tag">SVG</span><span class="tag">MOL</span>
+          <span class="tag">構造描画</span><span class="tag">3Dビューア</span>
+        </div>
         <a class="launch" href="/Temudraw/">エディタを開く &#8594;</a>
       </div>
+    </div>
+  </div>
+
+  <!-- スレッド板 -->
+  <div class="board" id="board-Temudraw">
+    <div class="board-header" onclick="toggleBoard('Temudraw')">
+      <h3>&#128172; スレッド板</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="count" id="count-Temudraw">0 スレッド</span>
+        <span class="toggle-arrow closed" id="arrow-Temudraw">&#9660;</span>
+      </div>
+    </div>
+    <div class="board-body collapsed" id="body-Temudraw">
+      <div class="thread-list" id="threads-Temudraw"></div>
+      <button class="new-thread-btn" id="ntbtn-Temudraw" onclick="showNewThread('Temudraw')">+ 新しいスレッドを立てる</button>
+      <div class="new-thread-form" id="newform-Temudraw">
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="nt-name-Temudraw" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <div class="pf-row"><input type="text" id="nt-title-Temudraw" placeholder="スレッドタイトル" maxlength="80"></div>
+          <textarea id="nt-body-Temudraw" placeholder="本文を入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button class="cancel-btn" onclick="hideNewThread('Temudraw')">キャンセル</button>
+            <button onclick="createThread('Temudraw')">スレッドを立てる</button>
+          </div>
+        </div>
+      </div>
+      <div class="thread-view" id="view-Temudraw">
+        <span class="tv-back" onclick="backToList('Temudraw')">&#8592; スレッド一覧に戻る</span>
+        <div class="tv-title" id="vtitle-Temudraw"></div>
+        <div id="replies-Temudraw"></div>
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="rp-name-Temudraw" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <textarea id="rp-body-Temudraw" placeholder="レスを入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button onclick="postReply('Temudraw')">書き込む</button>
+          </div>
+        </div>
+      </div>
+      <div class="auto-refresh" id="autorefresh-Temudraw"><div class="spinner"></div> リアルタイム更新中</div>
     </div>
   </div>
 </div>
