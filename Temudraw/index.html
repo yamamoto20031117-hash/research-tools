@@ -1843,7 +1843,76 @@ async function fetchCompound(name){
       }catch(e){}
     }
 
-    // 9) ファジー検索: autocomplete候補から最も近い名前を自動検索
+    // 9) Wikipedia/Wikidata検索 → SMILES/InChI/CAS抽出 → CIR/PubChem
+    if(!sdf2d){
+      try{
+        // 英語・日本語Wikipedia両方を並列検索
+        const [enWiki,jaWiki]=await Promise.allSettled([
+          fetchT(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(name)}&srnamespace=0&srlimit=3&format=json&origin=*`,6000)
+            .then(r=>r.ok?r.json():null).catch(()=>null),
+          fetchT(`https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(name)}&srnamespace=0&srlimit=3&format=json&origin=*`,6000)
+            .then(r=>r.ok?r.json():null).catch(()=>null)
+        ]);
+        const pageTitles=[];
+        const addTitles=(res,lang)=>{
+          if(res.status==='fulfilled'&&res.value?.query?.search){
+            res.value.query.search.forEach(s=>pageTitles.push({title:s.title,lang}));
+          }
+        };
+        addTitles(enWiki,'en');addTitles(jaWiki,'ja');
+
+        for(const pg of pageTitles){
+          if(sdf2d) break;
+          try{
+            // ページ本文からSMILES/InChI/CASを抽出
+            const pageRes=await fetchT(`https://${pg.lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(pg.title)}&prop=revisions&rvprop=content&rvslots=main&format=json&origin=*`,8000);
+            if(!pageRes.ok) continue;
+            const pageData=await pageRes.json();
+            const pages=pageData?.query?.pages;
+            if(!pages) continue;
+            const content=Object.values(pages)[0]?.revisions?.[0]?.slots?.main?.['*']||'';
+            if(!content) continue;
+
+            // SMILES抽出
+            const smiMatch=content.match(/\|\s*SMILES\s*=\s*([^\n|}{]+)/i)||content.match(/smiles\s*=\s*([^\n|}{]+)/i);
+            // InChI抽出
+            const inchiMatch=content.match(/\|\s*InChI\s*=\s*(InChI=[^\n|}{]+)/i);
+            // CAS番号抽出
+            const casMatch=content.match(/\|\s*CAS(?:番号|No|_number)?\s*=\s*(\d{2,7}-\d{2}-\d)/i)
+              ||content.match(/CAS(?:番号|登録番号)[^\d]*(\d{2,7}-\d{2}-\d)/);
+
+            // SMILES → PubChem SDF
+            if(smiMatch&&!sdf2d){
+              const smi=smiMatch[1].trim();
+              if(smi.length>2&&smi.length<500){
+                try{
+                  const r=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(smi)}/SDF?record_type=2d`);
+                  if(r.ok){sdf2d=await r.text();resolvedName=pg.title;}
+                }catch(e){}
+              }
+            }
+            // CAS → CIR SDF
+            if(casMatch&&!sdf2d){
+              const cas=casMatch[1].trim();
+              try{
+                const r=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(cas)}/sdf`,8000);
+                if(r.ok){const t=await r.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=pg.title;}}
+              }catch(e){}
+            }
+            // InChI → CIR SDF
+            if(inchiMatch&&!sdf2d){
+              const inchi=inchiMatch[1].trim();
+              try{
+                const r=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(inchi)}/sdf`,8000);
+                if(r.ok){const t=await r.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=pg.title;}}
+              }catch(e){}
+            }
+          }catch(e){}
+        }
+      }catch(e){}
+    }
+
+    // 10) ファジー検索: autocomplete候補から最も近い名前を自動検索
     if(!sdf2d){
       try{
         const [acRes,cirRes]=await Promise.allSettled([
