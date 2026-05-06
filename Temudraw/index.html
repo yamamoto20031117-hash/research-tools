@@ -192,6 +192,23 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   color:var(--text2);font-size:11px;cursor:pointer;transition:.15s}
 .v3-style-btn.active{background:var(--accent-glow);color:var(--accent)}
 .v3-style-btn:hover{color:var(--text)}
+
+/* ====== 周期表モーダル ====== */
+#periodic-table-modal{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.7);
+  align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#periodic-table-modal.show{display:flex;align-items:center;justify-content:center}
+.pt-container{background:var(--surface);border:1px solid var(--border-hover);border-radius:16px;
+  padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.5);max-width:95vw;max-height:90vh;overflow:auto}
+.pt-container h3{color:var(--text);font-size:14px;font-weight:600;margin-bottom:12px}
+.pt-grid{display:grid;grid-template-columns:repeat(18,1fr);gap:2px}
+.pt-el{width:36px;height:36px;font-size:10px;border-radius:4px;cursor:pointer;
+  border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;
+  font-weight:600;transition:.12s;background:var(--surface3)}
+.pt-el:hover{transform:scale(1.15);border-color:var(--accent);z-index:2;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.pt-spacer{width:36px;height:36px}
+.pt-close{position:absolute;top:12px;right:12px;background:var(--surface3);border:1px solid var(--border);
+  border-radius:8px;padding:6px 12px;color:var(--text2);font-size:12px;cursor:pointer}
+.pt-close:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
 <body>
@@ -266,6 +283,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
       <div class="hd-item" data-act="furan">フラン</div>
       <div class="hd-item" data-act="thiophene">チオフェン</div>
       <div class="hd-item" data-act="imidazole">イミダゾール</div>
+      <div class="hd-sep"></div>
+      <div class="hd-item" data-act="porphyrin">ポルフィリン</div>
+      <div class="hd-item" data-act="phthalocyanine">フタロシアニン</div>
+      <div class="hd-item" data-act="indole">インドール</div>
+      <div class="hd-item" data-act="purine">プリン</div>
     </div>
   </div>
 
@@ -307,6 +329,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   <button class="tb" data-tool="dash">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="2.5 2.5"><line x1="5" y1="19" x2="19" y2="5"/></svg>
     <span class="tip">破線結合<span class="tip-key">D</span></span>
+  </button>
+  <button class="tb" data-tool="coord">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 3"><line x1="5" y1="19" x2="19" y2="5"/><path d="M17 5h3v3" stroke-width="1.5"/></svg>
+    <span class="tip">配位結合<span class="tip-key">4</span></span>
   </button>
   <div class="tb-sep"></div>
   <button class="tb" data-tool="ring6">
@@ -353,6 +379,26 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
     <button class="ap-btn" data-sym="H" style="color:#888">H</button>
     <button class="ap-btn" data-sym="Si" style="color:#868">Si</button>
     <button class="ap-btn" data-sym="..." style="color:var(--text3)">…</button>
+  </div>
+  <h4 style="margin-top:10px">よく使う金属</h4>
+  <div class="ap-grid">
+    <button class="ap-btn" data-sym="Fe" style="color:#6699cc">Fe</button>
+    <button class="ap-btn" data-sym="Cu" style="color:#6699cc">Cu</button>
+    <button class="ap-btn" data-sym="Zn" style="color:#6699cc">Zn</button>
+    <button class="ap-btn" data-sym="Ru" style="color:#6699cc">Ru</button>
+    <button class="ap-btn" data-sym="Eu" style="color:#80cc80">Eu</button>
+    <button class="ap-btn" data-sym="Pt" style="color:#6699cc">Pt</button>
+    <button class="ap-btn" data-sym="Pd" style="color:#6699cc">Pd</button>
+    <button class="ap-btn" data-sym="Au" style="color:#6699cc">Au</button>
+  </div>
+</div>
+
+<!-- 周期表モーダル -->
+<div id="periodic-table-modal">
+  <div class="pt-container" style="position:relative">
+    <button class="pt-close" onclick="closePeriodicTable()">✕ 閉じる</button>
+    <h3>周期表 — 元素を選択</h3>
+    <div class="pt-grid" id="pt-grid"></div>
   </div>
 </div>
 
@@ -699,6 +745,18 @@ function drawBond(b){
       l.setAttribute('stroke-linecap','round');
       g.appendChild(l);
     }
+  } else if(b.stereo==='coord'){
+    const l=createSVG('line');
+    setLA(l,x1,y1,x2,y2);l.setAttribute('stroke',col==='#444'?'#888':col);
+    l.setAttribute('stroke-width','2');l.setAttribute('stroke-linecap','round');
+    l.setAttribute('stroke-dasharray','4 3');
+    g.appendChild(l);
+    const aw=4,al=7;
+    const ax=x2-ux*al,ay=y2-uy*al;
+    const arrow=createSVG('polygon');
+    arrow.setAttribute('points',x2+','+y2+' '+(ax+px*aw)+','+(ay+py*aw)+' '+(ax-px*aw)+','+(ay-py*aw));
+    arrow.setAttribute('fill',col==='#444'?'#888':col);
+    g.appendChild(arrow);
   } else if(b.order===1.5){
     // Aromatic bond: render as single bond (circle drawn separately)
     const l=createSVG('line');
@@ -896,6 +954,10 @@ function placeRing(type,cx,cy){
     case'furan':makeHetero5(cx,cy,0,'O');break;
     case'thiophene':makeHetero5(cx,cy,0,'S');break;
     case'imidazole':makeImidazole(cx,cy);break;
+    case'porphyrin':makePorphyrin(cx,cy);break;
+    case'phthalocyanine':makePhthalocyanine(cx,cy);break;
+    case'indole':makeIndole(cx,cy);break;
+    case'purine':makePurine(cx,cy);break;
   }
 }
 
@@ -931,7 +993,7 @@ function onDown(e){
 
   switch(curTool){
     case'select':doSelDown(w,e);break;
-    case'bond':case'double':case'triple':case'wedge':case'dash':
+    case'bond':case'double':case'triple':case'wedge':case'dash':case'coord':
       startDraw(w);break;
     case'ring6':makeRing(6,w.x,w.y);break;
     case'ring5':makeRing(5,w.x,w.y);break;
@@ -1099,6 +1161,7 @@ function finishDraw(w){
   else if(curTool==='triple')ord=3;
   else if(curTool==='wedge')st='wedge';
   else if(curTool==='dash')st='dash';
+  else if(curTool==='coord')st='coord';
 
   const ex2=bonds.find(b=>(b.from===fa.id&&b.to===ta.id)||(b.from===ta.id&&b.to===fa.id));
   if(ex2){
@@ -1134,7 +1197,7 @@ const pal=document.getElementById('atom-palette');
 document.querySelectorAll('.ap-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const sym=btn.dataset.sym;
-    if(sym==='...'){openAtomDlg(null,true);return;}
+    if(sym==='...'){openPeriodicTable();return;}
     atomSym=sym;
     document.querySelectorAll('.ap-btn').forEach(b=>b.classList.remove('sel'));
     btn.classList.add('sel');
@@ -1182,7 +1245,7 @@ function setTool(t){
   const btn=document.querySelector(`.tb[data-tool="${t}"]`);
   if(btn)btn.classList.add('active');
   const names={select:'選択',bond:'単結合',double:'二重結合',triple:'三重結合',
-    wedge:'楔形結合',dash:'破線結合',ring5:'5員環',ring6:'6員環',benz:'ベンゼン',
+    wedge:'楔形結合',dash:'破線結合',coord:'配位結合',ring5:'5員環',ring6:'6員環',benz:'ベンゼン',
     eraser:'消しゴム',atom:'原子',pan:'移動'};
   document.getElementById('st-tool').textContent=names[t]||t;
   // show/hide atom palette
@@ -1220,6 +1283,7 @@ document.addEventListener('keydown',e=>{
   switch(e.key.toLowerCase()){
     case'v':setTool('select');break;case'1':setTool('bond');break;
     case'2':setTool('double');break;case'3':setTool('triple');break;
+    case'4':setTool('coord');break;
     case'w':setTool('wedge');break;case'd':setTool('dash');break;
     case'5':setTool('ring5');break;case'6':setTool('ring6');break;
     case'b':setTool('benz');break;case'e':setTool('eraser');break;
@@ -1271,6 +1335,7 @@ function doMenuAction(act){
       canvasWrap.classList.toggle('dark-canvas',darkCanvas);render();break;
     case'ring-3':case'ring-4':case'ring-5':case'ring-6':case'benzene':
     case'naphthalene':case'pyridine':case'pyrrole':case'furan':case'thiophene':case'imidazole':
+    case'porphyrin':case'phthalocyanine':case'indole':case'purine':
       pendingRing=act;canvasWrap.style.cursor='cell';
       toast('キャンバスをクリックして配置');break;
   }
@@ -1388,7 +1453,7 @@ function exportMOL(){
     lines.push(`${p10((a.x/40).toFixed(4))}${p10((-a.y/40).toFixed(4))}${p10('0.0000')} ${a.symbol.padEnd(3)} 0  0  0  0  0  0  0  0  0  0  0  0`);
   });
   for(const b of bonds){
-    let st=0;if(b.stereo==='wedge')st=1;else if(b.stereo==='dash')st=6;
+    let st=0;if(b.stereo==='wedge')st=1;else if(b.stereo==='dash')st=6;else if(b.stereo==='coord')st=9;
     const molOrd=b.order===1.5?4:b.order;
     lines.push(`${pad3(idx[b.from])}${pad3(idx[b.to])}${pad3(molOrd)}${pad3(st)}  0  0  0`);
   }
@@ -2579,6 +2644,257 @@ function set3DStyle(style){
   document.querySelectorAll('.v3-style-btn').forEach(b=>b.classList.remove('active'));
   document.querySelector(`.v3-style-btn[data-style="${style}"]`).classList.add('active');
   if(scene) build3D();
+}
+
+// ============================================================
+// 周期表モーダル
+// ============================================================
+const PT_DATA=[
+  {sym:'H',n:1,row:1,col:1,color:'#ffffff'},
+  {sym:'He',n:2,row:1,col:18,color:'#99ccff'},
+  {sym:'Li',n:3,row:2,col:1,color:'#ff6666'},{sym:'Be',n:4,row:2,col:2,color:'#ffa500'},
+  {sym:'B',n:5,row:2,col:13,color:'#cccc66'},{sym:'C',n:6,row:2,col:14,color:'#77dd77'},
+  {sym:'N',n:7,row:2,col:15,color:'#77dd77'},{sym:'O',n:8,row:2,col:16,color:'#77dd77'},
+  {sym:'F',n:9,row:2,col:17,color:'#00cc66'},{sym:'Ne',n:10,row:2,col:18,color:'#99ccff'},
+  {sym:'Na',n:11,row:3,col:1,color:'#ff6666'},{sym:'Mg',n:12,row:3,col:2,color:'#ffa500'},
+  {sym:'Al',n:13,row:3,col:13,color:'#66cc99'},{sym:'Si',n:14,row:3,col:14,color:'#cccc66'},
+  {sym:'P',n:15,row:3,col:15,color:'#77dd77'},{sym:'S',n:16,row:3,col:16,color:'#77dd77'},
+  {sym:'Cl',n:17,row:3,col:17,color:'#00cc66'},{sym:'Ar',n:18,row:3,col:18,color:'#99ccff'},
+  {sym:'K',n:19,row:4,col:1,color:'#ff6666'},{sym:'Ca',n:20,row:4,col:2,color:'#ffa500'},
+  {sym:'Sc',n:21,row:4,col:3,color:'#6699cc'},{sym:'Ti',n:22,row:4,col:4,color:'#6699cc'},
+  {sym:'V',n:23,row:4,col:5,color:'#6699cc'},{sym:'Cr',n:24,row:4,col:6,color:'#6699cc'},
+  {sym:'Mn',n:25,row:4,col:7,color:'#6699cc'},{sym:'Fe',n:26,row:4,col:8,color:'#6699cc'},
+  {sym:'Co',n:27,row:4,col:9,color:'#6699cc'},{sym:'Ni',n:28,row:4,col:10,color:'#6699cc'},
+  {sym:'Cu',n:29,row:4,col:11,color:'#6699cc'},{sym:'Zn',n:30,row:4,col:12,color:'#6699cc'},
+  {sym:'Ga',n:31,row:4,col:13,color:'#66cc99'},{sym:'Ge',n:32,row:4,col:14,color:'#cccc66'},
+  {sym:'As',n:33,row:4,col:15,color:'#cccc66'},{sym:'Se',n:34,row:4,col:16,color:'#77dd77'},
+  {sym:'Br',n:35,row:4,col:17,color:'#00cc66'},{sym:'Kr',n:36,row:4,col:18,color:'#99ccff'},
+  {sym:'Rb',n:37,row:5,col:1,color:'#ff6666'},{sym:'Sr',n:38,row:5,col:2,color:'#ffa500'},
+  {sym:'Y',n:39,row:5,col:3,color:'#6699cc'},{sym:'Zr',n:40,row:5,col:4,color:'#6699cc'},
+  {sym:'Nb',n:41,row:5,col:5,color:'#6699cc'},{sym:'Mo',n:42,row:5,col:6,color:'#6699cc'},
+  {sym:'Tc',n:43,row:5,col:7,color:'#6699cc'},{sym:'Ru',n:44,row:5,col:8,color:'#6699cc'},
+  {sym:'Rh',n:45,row:5,col:9,color:'#6699cc'},{sym:'Pd',n:46,row:5,col:10,color:'#6699cc'},
+  {sym:'Ag',n:47,row:5,col:11,color:'#6699cc'},{sym:'Cd',n:48,row:5,col:12,color:'#6699cc'},
+  {sym:'In',n:49,row:5,col:13,color:'#66cc99'},{sym:'Sn',n:50,row:5,col:14,color:'#66cc99'},
+  {sym:'Sb',n:51,row:5,col:15,color:'#cccc66'},{sym:'Te',n:52,row:5,col:16,color:'#cccc66'},
+  {sym:'I',n:53,row:5,col:17,color:'#00cc66'},{sym:'Xe',n:54,row:5,col:18,color:'#99ccff'},
+  {sym:'Cs',n:55,row:6,col:1,color:'#ff6666'},{sym:'Ba',n:56,row:6,col:2,color:'#ffa500'},
+  {sym:'La',n:57,row:6,col:3,color:'#6699cc'},
+  {sym:'Hf',n:72,row:6,col:4,color:'#6699cc'},{sym:'Ta',n:73,row:6,col:5,color:'#6699cc'},
+  {sym:'W',n:74,row:6,col:6,color:'#6699cc'},{sym:'Re',n:75,row:6,col:7,color:'#6699cc'},
+  {sym:'Os',n:76,row:6,col:8,color:'#6699cc'},{sym:'Ir',n:77,row:6,col:9,color:'#6699cc'},
+  {sym:'Pt',n:78,row:6,col:10,color:'#6699cc'},{sym:'Au',n:79,row:6,col:11,color:'#6699cc'},
+  {sym:'Hg',n:80,row:6,col:12,color:'#6699cc'},{sym:'Tl',n:81,row:6,col:13,color:'#66cc99'},
+  {sym:'Pb',n:82,row:6,col:14,color:'#66cc99'},{sym:'Bi',n:83,row:6,col:15,color:'#66cc99'},
+  {sym:'Po',n:84,row:6,col:16,color:'#66cc99'},{sym:'At',n:85,row:6,col:17,color:'#00cc66'},
+  {sym:'Rn',n:86,row:6,col:18,color:'#99ccff'},
+  {sym:'Fr',n:87,row:7,col:1,color:'#ff6666'},{sym:'Ra',n:88,row:7,col:2,color:'#ffa500'},
+  {sym:'Ac',n:89,row:7,col:3,color:'#6699cc'},
+  {sym:'Rf',n:104,row:7,col:4,color:'#6699cc'},{sym:'Db',n:105,row:7,col:5,color:'#6699cc'},
+  {sym:'Sg',n:106,row:7,col:6,color:'#6699cc'},{sym:'Bh',n:107,row:7,col:7,color:'#6699cc'},
+  {sym:'Hs',n:108,row:7,col:8,color:'#6699cc'},{sym:'Mt',n:109,row:7,col:9,color:'#6699cc'},
+  {sym:'Ds',n:110,row:7,col:10,color:'#6699cc'},{sym:'Rg',n:111,row:7,col:11,color:'#6699cc'},
+  {sym:'Cn',n:112,row:7,col:12,color:'#6699cc'},
+  // Lanthanides (row 9 = displayed below)
+  {sym:'Ce',n:58,row:9,col:4,color:'#80cc80'},{sym:'Pr',n:59,row:9,col:5,color:'#80cc80'},
+  {sym:'Nd',n:60,row:9,col:6,color:'#80cc80'},{sym:'Pm',n:61,row:9,col:7,color:'#80cc80'},
+  {sym:'Sm',n:62,row:9,col:8,color:'#80cc80'},{sym:'Eu',n:63,row:9,col:9,color:'#80cc80'},
+  {sym:'Gd',n:64,row:9,col:10,color:'#80cc80'},{sym:'Tb',n:65,row:9,col:11,color:'#80cc80'},
+  {sym:'Dy',n:66,row:9,col:12,color:'#80cc80'},{sym:'Ho',n:67,row:9,col:13,color:'#80cc80'},
+  {sym:'Er',n:68,row:9,col:14,color:'#80cc80'},{sym:'Tm',n:69,row:9,col:15,color:'#80cc80'},
+  {sym:'Yb',n:70,row:9,col:16,color:'#80cc80'},{sym:'Lu',n:71,row:9,col:17,color:'#80cc80'},
+  // Actinides (row 10)
+  {sym:'Th',n:90,row:10,col:4,color:'#cc80cc'},{sym:'Pa',n:91,row:10,col:5,color:'#cc80cc'},
+  {sym:'U',n:92,row:10,col:6,color:'#cc80cc'},{sym:'Np',n:93,row:10,col:7,color:'#cc80cc'},
+  {sym:'Pu',n:94,row:10,col:8,color:'#cc80cc'},{sym:'Am',n:95,row:10,col:9,color:'#cc80cc'},
+  {sym:'Cm',n:96,row:10,col:10,color:'#cc80cc'},{sym:'Bk',n:97,row:10,col:11,color:'#cc80cc'},
+  {sym:'Cf',n:98,row:10,col:12,color:'#cc80cc'},{sym:'Es',n:99,row:10,col:13,color:'#cc80cc'},
+  {sym:'Fm',n:100,row:10,col:14,color:'#cc80cc'},{sym:'Md',n:101,row:10,col:15,color:'#cc80cc'},
+  {sym:'No',n:102,row:10,col:16,color:'#cc80cc'},{sym:'Lr',n:103,row:10,col:17,color:'#cc80cc'}
+];
+
+function buildPeriodicTable(){
+  const grid=document.getElementById('pt-grid');
+  grid.innerHTML='';
+  // Build a map of row,col -> element
+  const map={};
+  for(const el of PT_DATA) map[el.row+','+el.col]=el;
+  // Rows 1-7 + gap + 9-10
+  const rows=[1,2,3,4,5,6,7,8,9,10];
+  for(const r of rows){
+    for(let c=1;c<=18;c++){
+      const el=map[r+','+c];
+      if(r===8){
+        // spacer row
+        const sp=document.createElement('div');sp.className='pt-spacer';grid.appendChild(sp);
+      } else if(el){
+        const btn=document.createElement('button');
+        btn.className='pt-el';
+        btn.textContent=el.sym;
+        btn.style.color=el.color;
+        btn.title=el.sym+' ('+el.n+')';
+        btn.addEventListener('click',function(){selectPeriodicElement(el.sym);});
+        grid.appendChild(btn);
+      } else {
+        const sp=document.createElement('div');sp.className='pt-spacer';grid.appendChild(sp);
+      }
+    }
+  }
+}
+
+function openPeriodicTable(){
+  document.getElementById('periodic-table-modal').classList.add('show');
+}
+function closePeriodicTable(){
+  document.getElementById('periodic-table-modal').classList.remove('show');
+}
+function selectPeriodicElement(sym){
+  atomSym=sym;
+  document.querySelectorAll('.ap-btn').forEach(function(b){b.classList.remove('sel');});
+  toast('原子: '+sym);
+  closePeriodicTable();
+}
+// Close modal on background click
+document.getElementById('periodic-table-modal').addEventListener('click',function(e){
+  if(e.target===this) closePeriodicTable();
+});
+buildPeriodicTable();
+
+// ============================================================
+// ポルフィリン・フタロシアニン・インドール・プリン テンプレート
+// ============================================================
+function makePorphyrin(cx,cy){
+  saveState();
+  var B=BOND_LEN;
+  var Ri=B*1.8, Ro=B*2.8, Rp=B*2.3;
+  var as=[];
+  for(var q=0;q<4;q++){
+    var base=-Math.PI/2+q*Math.PI/2;
+    var N=addAtom(cx+Ri*Math.cos(base),cy+Ri*Math.sin(base),'N');
+    var spread=0.35;
+    var Ca1=addAtom(cx+Ro*0.82*Math.cos(base-spread),cy+Ro*0.82*Math.sin(base-spread),'C');
+    var Ca2=addAtom(cx+Ro*0.82*Math.cos(base+spread),cy+Ro*0.82*Math.sin(base+spread),'C');
+    var Cb1=addAtom(cx+Rp*Math.cos(base-0.55),cy+Rp*Math.sin(base-0.55),'C');
+    var Cb2=addAtom(cx+Rp*Math.cos(base+0.55),cy+Rp*Math.sin(base+0.55),'C');
+    var mesoAng=base+Math.PI/4;
+    var Cm=addAtom(cx+Ro*Math.cos(mesoAng),cy+Ro*Math.sin(mesoAng),'C');
+    addBond(Ca1.id,Cb1.id,1.5);
+    addBond(Cb1.id,Cb2.id,1.5);
+    addBond(Cb2.id,Ca2.id,1.5);
+    addBond(Ca1.id,N.id,1.5);
+    addBond(N.id,Ca2.id,1.5);
+    as.push({N:N,Ca1:Ca1,Ca2:Ca2,Cb1:Cb1,Cb2:Cb2,Cm:Cm});
+  }
+  for(var q2=0;q2<4;q2++){
+    var cur=as[q2], nxt=as[(q2+1)%4];
+    addBond(cur.Ca2.id,cur.Cm.id,1.5);
+    addBond(cur.Cm.id,nxt.Ca1.id,1.5);
+  }
+  render();
+}
+
+function makePhthalocyanine(cx,cy){
+  saveState();
+  var B=BOND_LEN;
+  var Ri=B*2.0, Ro=B*3.0, Rp=B*2.5, Rb=B*3.5;
+  var as=[];
+  for(var q=0;q<4;q++){
+    var base=-Math.PI/2+q*Math.PI/2;
+    var spread=0.32;
+    var N=addAtom(cx+Ri*Math.cos(base),cy+Ri*Math.sin(base),'N');
+    var Ca1=addAtom(cx+Ro*0.78*Math.cos(base-spread),cy+Ro*0.78*Math.sin(base-spread),'C');
+    var Ca2=addAtom(cx+Ro*0.78*Math.cos(base+spread),cy+Ro*0.78*Math.sin(base+spread),'C');
+    var betaSpread=0.52;
+    var Cb1=addAtom(cx+Rp*Math.cos(base-betaSpread),cy+Rp*Math.sin(base-betaSpread),'C');
+    var Cb2=addAtom(cx+Rp*Math.cos(base+betaSpread),cy+Rp*Math.sin(base+betaSpread),'C');
+    var mesoAng=base+Math.PI/4;
+    var Nm=addAtom(cx+Ro*0.9*Math.cos(mesoAng),cy+Ro*0.9*Math.sin(mesoAng),'N');
+    var benzSpread1=0.70;
+    var Bd1=addAtom(cx+Rb*0.85*Math.cos(base-benzSpread1),cy+Rb*0.85*Math.sin(base-benzSpread1),'C');
+    var Bd2=addAtom(cx+Rb*0.85*Math.cos(base+benzSpread1),cy+Rb*0.85*Math.sin(base+benzSpread1),'C');
+    var Be1=addAtom(cx+Rb*Math.cos(base-0.55),cy+Rb*Math.sin(base-0.55),'C');
+    var Be2=addAtom(cx+Rb*Math.cos(base+0.55),cy+Rb*Math.sin(base+0.55),'C');
+    addBond(Ca1.id,Cb1.id,1.5);
+    addBond(Cb1.id,Cb2.id,1.5);
+    addBond(Cb2.id,Ca2.id,1.5);
+    addBond(Ca1.id,N.id,1.5);
+    addBond(N.id,Ca2.id,1.5);
+    addBond(Cb1.id,Bd1.id,1.5);
+    addBond(Bd1.id,Be1.id,1.5);
+    addBond(Be1.id,Be2.id,1.5);
+    addBond(Be2.id,Bd2.id,1.5);
+    addBond(Bd2.id,Cb2.id,1.5);
+    as.push({N:N,Ca1:Ca1,Ca2:Ca2,Cb1:Cb1,Cb2:Cb2,Nm:Nm});
+  }
+  for(var q2=0;q2<4;q2++){
+    var cur=as[q2], nxt=as[(q2+1)%4];
+    addBond(cur.Ca2.id,cur.Nm.id,1.5);
+    addBond(cur.Nm.id,nxt.Ca1.id,1.5);
+  }
+  render();
+}
+
+function makeIndole(cx,cy){
+  saveState();
+  var n=6,r6=BOND_LEN/(2*Math.sin(Math.PI/6));
+  var ra=[];
+  for(var i=0;i<6;i++){
+    var ang=-Math.PI/2+(2*Math.PI*i)/6;
+    ra.push(addAtom(cx+r6*Math.cos(ang),cy+r6*Math.sin(ang),'C'));
+  }
+  for(var i2=0;i2<6;i2++) addBond(ra[i2].id,ra[(i2+1)%6].id,1.5);
+  // Fuse 5-membered pyrrole ring on bond between ra[0] and ra[1]
+  var shared1=ra[0], shared2=ra[1];
+  var midX=(shared1.x+shared2.x)/2, midY=(shared1.y+shared2.y)/2;
+  var dx2=shared2.x-shared1.x, dy2=shared2.y-shared1.y;
+  var blen=Math.hypot(dx2,dy2);
+  var nx=-dy2/blen, ny=dx2/blen;
+  // Direction away from ring center
+  var ringCx=ra.reduce(function(s,a){return s+a.x;},0)/6;
+  var ringCy=ra.reduce(function(s,a){return s+a.y;},0)/6;
+  var dot=nx*(midX-ringCx)+ny*(midY-ringCy);
+  var dir=dot>0?1:-1;
+  var pDist=BOND_LEN*0.9;
+  var p1=addAtom(midX+nx*dir*pDist+dx2/blen*BOND_LEN*0.3, midY+ny*dir*pDist+dy2/blen*BOND_LEN*0.3,'C');
+  var pN=addAtom(midX+nx*dir*pDist*1.35, midY+ny*dir*pDist*1.35,'N');
+  var p2=addAtom(midX+nx*dir*pDist-dx2/blen*BOND_LEN*0.3, midY+ny*dir*pDist-dy2/blen*BOND_LEN*0.3,'C');
+  addBond(shared1.id,p1.id,1.5);
+  addBond(p1.id,pN.id,1.5);
+  addBond(pN.id,p2.id,1.5);
+  addBond(p2.id,shared2.id,1.5);
+  render();
+}
+
+function makePurine(cx,cy){
+  saveState();
+  var r6=BOND_LEN/(2*Math.sin(Math.PI/6));
+  // 6-membered pyrimidine ring with N at positions 0 and 2
+  var ra=[];
+  for(var i=0;i<6;i++){
+    var ang=-Math.PI/2+(2*Math.PI*i)/6;
+    var sym=(i===0||i===2)?'N':'C';
+    ra.push(addAtom(cx+r6*Math.cos(ang),cy+r6*Math.sin(ang),sym));
+  }
+  for(var i2=0;i2<6;i2++) addBond(ra[i2].id,ra[(i2+1)%6].id,1.5);
+  // Fuse 5-membered imidazole ring on bond between ra[3] and ra[4]
+  var shared1=ra[3], shared2=ra[4];
+  var midX=(shared1.x+shared2.x)/2, midY=(shared1.y+shared2.y)/2;
+  var dx2=shared2.x-shared1.x, dy2=shared2.y-shared1.y;
+  var blen=Math.hypot(dx2,dy2);
+  var nx=-dy2/blen, ny=dx2/blen;
+  var ringCx=ra.reduce(function(s,a){return s+a.x;},0)/6;
+  var ringCy=ra.reduce(function(s,a){return s+a.y;},0)/6;
+  var dot=nx*(midX-ringCx)+ny*(midY-ringCy);
+  var dir=dot>0?1:-1;
+  var pDist=BOND_LEN*0.9;
+  var p1=addAtom(midX+nx*dir*pDist+dx2/blen*BOND_LEN*0.3, midY+ny*dir*pDist+dy2/blen*BOND_LEN*0.3,'N');
+  var pC=addAtom(midX+nx*dir*pDist*1.35, midY+ny*dir*pDist*1.35,'C');
+  var p2=addAtom(midX+nx*dir*pDist-dx2/blen*BOND_LEN*0.3, midY+ny*dir*pDist-dy2/blen*BOND_LEN*0.3,'N');
+  addBond(shared1.id,p1.id,1.5);
+  addBond(p1.id,pC.id,1.5);
+  addBond(pC.id,p2.id,1.5);
+  addBond(p2.id,shared2.id,1.5);
+  render();
 }
 
 // ============================================================
