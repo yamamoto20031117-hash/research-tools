@@ -1683,28 +1683,36 @@ function showDidYouMean(suggestions){
 async function fetchCompound(name){
   searchLoading.style.display='block';
   toast(`"${name}" を検索中...`);
+
+  // タイムアウト付きfetch
+  function fetchT(url,ms=8000){
+    const ctrl=new AbortController();
+    const tid=setTimeout(()=>ctrl.abort(),ms);
+    return fetch(url,{signal:ctrl.signal}).finally(()=>clearTimeout(tid));
+  }
+
   try{
     let sdf2d=null;
     let resolvedName=name;
     let cid=null;
 
-    // === 多段階名前解決: 世界中の物質名に対応 ===
+    // === 多段階名前解決 ===
 
-    // 1) PubChem 名前検索 (最大のDB: 1億+化合物、慣用名・IUPAC・同義語全て)
+    // 1) PubChem 名前直接検索
     try{
-      const res=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/SDF?record_type=2d`);
+      const res=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/SDF?record_type=2d`);
       if(res.ok) sdf2d=await res.text();
     }catch(e){}
 
-    // 2) PubChem失敗 → CID検索 (同義語テーブル経由)
+    // 2) PubChem CID経由
     if(!sdf2d){
       try{
-        const resCid=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON`);
+        const resCid=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON`);
         if(resCid.ok){
           const cidData=await resCid.json();
           cid=cidData.IdentifierList?.CID?.[0];
           if(cid){
-            const resSdf=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/SDF?record_type=2d`);
+            const resSdf=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/SDF?record_type=2d`);
             if(resSdf.ok) sdf2d=await resSdf.text();
           }
         }
@@ -1712,10 +1720,9 @@ async function fetchCompound(name){
     }
 
     // 3) NCI/CADD Chemical Identifier Resolver (CIR)
-    //    慣用名・商品名・研究コード名に強い
     if(!sdf2d){
       try{
-        const resCir=await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(name)}/sdf`);
+        const resCir=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(name)}/sdf`,10000);
         if(resCir.ok){
           const txt=await resCir.text();
           if(txt.includes('V2000')||txt.includes('V3000')) sdf2d=txt;
@@ -1723,35 +1730,33 @@ async function fetchCompound(name){
       }catch(e){}
     }
 
-    // 4) OPSIN (IUPAC名パーサー) → SMILES → PubChem変換
+    // 4) OPSIN (IUPAC名パーサー) → SMILES → PubChem
     if(!sdf2d){
       try{
-        const resOpsin=await fetch(`https://opsin.ch.cam.ac.uk/opsin/${encodeURIComponent(name)}.smi`);
+        const resOpsin=await fetchT(`https://opsin.ch.cam.ac.uk/opsin/${encodeURIComponent(name)}.smi`,6000);
         if(resOpsin.ok){
           const smiles=await resOpsin.text();
-          if(smiles&&smiles.length>0&&!smiles.includes('<!DOCTYPE')){
-            // SMILES → PubChem SDF変換
-            const resSmi=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(smiles.trim())}/SDF?record_type=2d`);
+          if(smiles&&smiles.length>0&&smiles.length<500&&!smiles.includes('<!DOCTYPE')){
+            const resSmi=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(smiles.trim())}/SDF?record_type=2d`);
             if(resSmi.ok) sdf2d=await resSmi.text();
           }
         }
       }catch(e){}
     }
 
-    // 5) PubChem テキスト検索 (部分一致・あいまい検索)
+    // 5) PubChem word検索 (部分一致)
     if(!sdf2d){
       try{
-        const resSearch=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON?name_type=word`);
+        const resSearch=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON?name_type=word`);
         if(resSearch.ok){
           const d=await resSearch.json();
           const firstCid=d.IdentifierList?.CID?.[0];
           if(firstCid){
             cid=firstCid;
-            const resSdf=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${firstCid}/SDF?record_type=2d`);
+            const resSdf=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${firstCid}/SDF?record_type=2d`);
             if(resSdf.ok) sdf2d=await resSdf.text();
-            // 正式名取得
             try{
-              const resN=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${firstCid}/synonyms/JSON`);
+              const resN=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${firstCid}/synonyms/JSON`);
               if(resN.ok){const nd=await resN.json();resolvedName=nd.InformationList?.Information?.[0]?.Synonym?.[0]||name;}
             }catch(e){}
           }
@@ -1759,32 +1764,52 @@ async function fetchCompound(name){
       }catch(e){}
     }
 
-    // 全DB検索失敗
+    // 6) PubChem SDQ full-text検索 (最も広い検索)
+    if(!sdf2d){
+      try{
+        const q=encodeURIComponent(JSON.stringify({select:'*',collection:'compound',where:{pert_iname:name},order:['relevancescore,desc'],start:1,limit:1}));
+        const resSDQ=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/sdq/sdqagent.cgi?infmt=json&outfmt=json&query=${q}`,8000);
+        if(resSDQ.ok){
+          const sdqData=await resSDQ.json();
+          const sdqCid=sdqData?.SDQOutputSet?.[0]?.rows?.[0]?.cid;
+          if(sdqCid){
+            cid=sdqCid;
+            const resSdf=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${sdqCid}/SDF?record_type=2d`);
+            if(resSdf.ok) sdf2d=await resSdf.text();
+            try{
+              const resN=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${sdqCid}/synonyms/JSON`);
+              if(resN.ok){const nd=await resN.json();resolvedName=nd.InformationList?.Information?.[0]?.Synonym?.[0]||name;}
+            }catch(e){}
+          }
+        }
+      }catch(e){}
+    }
+
+    // 全DB検索失敗 → 候補表示
     if(!sdf2d){
       let suggestions=findSimilar(name);
-      try{
-        const resAC=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(name)}/json?limit=5`);
-        if(resAC.ok){
-          const d=await resAC.json();
-          const remote=d.dictionary_terms?.compound||[];
-          const existing=new Set(suggestions.map(s=>s.toLowerCase()));
-          suggestions=[...suggestions,...remote.filter(r=>!existing.has(r.toLowerCase()))].slice(0,8);
-        }
-      }catch(e){}
-      // CIR名前候補も追加
-      try{
-        const resCirNames=await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(name)}/names`);
-        if(resCirNames.ok){
-          const names=(await resCirNames.text()).split('\n').filter(n=>n.trim()).slice(0,3);
-          const existing=new Set(suggestions.map(s=>s.toLowerCase()));
-          suggestions=[...suggestions,...names.filter(n=>!existing.has(n.toLowerCase()))].slice(0,8);
-        }
-      }catch(e){}
+      // PubChem autocomplete + CIR候補を並列取得
+      const [acRes,cirRes]=await Promise.allSettled([
+        fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(name)}/json?limit=6`,5000)
+          .then(r=>r.ok?r.json():null).catch(()=>null),
+        fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(name)}/names`,5000)
+          .then(r=>r.ok?r.text():null).catch(()=>null)
+      ]);
+      const existing=new Set(suggestions.map(s=>s.toLowerCase()));
+      if(acRes.status==='fulfilled'&&acRes.value){
+        const remote=acRes.value.dictionary_terms?.compound||[];
+        remote.filter(r=>!existing.has(r.toLowerCase())).forEach(r=>{existing.add(r.toLowerCase());suggestions.push(r);});
+      }
+      if(cirRes.status==='fulfilled'&&cirRes.value){
+        cirRes.value.split('\n').filter(n=>n.trim()&&n.length<60).slice(0,3)
+          .filter(n=>!existing.has(n.toLowerCase())).forEach(n=>{existing.add(n.toLowerCase());suggestions.push(n);});
+      }
+      suggestions=suggestions.slice(0,8);
       if(suggestions.length>0){
         toast(`"${name}" が見つかりません — 候補を表示`);
         showDidYouMean(suggestions);
       } else {
-        toast(`"${name}" が見つかりません (全データベースを検索済み)`);
+        toast(`"${name}" が見つかりません`);
       }
       searchLoading.style.display='none';
       return;
