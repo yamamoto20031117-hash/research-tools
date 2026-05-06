@@ -2763,137 +2763,185 @@ buildPeriodicTable();
 // ============================================================
 // ポルフィリン・フタロシアニン・インドール・プリン テンプレート
 // ============================================================
+// ポルフィリン: 明示的座標（教科書的な構造）
 function makePorphyrin(cx,cy){
   saveState();
   var B=BOND_LEN;
-  var Ri=B*1.8, Ro=B*2.8, Rp=B*2.3;
-  var as=[];
+  // 正確なポルフィリン座標（中心=0,0、Bでスケール）
+  // 4つのピロール環（各5原子）+ 4つのメソ炭素 = 24原子
+  var coords=[
+    // ピロール1（上）: N top, alpha左右, beta左右
+    {x:0,    y:-1.4, s:'N'},   // 0: N1
+    {x:-0.7, y:-1.95,s:'C'},   // 1: Ca1
+    {x:-1.2, y:-2.85,s:'C'},   // 2: Cb1
+    {x:-0.45,y:-3.25,s:'C'},   // 3: Cb2 (was wrong: should connect back)
+    // Actually, let me use a clean coordinate system
+  ];
+  // Better approach: use parametric pyrrole positioning
+  // Each pyrrole: 5 atoms in a regular pentagon oriented toward center
+  // Then connect with meso carbons
+
+  // Pyrrole ring radius
+  var pr=B*0.62; // half-size pyrrole
+  var R=B*2.2;   // center to pyrrole-center distance
+
+  var pyrroles=[];
   for(var q=0;q<4;q++){
-    var base=-Math.PI/2+q*Math.PI/2;
-    var N=addAtom(cx+Ri*Math.cos(base),cy+Ri*Math.sin(base),'N');
-    var spread=0.35;
-    var Ca1=addAtom(cx+Ro*0.82*Math.cos(base-spread),cy+Ro*0.82*Math.sin(base-spread),'C');
-    var Ca2=addAtom(cx+Ro*0.82*Math.cos(base+spread),cy+Ro*0.82*Math.sin(base+spread),'C');
-    var Cb1=addAtom(cx+Rp*Math.cos(base-0.55),cy+Rp*Math.sin(base-0.55),'C');
-    var Cb2=addAtom(cx+Rp*Math.cos(base+0.55),cy+Rp*Math.sin(base+0.55),'C');
-    var mesoAng=base+Math.PI/4;
-    var Cm=addAtom(cx+Ro*Math.cos(mesoAng),cy+Ro*Math.sin(mesoAng),'C');
-    addBond(Ca1.id,Cb1.id,1.5);
-    addBond(Cb1.id,Cb2.id,1.5);
-    addBond(Cb2.id,Ca2.id,1.5);
-    addBond(Ca1.id,N.id,1.5);
-    addBond(N.id,Ca2.id,1.5);
-    as.push({N:N,Ca1:Ca1,Ca2:Ca2,Cb1:Cb1,Cb2:Cb2,Cm:Cm});
+    var ang=q*Math.PI/2; // 0, 90, 180, 270
+    var pcx=cx+R*Math.sin(ang);
+    var pcy=cy-R*Math.cos(ang);
+    // Pyrrole: 5 atoms, N points toward center
+    // Arrange as regular pentagon with N closest to macrocycle center
+    var atomsQ=[];
+    for(var i=0;i<5;i++){
+      // Pentagon vertices: N at bottom (toward center), going CW
+      var pa=ang+Math.PI+(i-0)*2*Math.PI/5;
+      var sym=(i===0)?'N':'C';
+      atomsQ.push(addAtom(pcx+pr*Math.sin(pa), pcy-pr*Math.cos(pa), sym));
+    }
+    // Bonds: 0-1, 1-2, 2-3, 3-4, 4-0
+    for(var j=0;j<5;j++) addBond(atomsQ[j].id, atomsQ[(j+1)%5].id, 1.5);
+    pyrroles.push(atomsQ);
   }
+  // Meso carbons: between adjacent pyrroles (connect alpha carbons)
+  // In each pyrrole [N,C,C,C,C]: atoms[1] and atoms[4] are alpha carbons
   for(var q2=0;q2<4;q2++){
-    var cur=as[q2], nxt=as[(q2+1)%4];
-    addBond(cur.Ca2.id,cur.Cm.id,1.5);
-    addBond(cur.Cm.id,nxt.Ca1.id,1.5);
+    var cur=pyrroles[q2];
+    var nxt=pyrroles[(q2+1)%4];
+    // meso carbon between cur alpha(4) and nxt alpha(1)
+    var mx=(cur[4].x+nxt[1].x)/2;
+    var my=(cur[4].y+nxt[1].y)/2;
+    // Push meso outward slightly
+    var dx=mx-cx, dy=my-cy;
+    var d=Math.hypot(dx,dy);
+    var meso=addAtom(cx+dx/d*(d+B*0.2), cy+dy/d*(d+B*0.2), 'C');
+    addBond(cur[4].id, meso.id, 1.5);
+    addBond(meso.id, nxt[1].id, 1.5);
   }
   render();
 }
 
+// フタロシアニン: ポルフィリン + 融合ベンゼン環 + アザ架橋
 function makePhthalocyanine(cx,cy){
   saveState();
   var B=BOND_LEN;
-  var Ri=B*2.0, Ro=B*3.0, Rp=B*2.5, Rb=B*3.5;
-  var as=[];
+  var pr=B*0.62;
+  var R=B*2.6;
+
+  var pyrroles=[];
   for(var q=0;q<4;q++){
-    var base=-Math.PI/2+q*Math.PI/2;
-    var spread=0.32;
-    var N=addAtom(cx+Ri*Math.cos(base),cy+Ri*Math.sin(base),'N');
-    var Ca1=addAtom(cx+Ro*0.78*Math.cos(base-spread),cy+Ro*0.78*Math.sin(base-spread),'C');
-    var Ca2=addAtom(cx+Ro*0.78*Math.cos(base+spread),cy+Ro*0.78*Math.sin(base+spread),'C');
-    var betaSpread=0.52;
-    var Cb1=addAtom(cx+Rp*Math.cos(base-betaSpread),cy+Rp*Math.sin(base-betaSpread),'C');
-    var Cb2=addAtom(cx+Rp*Math.cos(base+betaSpread),cy+Rp*Math.sin(base+betaSpread),'C');
-    var mesoAng=base+Math.PI/4;
-    var Nm=addAtom(cx+Ro*0.9*Math.cos(mesoAng),cy+Ro*0.9*Math.sin(mesoAng),'N');
-    var benzSpread1=0.70;
-    var Bd1=addAtom(cx+Rb*0.85*Math.cos(base-benzSpread1),cy+Rb*0.85*Math.sin(base-benzSpread1),'C');
-    var Bd2=addAtom(cx+Rb*0.85*Math.cos(base+benzSpread1),cy+Rb*0.85*Math.sin(base+benzSpread1),'C');
-    var Be1=addAtom(cx+Rb*Math.cos(base-0.55),cy+Rb*Math.sin(base-0.55),'C');
-    var Be2=addAtom(cx+Rb*Math.cos(base+0.55),cy+Rb*Math.sin(base+0.55),'C');
-    addBond(Ca1.id,Cb1.id,1.5);
-    addBond(Cb1.id,Cb2.id,1.5);
-    addBond(Cb2.id,Ca2.id,1.5);
-    addBond(Ca1.id,N.id,1.5);
-    addBond(N.id,Ca2.id,1.5);
-    addBond(Cb1.id,Bd1.id,1.5);
-    addBond(Bd1.id,Be1.id,1.5);
-    addBond(Be1.id,Be2.id,1.5);
-    addBond(Be2.id,Bd2.id,1.5);
-    addBond(Bd2.id,Cb2.id,1.5);
-    as.push({N:N,Ca1:Ca1,Ca2:Ca2,Cb1:Cb1,Cb2:Cb2,Nm:Nm});
+    var ang=q*Math.PI/2;
+    var pcx=cx+R*Math.sin(ang);
+    var pcy=cy-R*Math.cos(ang);
+    var atomsQ=[];
+    for(var i=0;i<5;i++){
+      var pa=ang+Math.PI+i*2*Math.PI/5;
+      var sym=(i===0)?'N':'C';
+      atomsQ.push(addAtom(pcx+pr*Math.sin(pa), pcy-pr*Math.cos(pa), sym));
+    }
+    for(var j=0;j<5;j++) addBond(atomsQ[j].id, atomsQ[(j+1)%5].id, 1.5);
+
+    // 融合ベンゼン環: beta炭素(atoms[2],atoms[3])に接合
+    var b1=atomsQ[2], b2=atomsQ[3];
+    var bmx=(b1.x+b2.x)/2, bmy=(b1.y+b2.y)/2;
+    var bNx=bmx-pcx, bNy=bmy-pcy;
+    var bNorm=Math.hypot(bNx,bNy);
+    bNx/=bNorm; bNy/=bNorm;
+    var bdx=b2.x-b1.x, bdy=b2.y-b1.y;
+    var bLen=Math.hypot(bdx,bdy);
+    var btx=bdx/bLen, bty=bdy/bLen;
+    // 4 new atoms for fused benzene
+    var f1=addAtom(b1.x+bNx*B*0.85-btx*B*0.1, b1.y+bNy*B*0.85-bty*B*0.1, 'C');
+    var f2=addAtom(b1.x+bNx*B*1.7, b1.y+bNy*B*1.7, 'C');
+    var f3=addAtom(b2.x+bNx*B*1.7, b2.y+bNy*B*1.7, 'C');
+    var f4=addAtom(b2.x+bNx*B*0.85+btx*B*0.1, b2.y+bNy*B*0.85+bty*B*0.1, 'C');
+    addBond(b1.id, f1.id, 1.5); addBond(f1.id, f2.id, 1.5);
+    addBond(f2.id, f3.id, 1.5); addBond(f3.id, f4.id, 1.5);
+    addBond(f4.id, b2.id, 1.5);
+
+    pyrroles.push(atomsQ);
   }
+  // アザ架橋（メソ位置にN）
   for(var q2=0;q2<4;q2++){
-    var cur=as[q2], nxt=as[(q2+1)%4];
-    addBond(cur.Ca2.id,cur.Nm.id,1.5);
-    addBond(cur.Nm.id,nxt.Ca1.id,1.5);
+    var cur=pyrroles[q2];
+    var nxt=pyrroles[(q2+1)%4];
+    var mx=(cur[4].x+nxt[1].x)/2;
+    var my=(cur[4].y+nxt[1].y)/2;
+    var aN=addAtom(mx, my, 'N');
+    addBond(cur[4].id, aN.id, 1.5);
+    addBond(aN.id, nxt[1].id, 1.5);
   }
   render();
 }
 
+// インドール: ベンゼン + ピロール融合（ナフタレン方式で共有原子マージ）
 function makeIndole(cx,cy){
   saveState();
-  var n=6,r6=BOND_LEN/(2*Math.sin(Math.PI/6));
+  var B=BOND_LEN;
+  var r6=B/(2*Math.sin(Math.PI/6));
+  var r5=B/(2*Math.sin(Math.PI/5));
+  // ベンゼン環
   var ra=[];
   for(var i=0;i<6;i++){
-    var ang=-Math.PI/2+(2*Math.PI*i)/6;
-    ra.push(addAtom(cx+r6*Math.cos(ang),cy+r6*Math.sin(ang),'C'));
+    var a6=-Math.PI/2+(2*Math.PI*i)/6;
+    ra.push(addAtom(cx+r6*Math.cos(a6), cy+r6*Math.sin(a6), 'C'));
   }
-  for(var i2=0;i2<6;i2++) addBond(ra[i2].id,ra[(i2+1)%6].id,1.5);
-  // Fuse 5-membered pyrrole ring on bond between ra[0] and ra[1]
-  var shared1=ra[0], shared2=ra[1];
-  var midX=(shared1.x+shared2.x)/2, midY=(shared1.y+shared2.y)/2;
-  var dx2=shared2.x-shared1.x, dy2=shared2.y-shared1.y;
-  var blen=Math.hypot(dx2,dy2);
-  var nx=-dy2/blen, ny=dx2/blen;
-  // Direction away from ring center
-  var ringCx=ra.reduce(function(s,a){return s+a.x;},0)/6;
-  var ringCy=ra.reduce(function(s,a){return s+a.y;},0)/6;
-  var dot=nx*(midX-ringCx)+ny*(midY-ringCy);
-  var dir=dot>0?1:-1;
-  var pDist=BOND_LEN*0.9;
-  var p1=addAtom(midX+nx*dir*pDist+dx2/blen*BOND_LEN*0.3, midY+ny*dir*pDist+dy2/blen*BOND_LEN*0.3,'C');
-  var pN=addAtom(midX+nx*dir*pDist*1.35, midY+ny*dir*pDist*1.35,'N');
-  var p2=addAtom(midX+nx*dir*pDist-dx2/blen*BOND_LEN*0.3, midY+ny*dir*pDist-dy2/blen*BOND_LEN*0.3,'C');
-  addBond(shared1.id,p1.id,1.5);
-  addBond(p1.id,pN.id,1.5);
-  addBond(pN.id,p2.id,1.5);
-  addBond(p2.id,shared2.id,1.5);
+  for(var j=0;j<6;j++) addBond(ra[j].id, ra[(j+1)%6].id, 1.5);
+  // ピロール環: ra[1]-ra[2]の辺を共有して外側に融合
+  // 共有辺の中点から外向き法線を計算
+  var s1=ra[1], s2=ra[2];
+  var mx=(s1.x+s2.x)/2, my=(s1.y+s2.y)/2;
+  // ベンゼン中心からの方向
+  var rcx=0,rcy=0;for(var k=0;k<6;k++){rcx+=ra[k].x;rcy+=ra[k].y;}rcx/=6;rcy/=6;
+  var outX=mx-rcx, outY=my-rcy;
+  var outN=Math.hypot(outX,outY); outX/=outN; outY/=outN;
+  // 共有辺の接線
+  var tx=s2.x-s1.x, ty=s2.y-s1.y;
+  var tN=Math.hypot(tx,ty); tx/=tN; ty/=tN;
+  // 5角形の3つの新頂点（共有辺 + 3新原子）
+  // 正五角形の高さ: h = r5*(1+cos(π/5))
+  var h5=r5*(1+Math.cos(Math.PI/5));
+  var w5=r5*Math.sin(2*Math.PI/5);
+  // 頂点配置: s1→p1→pTop→p2→s2
+  var p1=addAtom(s1.x+outX*B*0.58+tx*B*0.18, s1.y+outY*B*0.58+ty*B*0.18, 'C');
+  var pTop=addAtom(mx+outX*B*0.95, my+outY*B*0.95, 'N');
+  var p2=addAtom(s2.x+outX*B*0.58-tx*B*0.18, s2.y+outY*B*0.58-ty*B*0.18, 'C');
+  addBond(s1.id, p1.id, 1.5);
+  addBond(p1.id, pTop.id, 1.5);
+  addBond(pTop.id, p2.id, 1.5);
+  addBond(p2.id, s2.id, 1.5);
   render();
 }
 
+// プリン: ピリミジン(6員環, N1,N3) + イミダゾール(5員環, N7,N9) 融合
 function makePurine(cx,cy){
   saveState();
-  var r6=BOND_LEN/(2*Math.sin(Math.PI/6));
-  // 6-membered pyrimidine ring with N at positions 0 and 2
+  var B=BOND_LEN;
+  var r6=B/(2*Math.sin(Math.PI/6));
+  // ピリミジン環: N at positions 1,3 (0-indexed: 0,2)
   var ra=[];
   for(var i=0;i<6;i++){
-    var ang=-Math.PI/2+(2*Math.PI*i)/6;
-    var sym=(i===0||i===2)?'N':'C';
-    ra.push(addAtom(cx+r6*Math.cos(ang),cy+r6*Math.sin(ang),sym));
+    var a6=-Math.PI/2+(2*Math.PI*i)/6;
+    var sym=(i===0||i===2)?'N':'C'; // N1, N3
+    ra.push(addAtom(cx+r6*Math.cos(a6), cy+r6*Math.sin(a6), sym));
   }
-  for(var i2=0;i2<6;i2++) addBond(ra[i2].id,ra[(i2+1)%6].id,1.5);
-  // Fuse 5-membered imidazole ring on bond between ra[3] and ra[4]
-  var shared1=ra[3], shared2=ra[4];
-  var midX=(shared1.x+shared2.x)/2, midY=(shared1.y+shared2.y)/2;
-  var dx2=shared2.x-shared1.x, dy2=shared2.y-shared1.y;
-  var blen=Math.hypot(dx2,dy2);
-  var nx=-dy2/blen, ny=dx2/blen;
-  var ringCx=ra.reduce(function(s,a){return s+a.x;},0)/6;
-  var ringCy=ra.reduce(function(s,a){return s+a.y;},0)/6;
-  var dot=nx*(midX-ringCx)+ny*(midY-ringCy);
-  var dir=dot>0?1:-1;
-  var pDist=BOND_LEN*0.9;
-  var p1=addAtom(midX+nx*dir*pDist+dx2/blen*BOND_LEN*0.3, midY+ny*dir*pDist+dy2/blen*BOND_LEN*0.3,'N');
-  var pC=addAtom(midX+nx*dir*pDist*1.35, midY+ny*dir*pDist*1.35,'C');
-  var p2=addAtom(midX+nx*dir*pDist-dx2/blen*BOND_LEN*0.3, midY+ny*dir*pDist-dy2/blen*BOND_LEN*0.3,'N');
-  addBond(shared1.id,p1.id,1.5);
-  addBond(p1.id,pC.id,1.5);
-  addBond(pC.id,p2.id,1.5);
-  addBond(p2.id,shared2.id,1.5);
+  for(var j=0;j<6;j++) addBond(ra[j].id, ra[(j+1)%6].id, 1.5);
+  // イミダゾール環: ra[3](C4)-ra[4](C5)の辺を共有して外側に融合
+  var s1=ra[3], s2=ra[4];
+  var mx=(s1.x+s2.x)/2, my=(s1.y+s2.y)/2;
+  var rcx=0,rcy=0;for(var k=0;k<6;k++){rcx+=ra[k].x;rcy+=ra[k].y;}rcx/=6;rcy/=6;
+  var outX=mx-rcx, outY=my-rcy;
+  var outN=Math.hypot(outX,outY); outX/=outN; outY/=outN;
+  var tx=s2.x-s1.x, ty=s2.y-s1.y;
+  var tN=Math.hypot(tx,ty); tx/=tN; ty/=tN;
+  // N7, C8, N9
+  var p1=addAtom(s2.x+outX*B*0.58-tx*B*0.18, s2.y+outY*B*0.58-ty*B*0.18, 'N'); // N7
+  var pTop=addAtom(mx+outX*B*0.95, my+outY*B*0.95, 'C'); // C8
+  var p2=addAtom(s1.x+outX*B*0.58+tx*B*0.18, s1.y+outY*B*0.58+ty*B*0.18, 'N'); // N9
+  addBond(s2.id, p1.id, 1.5);
+  addBond(p1.id, pTop.id, 1.5);
+  addBond(pTop.id, p2.id, 1.5);
+  addBond(p2.id, s1.id, 1.5);
   render();
 }
 
