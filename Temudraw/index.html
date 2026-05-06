@@ -1764,10 +1764,68 @@ async function fetchCompound(name){
       }catch(e){}
     }
 
-    // 6) PubChem SDQ full-text検索 (最も広い検索)
+    // 6) PubChem Substance名前検索 (compound DBより広い)
     if(!sdf2d){
       try{
-        const q=encodeURIComponent(JSON.stringify({select:'*',collection:'compound',where:{pert_iname:name},order:['relevancescore,desc'],start:1,limit:1}));
+        const resSub=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/substance/name/${encodeURIComponent(name)}/sids/JSON?MaxRecords=3`);
+        if(resSub.ok){
+          const subData=await resSub.json();
+          const sid=subData?.IdentifierList?.SID?.[0];
+          if(sid){
+            // SIDからCIDを取得
+            const resCids=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/substance/sid/${sid}/cids/JSON`);
+            if(resCids.ok){
+              const cidsData=await resCids.json();
+              const foundCid=cidsData?.InformationList?.Information?.[0]?.CID?.[0];
+              if(foundCid){
+                cid=foundCid;
+                const resSdf=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${foundCid}/SDF?record_type=2d`);
+                if(resSdf.ok) sdf2d=await resSdf.text();
+                try{
+                  const resN=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${foundCid}/synonyms/JSON`);
+                  if(resN.ok){const nd=await resN.json();resolvedName=nd.InformationList?.Information?.[0]?.Synonym?.[0]||name;}
+                }catch(e){}
+              }
+            }
+          }
+        }
+      }catch(e){}
+    }
+
+    // 7) 名前バリエーション検索 (ハイフン・スペース追加/除去)
+    if(!sdf2d){
+      const variants=new Set();
+      // cycloawadorin → cyclo-awadorin, cyclo awadorin
+      const nm=name.toLowerCase();
+      // 接頭辞を分離
+      const prefixes=['cyclo','iso','neo','homo','nor','epi','ent','pseudo','dihydro','tetrahydro','deoxy','methyl','dimethyl','acetyl'];
+      for(const p of prefixes){
+        if(nm.startsWith(p)&&nm.length>p.length&&nm[p.length]!=='-'&&nm[p.length]!==' '){
+          variants.add(p+'-'+nm.slice(p.length));
+          variants.add(p+' '+nm.slice(p.length));
+        }
+      }
+      // ハイフン除去/追加
+      if(name.includes('-')) variants.add(name.replace(/-/g,''));
+      for(const v of variants){
+        if(sdf2d) break;
+        try{
+          const res=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(v)}/SDF?record_type=2d`);
+          if(res.ok){sdf2d=await res.text();resolvedName=v;}
+        }catch(e){}
+        if(!sdf2d){
+          try{
+            const res=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(v)}/sdf`,8000);
+            if(res.ok){const t=await res.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=v;}}
+          }catch(e){}
+        }
+      }
+    }
+
+    // 8) PubChem SDQ synonym検索 (最も広い検索)
+    if(!sdf2d){
+      try{
+        const q=encodeURIComponent(JSON.stringify({select:'*',collection:'synonym',where:{synonym:name},order:['relevancescore,desc'],start:1,limit:3}));
         const resSDQ=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/sdq/sdqagent.cgi?infmt=json&outfmt=json&query=${q}`,8000);
         if(resSDQ.ok){
           const sdqData=await resSDQ.json();
@@ -2044,7 +2102,7 @@ function loadThreeJS(cb){
     // Minimal OrbitControls inline
     THREE.OrbitControls=function(camera,domElement){
       this.camera=camera;this.domElement=domElement;this.target=new THREE.Vector3();
-      this.enableDamping=true;this.dampingFactor=0.08;this.rotateSpeed=0.8;
+      this.enableDamping=true;this.dampingFactor=0.08;this.rotateSpeed=0.35;
       this.zoomSpeed=1.2;this.minDistance=2;this.maxDistance=100;
       let spherical=new THREE.Spherical();let sphericalDelta=new THREE.Spherical();
       let scale=1;let panOffset=new THREE.Vector3();
