@@ -1558,20 +1558,44 @@ searchInput.addEventListener('focus',()=>{
 searchInput.addEventListener('blur',()=>{setTimeout(hideAC,200);});
 
 async function fetchRemoteAC(query){
+  const existing=new Set(acItems.map(s=>s.toLowerCase()));
+  let added=false;
+
+  // PubChem autocomplete (1億+化合物)
   try{
-    const res=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(query)}/json?limit=6`);
-    if(!res.ok)return;
-    const data=await res.json();
-    const remote=data.dictionary_terms?.compound||[];
-    if(!remote.length)return;
-    // ローカル結果とマージ（重複排除）
-    const existing=new Set(acItems.map(s=>s.toLowerCase()));
-    const newItems=remote.filter(r=>!existing.has(r.toLowerCase()));
-    if(newItems.length){
-      acItems=[...acItems,...newItems].slice(0,10);
-      renderAC();
+    const res=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(query)}/json?limit=8`);
+    if(res.ok){
+      const data=await res.json();
+      const remote=data.dictionary_terms?.compound||[];
+      const newItems=remote.filter(r=>!existing.has(r.toLowerCase()));
+      if(newItems.length){
+        newItems.forEach(r=>existing.add(r.toLowerCase()));
+        acItems=[...acItems,...newItems];
+        added=true;
+      }
     }
   }catch(e){}
+
+  // CIR名前解決チェック (入力が3文字以上で候補が少ない場合)
+  if(acItems.length<3&&query.length>=3){
+    try{
+      const resCir=await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(query)}/names`);
+      if(resCir.ok){
+        const names=(await resCir.text()).split('\n').filter(n=>n.trim()&&n.length<60).slice(0,4);
+        const newNames=names.filter(n=>!existing.has(n.toLowerCase()));
+        if(newNames.length){
+          newNames.forEach(n=>existing.add(n.toLowerCase()));
+          acItems=[...acItems,...newNames];
+          added=true;
+        }
+      }
+    }catch(e){}
+  }
+
+  if(added){
+    acItems=acItems.slice(0,12);
+    renderAC();
+  }
 }
 
 function renderAC(){
@@ -1658,10 +1682,83 @@ async function fetchCompound(name){
   searchLoading.style.display='block';
   toast(`"${name}" を検索中...`);
   try{
-    // Fetch 2D SDF for editor
-    const res2d=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/SDF?record_type=2d`);
-    if(!res2d.ok){
-      // 見つからない → ローカル辞書で類似候補 + PubChem補完
+    let sdf2d=null;
+    let resolvedName=name;
+    let cid=null;
+
+    // === 多段階名前解決: 世界中の物質名に対応 ===
+
+    // 1) PubChem 名前検索 (最大のDB: 1億+化合物、慣用名・IUPAC・同義語全て)
+    try{
+      const res=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/SDF?record_type=2d`);
+      if(res.ok) sdf2d=await res.text();
+    }catch(e){}
+
+    // 2) PubChem失敗 → CID検索 (同義語テーブル経由)
+    if(!sdf2d){
+      try{
+        const resCid=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON`);
+        if(resCid.ok){
+          const cidData=await resCid.json();
+          cid=cidData.IdentifierList?.CID?.[0];
+          if(cid){
+            const resSdf=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/SDF?record_type=2d`);
+            if(resSdf.ok) sdf2d=await resSdf.text();
+          }
+        }
+      }catch(e){}
+    }
+
+    // 3) NCI/CADD Chemical Identifier Resolver (CIR)
+    //    慣用名・商品名・研究コード名に強い
+    if(!sdf2d){
+      try{
+        const resCir=await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(name)}/sdf`);
+        if(resCir.ok){
+          const txt=await resCir.text();
+          if(txt.includes('V2000')||txt.includes('V3000')) sdf2d=txt;
+        }
+      }catch(e){}
+    }
+
+    // 4) OPSIN (IUPAC名パーサー) → SMILES → PubChem変換
+    if(!sdf2d){
+      try{
+        const resOpsin=await fetch(`https://opsin.ch.cam.ac.uk/opsin/${encodeURIComponent(name)}.smi`);
+        if(resOpsin.ok){
+          const smiles=await resOpsin.text();
+          if(smiles&&smiles.length>0&&!smiles.includes('<!DOCTYPE')){
+            // SMILES → PubChem SDF変換
+            const resSmi=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(smiles.trim())}/SDF?record_type=2d`);
+            if(resSmi.ok) sdf2d=await resSmi.text();
+          }
+        }
+      }catch(e){}
+    }
+
+    // 5) PubChem テキスト検索 (部分一致・あいまい検索)
+    if(!sdf2d){
+      try{
+        const resSearch=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON?name_type=word`);
+        if(resSearch.ok){
+          const d=await resSearch.json();
+          const firstCid=d.IdentifierList?.CID?.[0];
+          if(firstCid){
+            cid=firstCid;
+            const resSdf=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${firstCid}/SDF?record_type=2d`);
+            if(resSdf.ok) sdf2d=await resSdf.text();
+            // 正式名取得
+            try{
+              const resN=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${firstCid}/synonyms/JSON`);
+              if(resN.ok){const nd=await resN.json();resolvedName=nd.InformationList?.Information?.[0]?.Synonym?.[0]||name;}
+            }catch(e){}
+          }
+        }
+      }catch(e){}
+    }
+
+    // 全DB検索失敗
+    if(!sdf2d){
       let suggestions=findSimilar(name);
       try{
         const resAC=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(name)}/json?limit=5`);
@@ -1669,51 +1766,59 @@ async function fetchCompound(name){
           const d=await resAC.json();
           const remote=d.dictionary_terms?.compound||[];
           const existing=new Set(suggestions.map(s=>s.toLowerCase()));
-          suggestions=[...suggestions,...remote.filter(r=>!existing.has(r.toLowerCase()))].slice(0,6);
+          suggestions=[...suggestions,...remote.filter(r=>!existing.has(r.toLowerCase()))].slice(0,8);
+        }
+      }catch(e){}
+      // CIR名前候補も追加
+      try{
+        const resCirNames=await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(name)}/names`);
+        if(resCirNames.ok){
+          const names=(await resCirNames.text()).split('\n').filter(n=>n.trim()).slice(0,3);
+          const existing=new Set(suggestions.map(s=>s.toLowerCase()));
+          suggestions=[...suggestions,...names.filter(n=>!existing.has(n.toLowerCase()))].slice(0,8);
         }
       }catch(e){}
       if(suggestions.length>0){
-        toast(`"${name}" が見つかりません`);
+        toast(`"${name}" が見つかりません — 候補を表示`);
         showDidYouMean(suggestions);
       } else {
-        toast(`"${name}" が見つかりません`);
+        toast(`"${name}" が見つかりません (全データベースを検索済み)`);
       }
       searchLoading.style.display='none';
       return;
     }
-    const sdf2d=await res2d.text();
 
     // Parse into editor
     saveState();
     atoms=[];bonds=[];nxA=1;nxB=1;clearSel();
     parseMOL(sdf2d);
-    toast(`${name} を読み込みました`);
+    const displayName=resolvedName!==name?`${resolvedName} (${name})`:name;
+    toast(`${displayName} を読み込みました`);
 
-    // Fetch 3D SDF for viewer
+    // Fetch 3D SDF for viewer (CID経由が確実)
     let got3D=false;
+    const searchTarget=cid?`cid/${cid}`:`name/${encodeURIComponent(resolvedName)}`;
     try{
-      const res3d=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/SDF?record_type=3d`);
+      const res3d=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/${searchTarget}/SDF?record_type=3d`);
       if(res3d.ok){
         const sdf3d=await res3d.text();
         current3DData=parse3DSDF(sdf3d);
-        current3DData.name=name;
+        current3DData.name=resolvedName;
         got3D=true;
       }
     }catch(e3d){}
-    // 3D取得失敗時は2Dデータ(z=0)で代用
+    // 3D取得失敗時は力場法で3D座標を推定
     if(!got3D){
-      current3DData={
-        atoms3d:atoms.map(a=>({x:a.x/40,y:-a.y/40,z:0,symbol:a.symbol})),
-        bonds3d:bonds.map(b=>({from:atoms.findIndex(a=>a.id===b.from),to:atoms.findIndex(a=>a.id===b.to),order:b.order===1.5?1:b.order})),
-        name,formula:'',mw:0
-      };
+      const gen=generate3DCoords(atoms,bonds);
+      current3DData={...gen,name:resolvedName,formula:'',mw:0};
     }
     document.getElementById('btn-3d').style.borderColor='var(--accent2)';
     document.getElementById('btn-3d').style.color='var(--accent2)';
 
     // Fetch properties
     try{
-      const resProp=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/property/MolecularFormula,MolecularWeight/JSON`);
+      const propTarget=cid?`cid/${cid}`:`name/${encodeURIComponent(resolvedName)}`;
+      const resProp=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/${propTarget}/property/MolecularFormula,MolecularWeight/JSON`);
       if(resProp.ok){
         const prop=await resProp.json();
         const p=prop.PropertyTable.Properties[0];
@@ -1729,6 +1834,335 @@ async function fetchCompound(name){
   }finally{
     searchLoading.style.display='none';
   }
+}
+
+// ============================================================
+// 2D→3D座標生成: MMFF94風 分子力場法
+// 結合伸縮 + 結合角 + 二面角 + ファンデルワールス + 平面性拘束
+// ============================================================
+function generate3DCoords(atomList, bondList){
+  const n=atomList.length;
+  if(n===0)return{atoms3d:[],bonds3d:[]};
+
+  // --- 隣接リスト・結合マップ構築 ---
+  const adj=Array.from({length:n},()=>[]);
+  const bondMap=[];
+  bondList.forEach(b=>{
+    const fi=atomList.findIndex(a=>a.id===b.from);
+    const ti=atomList.findIndex(a=>a.id===b.to);
+    if(fi>=0&&ti>=0){
+      const ord=b.order===1.5?1.5:b.order;
+      adj[fi].push({to:ti,order:ord,bi:bondMap.length});
+      adj[ti].push({to:fi,order:ord,bi:bondMap.length});
+      bondMap.push({from:fi,to:ti,order:ord>=1.5?Math.round(ord):ord});
+    }
+  });
+
+  // --- 原子パラメータ ---
+  const COVALENT_RADII={C:0.77,N:0.70,O:0.66,S:1.04,P:1.07,F:0.64,Cl:0.99,Br:1.14,I:1.33,H:0.31,B:0.84,Si:1.17};
+  const VDW_RADII={C:1.7,N:1.55,O:1.52,S:1.8,P:1.8,F:1.47,Cl:1.75,Br:1.85,I:1.98,H:1.2,B:1.65,Si:2.1};
+
+  function getCovRadius(sym){return COVALENT_RADII[sym]||0.77;}
+  function getVdwRadius(sym){return VDW_RADII[sym]||1.7;}
+
+  // --- 混成推定 ---
+  function getHybrid(idx){
+    const bs=adj[idx];
+    if(bs.length===0)return 'sp3';
+    const maxOrd=Math.max(...bs.map(b=>b.order));
+    const totalOrd=bs.reduce((s,b)=>s+b.order,0);
+    if(maxOrd>=3||(bs.length===2&&totalOrd>=4))return 'sp';
+    if(maxOrd>=2||bs.some(b=>b.order===1.5))return 'sp2';
+    if(bs.length<=3)return bs.length===3?'sp2':'sp3';
+    return 'sp3';
+  }
+  const hybrid=atomList.map((_,i)=>getHybrid(i));
+
+  // 理想角度: sp3=109.47°, sp2=120°, sp=180°
+  const IDEAL_ANGLE={sp3:109.47*Math.PI/180, sp2:120*Math.PI/180, sp:Math.PI};
+
+  // --- リング検出 (各リングを配列で保存) ---
+  const rings=[];
+  const atomRings=Array.from({length:n},()=>[]);// 各原子が属するリングidx
+  (function detectRings(){
+    // DFS cycle detection for rings size 3-8
+    function findCycles(start){
+      const stack=[{node:start,parent:-1,path:[start]}];
+      const visited=new Set([start]);
+      while(stack.length>0){
+        const{node,parent,path}=stack.pop();
+        for(const e of adj[node]){
+          if(e.to===parent)continue;
+          if(visited.has(e.to)){
+            const ci=path.indexOf(e.to);
+            if(ci>=0){
+              const ring=path.slice(ci);
+              if(ring.length>=3&&ring.length<=8){
+                // 重複チェック
+                const key=[...ring].sort().join(',');
+                if(!seenKeys.has(key)){
+                  seenKeys.add(key);
+                  const ri=rings.length;
+                  rings.push(ring);
+                  ring.forEach(a=>atomRings[a].push(ri));
+                }
+              }
+            }
+          } else {
+            visited.add(e.to);
+            stack.push({node:e.to,parent:node,path:[...path,e.to]});
+          }
+        }
+      }
+    }
+    const seenKeys=new Set();
+    for(let i=0;i<n;i++) findCycles(i);
+  })();
+
+  // --- 理想結合長 (Schomaker-Stevenson近似) ---
+  function idealBondLen(i,j,order){
+    const r1=getCovRadius(atomList[i].symbol);
+    const r2=getCovRadius(atomList[j].symbol);
+    let len=r1+r2;
+    if(order>=2)len-=0.15;
+    if(order>=3)len-=0.25;
+    if(order===1.5)len-=0.08;
+    return len;
+  }
+
+  // --- 角度リスト構築 (i-j-k, jが中心原子) ---
+  const angles=[];
+  for(let j=0;j<n;j++){
+    const neigh=adj[j];
+    for(let a=0;a<neigh.length;a++){
+      for(let b=a+1;b<neigh.length;b++){
+        angles.push({i:neigh[a].to, j, k:neigh[b].to, ideal:IDEAL_ANGLE[hybrid[j]]});
+      }
+    }
+  }
+
+  // --- 二面角リスト構築 (i-j-k-l) ---
+  const torsions=[];
+  for(const bnd of bondMap){
+    const j=bnd.from, k=bnd.to;
+    for(const ej of adj[j]){
+      if(ej.to===k)continue;
+      for(const ek of adj[k]){
+        if(ek.to===j||ek.to===ej.to)continue;
+        // 二面角理想値: sp3-sp3=60°(gauche), sp2含む=0°or180°
+        let idealTorsion=Math.PI/3; // 60° staggered
+        let barrier=1.0;
+        if(hybrid[j]==='sp2'&&hybrid[k]==='sp2'){idealTorsion=0;barrier=6.0;}// 共役平面
+        else if(hybrid[j]==='sp2'||hybrid[k]==='sp2'){idealTorsion=0;barrier=2.0;}
+        torsions.push({i:ej.to,j,k,l:ek.to,ideal:idealTorsion,barrier});
+      }
+    }
+  }
+
+  // --- 平面性リスト (sp2中心原子 + 芳香環全体) ---
+  const planarGroups=[];
+  // sp2原子の隣接原子は同一平面
+  for(let i=0;i<n;i++){
+    if(hybrid[i]==='sp2'&&adj[i].length>=3){
+      planarGroups.push([i,...adj[i].map(e=>e.to)]);
+    }
+  }
+  // 芳香環全体
+  rings.forEach(ring=>{
+    const isAromatic=ring.every(a=>hybrid[a]==='sp2');
+    if(isAromatic) planarGroups.push([...ring]);
+  });
+
+  // --- 初期座標: 2Dから開始 + sp3にz摂動 ---
+  const scale=1/40;
+  const pos=atomList.map(a=>[a.x*scale, -a.y*scale, 0]);
+  // 中心を原点に
+  let cx=0,cy=0;
+  pos.forEach(p=>{cx+=p[0];cy+=p[1]});
+  cx/=n;cy/=n;
+  pos.forEach(p=>{p[0]-=cx;p[1]-=cy;});
+
+  // sp3原子に初期z摂動を付与 (対称性を破る)
+  // 6員環の椅子型初期配置
+  rings.forEach(ring=>{
+    if(ring.length===6&&ring.every(a=>hybrid[a]==='sp3')){
+      // 椅子型: 交互に+0.25, -0.25
+      ring.forEach((a,idx)=>{pos[a][2]=(idx%2===0?0.25:-0.25);});
+    }
+  });
+  // 残りのsp3
+  for(let i=0;i<n;i++){
+    if(hybrid[i]==='sp3'&&pos[i][2]===0&&adj[i].length>=2){
+      pos[i][2]=(i%2===0?0.3:-0.3)*(1+Math.sin(i*1.7)*0.5);
+    }
+  }
+
+  // --- ベクトルユーティリティ ---
+  function vsub(a,b){return[a[0]-b[0],a[1]-b[1],a[2]-b[2]];}
+  function vadd(a,b){return[a[0]+b[0],a[1]+b[1],a[2]+b[2]];}
+  function vscale(a,s){return[a[0]*s,a[1]*s,a[2]*s];}
+  function vdot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+  function vcross(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
+  function vnorm(a){return Math.sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]);}
+  function vnormalize(a){const l=vnorm(a)||1e-10;return[a[0]/l,a[1]/l,a[2]/l];}
+
+  // 二面角計算
+  function calcTorsion(pi,pj,pk,pl){
+    const b1=vsub(pj,pi),b2=vsub(pk,pj),b3=vsub(pl,pk);
+    const n1=vcross(b1,b2),n2=vcross(b2,b3);
+    const ln1=vnorm(n1),ln2=vnorm(n2);
+    if(ln1<1e-8||ln2<1e-8)return 0;
+    let cos=vdot(n1,n2)/(ln1*ln2);
+    cos=Math.max(-1,Math.min(1,cos));
+    let angle=Math.acos(cos);
+    // 符号判定
+    if(vdot(vcross(n1,n2),b2)<0)angle=-angle;
+    return angle;
+  }
+
+  // --- 力場エネルギー最小化 (ステepest descent + 適応的ステップ) ---
+  const NITER=300;
+  let stepSize=0.02;
+
+  for(let iter=0;iter<NITER;iter++){
+    const grad=Array.from({length:n},()=>[0,0,0]);
+
+    // 1) 結合伸縮エネルギー: E = kb*(r - r0)^2
+    const kb=300; // kcal/mol/Å²
+    for(const b of bondMap){
+      const rij=vsub(pos[b.to],pos[b.from]);
+      const r=vnorm(rij)||1e-10;
+      const r0=idealBondLen(b.from,b.to,b.order);
+      const dr=r-r0;
+      const f=2*kb*dr/r;
+      const fv=vscale(rij,f/r);
+      grad[b.from][0]+=fv[0];grad[b.from][1]+=fv[1];grad[b.from][2]+=fv[2];
+      grad[b.to][0]-=fv[0];grad[b.to][1]-=fv[1];grad[b.to][2]-=fv[2];
+    }
+
+    // 2) 結合角エネルギー: E = ka*(θ - θ0)^2
+    const ka=80; // kcal/mol/rad²
+    for(const ang of angles){
+      const rji=vsub(pos[ang.i],pos[ang.j]);
+      const rjk=vsub(pos[ang.k],pos[ang.j]);
+      const lji=vnorm(rji)||1e-10, ljk=vnorm(rjk)||1e-10;
+      let cosTheta=vdot(rji,rjk)/(lji*ljk);
+      cosTheta=Math.max(-0.999,Math.min(0.999,cosTheta));
+      const theta=Math.acos(cosTheta);
+      const dTheta=theta-ang.ideal;
+      // 力の方向 (近似的な数値微分代替: 解析的)
+      const sinTheta=Math.sin(theta)||1e-10;
+      const dEdTheta=2*ka*dTheta;
+      // i に対する力
+      const uji=vnormalize(rji), ujk=vnormalize(rjk);
+      const fi=vscale(vsub(vscale(ujk,1/lji),vscale(uji,cosTheta/lji)),-dEdTheta/sinTheta);
+      const fk=vscale(vsub(vscale(uji,1/ljk),vscale(ujk,cosTheta/ljk)),-dEdTheta/sinTheta);
+      grad[ang.i][0]-=fi[0];grad[ang.i][1]-=fi[1];grad[ang.i][2]-=fi[2];
+      grad[ang.k][0]-=fk[0];grad[ang.k][1]-=fk[1];grad[ang.k][2]-=fk[2];
+      grad[ang.j][0]+=fi[0]+fk[0];grad[ang.j][1]+=fi[1]+fk[1];grad[ang.j][2]+=fi[2]+fk[2];
+    }
+
+    // 3) 二面角エネルギー: E = V/2 * (1 + cos(n*φ - φ0))
+    // 簡略版: 数値勾配
+    if(iter<200){ // 二面角は初期段階で強く適用
+      const eps=0.001;
+      const torsionScale=iter<100?3.0:1.5;
+      for(const t of torsions){
+        const phi=calcTorsion(pos[t.i],pos[t.j],pos[t.k],pos[t.l]);
+        // V/2*(1-cos(n*phi)) n=3 for sp3-sp3, n=2 for sp2
+        const nfold=(hybrid[t.j]==='sp2'&&hybrid[t.k]==='sp2')?2:3;
+        const E=t.barrier*torsionScale*(1-Math.cos(nfold*phi-nfold*t.ideal));
+        // 数値勾配 (4原子それぞれのxyz)
+        const atoms4=[t.i,t.j,t.k,t.l];
+        for(const ai of atoms4){
+          for(let d=0;d<3;d++){
+            pos[ai][d]+=eps;
+            const phi2=calcTorsion(pos[t.i],pos[t.j],pos[t.k],pos[t.l]);
+            const E2=t.barrier*torsionScale*(1-Math.cos(nfold*phi2-nfold*t.ideal));
+            pos[ai][d]-=eps;
+            grad[ai][d]+=(E2-E)/eps;
+          }
+        }
+      }
+    }
+
+    // 4) ファンデルワールス (Lennard-Jones 6-12 簡略化 → ソフト反発のみ)
+    for(let i=0;i<n;i++){
+      for(let j=i+1;j<n;j++){
+        // 結合している原子ペアはスキップ (1-2)
+        if(adj[i].some(e=>e.to===j))continue;
+        // 1-3もスキップ
+        let is13=false;
+        for(const ei of adj[i]){if(adj[ei.to].some(e=>e.to===j)){is13=true;break;}}
+        if(is13)continue;
+
+        const rij=vsub(pos[j],pos[i]);
+        const dist=vnorm(rij)||1e-10;
+        const sigma=(getVdwRadius(atomList[i].symbol)+getVdwRadius(atomList[j].symbol))*0.5;
+        // ソフトLJ: 距離がsigma以下なら反発
+        if(dist<sigma*1.2){
+          const ratio=sigma/dist;
+          const f=12*0.05*(Math.pow(ratio,12)-Math.pow(ratio,6))/(dist);
+          const fv=vscale(rij,-f/dist);
+          grad[i][0]+=fv[0];grad[i][1]+=fv[1];grad[i][2]+=fv[2];
+          grad[j][0]-=fv[0];grad[j][1]-=fv[1];grad[j][2]-=fv[2];
+        }
+      }
+    }
+
+    // 5) 平面性拘束 (sp2/芳香環)
+    const kplanar=150;
+    for(const group of planarGroups){
+      if(group.length<3)continue;
+      // 最小二乗平面の法線を計算
+      const centroid=[0,0,0];
+      group.forEach(a=>{centroid[0]+=pos[a][0];centroid[1]+=pos[a][1];centroid[2]+=pos[a][2];});
+      centroid[0]/=group.length;centroid[1]/=group.length;centroid[2]/=group.length;
+      // 法線: 隣接ペアの外積の平均
+      let normal=[0,0,0];
+      for(let g=0;g<group.length-1;g++){
+        const v1=vsub(pos[group[g]],centroid);
+        const v2=vsub(pos[group[g+1]],centroid);
+        const cr=vcross(v1,v2);
+        normal[0]+=cr[0];normal[1]+=cr[1];normal[2]+=cr[2];
+      }
+      normal=vnormalize(normal);
+      // 各原子を平面に押し戻す
+      for(const a of group){
+        const d=vdot(vsub(pos[a],centroid),normal);
+        grad[a][0]+=kplanar*d*normal[0];
+        grad[a][1]+=kplanar*d*normal[1];
+        grad[a][2]+=kplanar*d*normal[2];
+      }
+    }
+
+    // --- 座標更新 (steepest descent) ---
+    let maxGrad=0;
+    for(let i=0;i<n;i++){
+      const g=Math.sqrt(grad[i][0]**2+grad[i][1]**2+grad[i][2]**2);
+      if(g>maxGrad)maxGrad=g;
+    }
+    // 適応的ステップサイズ
+    const actualStep=maxGrad>0?Math.min(stepSize,0.1/maxGrad):stepSize;
+    for(let i=0;i<n;i++){
+      pos[i][0]-=grad[i][0]*actualStep;
+      pos[i][1]-=grad[i][1]*actualStep;
+      pos[i][2]-=grad[i][2]*actualStep;
+    }
+    // 徐々にステップ縮小
+    if(iter>100)stepSize*=0.998;
+  }
+
+  // --- 中心を原点に ---
+  let fcx=0,fcy=0,fcz=0;
+  pos.forEach(p=>{fcx+=p[0];fcy+=p[1];fcz+=p[2];});
+  fcx/=n;fcy/=n;fcz/=n;
+  pos.forEach(p=>{p[0]-=fcx;p[1]-=fcy;p[2]-=fcz;});
+
+  return{
+    atoms3d:pos.map((p,i)=>({x:p[0],y:p[1],z:p[2],symbol:atomList[i].symbol})),
+    bonds3d:bondMap
+  };
 }
 
 function parse3DSDF(text){
@@ -1764,13 +2198,10 @@ let currentStyle='ball-stick';
 
 function toggle3D(){
   if(!current3DData){
-    // 手描きの分子があればそれを3D表示
+    // 手描きの分子があればそれを3D表示（力場法で立体座標生成）
     if(atoms.length>0){
-      current3DData={
-        atoms3d:atoms.map(a=>({x:a.x/40,y:-a.y/40,z:0,symbol:a.symbol})),
-        bonds3d:bonds.map(b=>({from:atoms.findIndex(a=>a.id===b.from),to:atoms.findIndex(a=>a.id===b.to),order:b.order===1.5?1:b.order})),
-        name:'手描き分子',formula:'',mw:0
-      };
+      const gen=generate3DCoords(atoms,bonds);
+      current3DData={...gen,name:'手描き分子',formula:'',mw:0};
     } else {
       toast('分子を描画するか、物質名を検索してください');return;
     }
