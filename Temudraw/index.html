@@ -1695,6 +1695,7 @@ async function fetchCompound(name){
     let sdf2d=null;
     let resolvedName=name;
     let cid=null;
+    let cirKey=null; // CIR 3D取得用の検索キー（英語名・CAS番号等）
 
     // === 日本語入力の前処理 ===
     const hasJP=/[　-〿぀-ゟ゠-ヿ一-龯＀-ﾟ]/.test(name);
@@ -1753,25 +1754,25 @@ async function fetchCompound(name){
           const smi=en.slice(7);
           try{
             const r=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(smi)}/SDF?record_type=2d`);
-            if(r.ok){sdf2d=await r.text();resolvedName=name;}
+            if(r.ok){sdf2d=await r.text();resolvedName=name;cirKey=smi;}
           }catch(e){}
           if(!sdf2d){
             try{
               const r=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(smi)}/sdf`,8000);
-              if(r.ok){const t=await r.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=name;}}
+              if(r.ok){const t=await r.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=name;cirKey=smi;}}
             }catch(e){}
           }
         } else if(en.startsWith('CAS:')){
           const cas=en.slice(4);
           try{
             const r=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(cas)}/sdf`,8000);
-            if(r.ok){const t=await r.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=name;}}
+            if(r.ok){const t=await r.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=name;cirKey=cas;}}
           }catch(e){}
         } else {
           // 英語名でPubChem検索
           try{
             const r=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(en)}/SDF?record_type=2d`);
-            if(r.ok){sdf2d=await r.text();resolvedName=en;
+            if(r.ok){sdf2d=await r.text();resolvedName=en;cirKey=en;
               try{const rc=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(en)}/cids/JSON`);
                 if(rc.ok){const cd=await rc.json();cid=cd.IdentifierList?.CID?.[0]||null;}}catch(e){}
             }
@@ -1779,7 +1780,7 @@ async function fetchCompound(name){
           if(!sdf2d){
             try{
               const r=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(en)}/sdf`,8000);
-              if(r.ok){const t=await r.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=en;}}
+              if(r.ok){const t=await r.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=en;cirKey=en;}}
             }catch(e){}
           }
         }
@@ -2096,23 +2097,27 @@ async function fetchCompound(name){
       }
     }catch(e3d){}
     // 2) NCI CACTUS/CORINA 3D (専門的な3D座標生成エンジン)
+    // cirKey（CAS番号・英語名等）とresolvedName両方を試行
     if(!got3D){
-      try{
-        const resCir3d=await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(resolvedName)}/sdf?get3d=true`);
-        if(resCir3d.ok){
-          const sdf3d=await resCir3d.text();
-          if((sdf3d.includes('V2000')||sdf3d.includes('V3000'))&&!sdf3d.includes('<html')){
-            const parsed=parse3DSDF(sdf3d);
-            // z座標が全て0でないことを確認（実際に3Dであることを検証）
-            const hasZ=parsed.atoms3d.some(a=>Math.abs(a.z)>0.01);
-            if(hasZ){
-              current3DData=parsed;
-              current3DData.name=resolvedName;
-              got3D=true;
+      const cir3dKeys=[cirKey,resolvedName,name].filter((v,i,a)=>v&&a.indexOf(v)===i&&!/[　-〿぀-ゟ゠-ヿ一-龯]/.test(v));
+      for(const key of cir3dKeys){
+        if(got3D) break;
+        try{
+          const resCir3d=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(key)}/sdf?get3d=true`,10000);
+          if(resCir3d.ok){
+            const sdf3d=await resCir3d.text();
+            if((sdf3d.includes('V2000')||sdf3d.includes('V3000'))&&!sdf3d.includes('<html')){
+              const parsed=parse3DSDF(sdf3d);
+              const hasZ=parsed.atoms3d.some(a=>Math.abs(a.z)>0.01);
+              if(hasZ){
+                current3DData=parsed;
+                current3DData.name=resolvedName;
+                got3D=true;
+              }
             }
           }
-        }
-      }catch(e){}
+        }catch(e){}
+      }
     }
     // 3) フォールバック: 2D座標+軽微なz変位（壊すよりマシ）
     if(!got3D){
