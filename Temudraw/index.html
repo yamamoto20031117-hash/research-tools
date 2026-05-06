@@ -1680,6 +1680,27 @@ function showDidYouMean(suggestions){
   acItems=suggestions;acIndex=-1;
 }
 
+// 化学名の正規化（Unicode Greek文字、重複表記、全角→半角）
+function normalizeChemName(s){
+  // 全角英数→半角
+  s=s.replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+  // Unicode Greekの重複パターン（αalpha𝛼 等）をαに統一
+  const greekMap={'α':'alpha','β':'beta','γ':'gamma','δ':'delta','ε':'epsilon',
+    'ω':'omega','𝛼':'alpha','𝛽':'beta','𝛾':'gamma','𝛿':'delta'};
+  // まず重複パターンを除去: αalpha𝛼 → alpha
+  for(const[sym,txt] of Object.entries(greekMap)){
+    const esc=sym.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    // sym+text+sym, sym+text, text+sym のような重複を除去
+    s=s.replace(new RegExp(esc+'\\s*'+txt+'\\s*'+esc,'gi'),txt);
+    s=s.replace(new RegExp(esc+'\\s*'+txt,'gi'),txt);
+    s=s.replace(new RegExp(txt+'\\s*'+esc,'gi'),txt);
+    s=s.replace(new RegExp(esc,'g'),txt);
+  }
+  // 連続スペース除去
+  s=s.replace(/\s+/g,' ').trim();
+  return s;
+}
+
 async function fetchCompound(name){
   searchLoading.style.display='block';
   toast(`"${name}" を検索中...`);
@@ -1696,6 +1717,12 @@ async function fetchCompound(name){
     let resolvedName=name;
     let cid=null;
     let cirKey=null; // CIR 3D取得用の検索キー（英語名・CAS番号等）
+
+    // === 名前の正規化 ===
+    const normalized=normalizeChemName(name);
+    // 正規化後の名前が異なる場合、正規化版も検索対象に追加
+    const searchNames=[name];
+    if(normalized!==name) searchNames.push(normalized);
 
     // === 日本語入力の前処理 ===
     const hasJP=/[　-〿぀-ゟ゠-ヿ一-龯＀-ﾟ]/.test(name);
@@ -1790,11 +1817,14 @@ async function fetchCompound(name){
 
     // === 多段階名前解決 ===
 
-    // 1) PubChem 名前直接検索
-    try{
-      const res=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/SDF?record_type=2d`);
-      if(res.ok) sdf2d=await res.text();
-    }catch(e){}
+    // 1) PubChem 名前直接検索（正規化版も試行）
+    for(const sn of searchNames){
+      if(sdf2d) break;
+      try{
+        const res=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(sn)}/SDF?record_type=2d`);
+        if(res.ok){sdf2d=await res.text();if(sn!==name)resolvedName=sn;}
+      }catch(e){}
+    }
 
     // 2) PubChem CID経由
     if(!sdf2d){
@@ -1811,26 +1841,28 @@ async function fetchCompound(name){
       }catch(e){}
     }
 
-    // 3) NCI/CADD Chemical Identifier Resolver (CIR)
-    if(!sdf2d){
+    // 3) NCI/CADD Chemical Identifier Resolver (CIR) — 正規化版も試行
+    for(const sn of searchNames){
+      if(sdf2d) break;
       try{
-        const resCir=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(name)}/sdf`,10000);
+        const resCir=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(sn)}/sdf`,10000);
         if(resCir.ok){
           const txt=await resCir.text();
-          if(txt.includes('V2000')||txt.includes('V3000')) sdf2d=txt;
+          if(txt.includes('V2000')||txt.includes('V3000')){sdf2d=txt;cirKey=sn;if(sn!==name)resolvedName=sn;}
         }
       }catch(e){}
     }
 
-    // 4) OPSIN (IUPAC名パーサー) → SMILES → PubChem
-    if(!sdf2d){
+    // 4) OPSIN (IUPAC名パーサー) → SMILES → PubChem — 正規化版も試行
+    for(const sn of searchNames){
+      if(sdf2d) break;
       try{
-        const resOpsin=await fetchT(`https://opsin.ch.cam.ac.uk/opsin/${encodeURIComponent(name)}.smi`,6000);
+        const resOpsin=await fetchT(`https://opsin.ch.cam.ac.uk/opsin/${encodeURIComponent(sn)}.smi`,6000);
         if(resOpsin.ok){
           const smiles=await resOpsin.text();
           if(smiles&&smiles.length>0&&smiles.length<500&&!smiles.includes('<!DOCTYPE')){
             const resSmi=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(smiles.trim())}/SDF?record_type=2d`);
-            if(resSmi.ok) sdf2d=await resSmi.text();
+            if(resSmi.ok){sdf2d=await resSmi.text();cirKey=smiles.trim();}
           }
         }
       }catch(e){}
