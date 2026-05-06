@@ -1843,34 +1843,74 @@ async function fetchCompound(name){
       }catch(e){}
     }
 
-    // 全DB検索失敗 → 候補表示
+    // 9) ファジー検索: autocomplete候補から最も近い名前を自動検索
     if(!sdf2d){
-      let suggestions=findSimilar(name);
-      // PubChem autocomplete + CIR候補を並列取得
-      const [acRes,cirRes]=await Promise.allSettled([
-        fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(name)}/json?limit=6`,5000)
-          .then(r=>r.ok?r.json():null).catch(()=>null),
-        fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(name)}/names`,5000)
-          .then(r=>r.ok?r.text():null).catch(()=>null)
-      ]);
-      const existing=new Set(suggestions.map(s=>s.toLowerCase()));
-      if(acRes.status==='fulfilled'&&acRes.value){
-        const remote=acRes.value.dictionary_terms?.compound||[];
-        remote.filter(r=>!existing.has(r.toLowerCase())).forEach(r=>{existing.add(r.toLowerCase());suggestions.push(r);});
-      }
-      if(cirRes.status==='fulfilled'&&cirRes.value){
-        cirRes.value.split('\n').filter(n=>n.trim()&&n.length<60).slice(0,3)
-          .filter(n=>!existing.has(n.toLowerCase())).forEach(n=>{existing.add(n.toLowerCase());suggestions.push(n);});
-      }
-      suggestions=suggestions.slice(0,8);
-      if(suggestions.length>0){
-        toast(`"${name}" が見つかりません — 候補を表示`);
-        showDidYouMean(suggestions);
-      } else {
+      try{
+        const [acRes,cirRes]=await Promise.allSettled([
+          fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(name)}/json?limit=10`,5000)
+            .then(r=>r.ok?r.json():null).catch(()=>null),
+          fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(name)}/names`,5000)
+            .then(r=>r.ok?r.text():null).catch(()=>null)
+        ]);
+        // autocomplete + CIR候補を収集
+        const candidates=[];
+        if(acRes.status==='fulfilled'&&acRes.value){
+          (acRes.value.dictionary_terms?.compound||[]).forEach(c=>candidates.push(c));
+        }
+        if(cirRes.status==='fulfilled'&&cirRes.value){
+          cirRes.value.split('\n').filter(n=>n.trim()&&n.length<60).slice(0,5).forEach(c=>candidates.push(c));
+        }
+        // Levenshtein距離でランク付け（正規化: 短い名前ほど厳しく判定）
+        const q=name.toLowerCase();
+        const ranked=candidates
+          .map(c=>({name:c, dist:levenshtein(q,c.toLowerCase())}))
+          .filter(x=>x.dist>0)
+          .sort((a,b)=>a.dist-b.dist);
+        // 距離が十分近い候補（名前長の30%以内 かつ 最大4文字差）を自動検索
+        const threshold=Math.min(4, Math.ceil(q.length*0.3));
+        const bestMatches=ranked.filter(x=>x.dist<=threshold).slice(0,3);
+        for(const m of bestMatches){
+          if(sdf2d) break;
+          toast(`"${m.name}" を試行中... (距離:${m.dist})`);
+          try{
+            const res=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(m.name)}/SDF?record_type=2d`);
+            if(res.ok){
+              sdf2d=await res.text();
+              resolvedName=m.name;
+              // CID取得
+              try{
+                const rc=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(m.name)}/cids/JSON`);
+                if(rc.ok){const cd=await rc.json();cid=cd.IdentifierList?.CID?.[0]||null;}
+              }catch(e){}
+            }
+          }catch(e){}
+          if(!sdf2d){
+            try{
+              const res=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(m.name)}/sdf`,8000);
+              if(res.ok){const t=await res.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=m.name;}}
+            }catch(e){}
+          }
+        }
+        // それでも見つからない場合 → 候補表示
+        if(!sdf2d){
+          let suggestions=findSimilar(name);
+          const existing=new Set(suggestions.map(s=>s.toLowerCase()));
+          candidates.filter(c=>!existing.has(c.toLowerCase())).forEach(c=>{existing.add(c.toLowerCase());suggestions.push(c);});
+          suggestions=suggestions.slice(0,8);
+          if(suggestions.length>0){
+            toast(`"${name}" が見つかりません — 候補を表示`);
+            showDidYouMean(suggestions);
+          } else {
+            toast(`"${name}" が見つかりません`);
+          }
+          searchLoading.style.display='none';
+          return;
+        }
+      }catch(e){
         toast(`"${name}" が見つかりません`);
+        searchLoading.style.display='none';
+        return;
       }
-      searchLoading.style.display='none';
-      return;
     }
 
     // Parse into editor
