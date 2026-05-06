@@ -1184,6 +1184,9 @@ function setTool(t){
 // Keyboard
 let spaceHeld=false;
 document.addEventListener('keydown',e=>{
+  // 入力欄にフォーカスがある場合はショートカットをスキップ
+  const ae=document.activeElement;
+  if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.isContentEditable))return;
   if(document.querySelector('.dlg-overlay.show')){
     if(e.key==='Enter')confirmDlg();if(e.key==='Escape')closeDlg();return;
   }
