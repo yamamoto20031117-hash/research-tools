@@ -159,6 +159,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 #search-loading{display:none;width:14px;height:14px;border:2px solid var(--border);
   border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;margin-left:-26px;margin-right:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
+#search-progress{display:none;position:fixed;top:44px;left:0;right:0;height:3px;z-index:200;background:rgba(0,0,0,0.3)}
+#search-progress .sp-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  border-radius:0 2px 2px 0;transition:width .3s ease;width:0}
+#search-progress .sp-label{position:absolute;top:6px;left:50%;transform:translateX(-50%);
+  font-size:10px;color:var(--text2);background:var(--surface2);padding:2px 10px;
+  border-radius:10px;border:1px solid var(--border);white-space:nowrap;opacity:0.95}
 #btn-3d{padding:5px 12px;background:var(--surface3);border:1px solid var(--border);
   border-radius:20px;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;
   transition:.15s;white-space:nowrap}
@@ -273,6 +279,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
     <button id="btn-3d" onclick="toggle3D()">3D</button>
   </div>
 </div>
+
+<div id="search-progress"><div class="sp-bar"></div><div class="sp-label"></div></div>
 
 <!-- ツールバー -->
 <div id="toolbar">
@@ -1703,7 +1711,26 @@ function normalizeChemName(s){
 
 async function fetchCompound(name){
   searchLoading.style.display='block';
-  toast(`"${name}" を検索中...`);
+
+  // プログレスバー
+  const progEl=document.getElementById('search-progress');
+  const progBar=progEl.querySelector('.sp-bar');
+  const progLabel=progEl.querySelector('.sp-label');
+  progEl.style.display='block';progBar.style.width='0%';
+  const totalSteps=12; // 検索全ステップ数
+  let currentStep=0;
+  function progress(label){
+    currentStep++;
+    const pct=Math.min(Math.round((currentStep/totalSteps)*100),95);
+    progBar.style.width=pct+'%';
+    progLabel.textContent=`${label} (${pct}%)`;
+  }
+  function progressDone(){
+    progBar.style.width='100%';progLabel.textContent='完了';
+    setTimeout(()=>{progEl.style.display='none';progBar.style.width='0%';},600);
+  }
+
+  progress(`"${name}" を検索中...`);
 
   // タイムアウト付きfetch
   function fetchT(url,ms=8000){
@@ -1725,6 +1752,7 @@ async function fetchCompound(name){
     if(normalized!==name) searchNames.push(normalized);
 
     // === 日本語入力の前処理 ===
+    if(/[　-〿぀-ゟ゠-ヿ一-龯＀-ﾟ]/.test(name)) progress('日本語名を解決中...');
     const hasJP=/[　-〿぀-ゟ゠-ヿ一-龯＀-ﾟ]/.test(name);
     let englishNames=[];
     if(hasJP){
@@ -1818,6 +1846,7 @@ async function fetchCompound(name){
     // === 多段階名前解決 ===
 
     // 1) PubChem 名前直接検索（正規化版も試行）
+    if(!sdf2d) progress('PubChem検索...');
     for(const sn of searchNames){
       if(sdf2d) break;
       try{
@@ -1842,6 +1871,7 @@ async function fetchCompound(name){
     }
 
     // 3) NCI/CADD Chemical Identifier Resolver (CIR) — 正規化版も試行
+    if(!sdf2d) progress('CIR検索...');
     for(const sn of searchNames){
       if(sdf2d) break;
       try{
@@ -1854,6 +1884,7 @@ async function fetchCompound(name){
     }
 
     // 4) OPSIN (IUPAC名パーサー) → SMILES → PubChem — 正規化版も試行
+    if(!sdf2d) progress('OPSIN/IUPAC解析...');
     for(const sn of searchNames){
       if(sdf2d) break;
       try{
@@ -1889,6 +1920,7 @@ async function fetchCompound(name){
     }
 
     // 6) PubChem Substance名前検索 (compound DBより広い)
+    if(!sdf2d) progress('Substance DB検索...');
     if(!sdf2d){
       try{
         const resSub=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/substance/name/${encodeURIComponent(name)}/sids/JSON?MaxRecords=3`);
@@ -1917,6 +1949,7 @@ async function fetchCompound(name){
     }
 
     // 7) 名前バリエーション検索 (ハイフン・スペース追加/除去)
+    if(!sdf2d) progress('名前バリエーション検索...');
     if(!sdf2d){
       const variants=new Set();
       // cycloawadorin → cyclo-awadorin, cyclo awadorin
@@ -1968,6 +2001,7 @@ async function fetchCompound(name){
     }
 
     // 9) Wikipedia/Wikidata検索 → SMILES/InChI/CAS抽出 → CIR/PubChem
+    if(!sdf2d) progress('Wikipedia検索...');
     if(!sdf2d){
       try{
         // 英語・日本語Wikipedia両方を並列検索
@@ -2037,6 +2071,7 @@ async function fetchCompound(name){
     }
 
     // 10) ファジー検索: autocomplete候補から最も近い名前を自動検索
+    if(!sdf2d) progress('ファジー検索...');
     if(!sdf2d){
       try{
         const [acRes,cirRes]=await Promise.allSettled([
@@ -2097,11 +2132,13 @@ async function fetchCompound(name){
             toast(`"${name}" が見つかりません`);
           }
           searchLoading.style.display='none';
+          progressDone();
           return;
         }
       }catch(e){
         toast(`"${name}" が見つかりません`);
         searchLoading.style.display='none';
+        progressDone();
         return;
       }
     }
@@ -2114,6 +2151,7 @@ async function fetchCompound(name){
     toast(`${displayName} を読み込みました`);
 
     // Fetch 3D SDF for viewer
+    progress('3Dデータ取得中...');
     let got3D=false;
     // 1) PubChem 3D conformer (小分子のみ提供)
     const searchTarget=cid?`cid/${cid}`:`name/${encodeURIComponent(resolvedName)}`;
@@ -2159,6 +2197,13 @@ async function fetchCompound(name){
     document.getElementById('btn-3d').style.borderColor='var(--accent2)';
     document.getElementById('btn-3d').style.color='var(--accent2)';
 
+    // 3Dビューアが開いている場合は自動リフレッシュ
+    if(viewer3dEl.classList.contains('show')&&current3DData){
+      close3D();
+      open3D();
+    }
+
+    progress('プロパティ取得中...');
     // Fetch properties
     try{
       const propTarget=cid?`cid/${cid}`:`name/${encodeURIComponent(resolvedName)}`;
@@ -2177,6 +2222,7 @@ async function fetchCompound(name){
     toast(`エラー: ${err.message}`);
   }finally{
     searchLoading.style.display='none';
+    progressDone();
   }
 }
 
