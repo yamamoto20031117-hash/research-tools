@@ -266,7 +266,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   <div id="search-wrap">
     <div class="s-inner">
       <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="7"/><line x1="15.5" y1="15.5" x2="21" y2="21"/></svg>
-      <input id="search-input" type="text" placeholder="物質名を入力 (例: aspirin, caffeine...)" spellcheck="false" autocomplete="off"/>
+      <input id="search-input" type="text" placeholder="物質名を入力 (例: caffeine, アスピリン...)" spellcheck="false" autocomplete="off"/>
       <div id="autocomplete"></div>
     </div>
     <div id="search-loading"></div>
@@ -1695,6 +1695,97 @@ async function fetchCompound(name){
     let sdf2d=null;
     let resolvedName=name;
     let cid=null;
+
+    // === 日本語入力の前処理 ===
+    const hasJP=/[　-〿぀-ゟ゠-ヿ一-龯＀-ﾟ]/.test(name);
+    let englishNames=[];
+    if(hasJP){
+      toast(`日本語名を解決中...`);
+      // 日本語Wikipedia → 英語名・識別子を取得
+      try{
+        const sr=await fetchT(`https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(name)}&srnamespace=0&srlimit=3&format=json&origin=*`,6000);
+        if(sr.ok){
+          const srd=await sr.json();
+          const titles=(srd?.query?.search||[]).map(s=>s.title);
+          for(const t of titles){
+            // 英語版リンク取得
+            try{
+              const ll=await fetchT(`https://ja.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(t)}&prop=langlinks&lllang=en&format=json&origin=*`,5000);
+              if(ll.ok){
+                const lld=await ll.json();
+                const pg=Object.values(lld?.query?.pages||{})[0];
+                const enTitle=pg?.langlinks?.[0]?.['*'];
+                if(enTitle) englishNames.push(enTitle);
+              }
+            }catch(e){}
+            // ページ本文からIUPAC名/英名/SMILES/CAS抽出
+            try{
+              const pg=await fetchT(`https://ja.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(t)}&prop=revisions&rvprop=content&rvslots=main&format=json&origin=*`,6000);
+              if(pg.ok){
+                const pgd=await pg.json();
+                const content=Object.values(pgd?.query?.pages||{})[0]?.revisions?.[0]?.slots?.main?.['*']||'';
+                // IUPAC名
+                const iupac=content.match(/\|\s*IUPAC(?:名|Name|_name)\s*=\s*([^\n|}{]+)/i);
+                if(iupac) englishNames.push(iupac[1].trim());
+                // 英語名 (name/IUPACName等)
+                const ename=content.match(/\|\s*(?:english|name)\s*=\s*([^\n|}{]+)/i);
+                if(ename) englishNames.push(ename[1].trim());
+                // SMILES
+                const smi=content.match(/\|\s*SMILES\s*=\s*([^\n|}{]+)/i);
+                if(smi&&smi[1].trim().length>2) englishNames.push('SMILES:'+smi[1].trim());
+                // CAS
+                const cas=content.match(/\|\s*CAS(?:番号|No|_number)?\s*=\s*(\d{2,7}-\d{2}-\d)/i)
+                  ||content.match(/CAS(?:番号|登録番号)[^\d]*(\d{2,7}-\d{2}-\d)/);
+                if(cas) englishNames.push('CAS:'+cas[1].trim());
+              }
+            }catch(e){}
+          }
+        }
+      }catch(e){}
+      // CIRで日本語名直接試行
+      englishNames.push(name);
+      // 重複除去
+      englishNames=[...new Set(englishNames)];
+      // 英語名・SMILES・CASで順次検索
+      for(const en of englishNames){
+        if(sdf2d) break;
+        if(en.startsWith('SMILES:')){
+          const smi=en.slice(7);
+          try{
+            const r=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(smi)}/SDF?record_type=2d`);
+            if(r.ok){sdf2d=await r.text();resolvedName=name;}
+          }catch(e){}
+          if(!sdf2d){
+            try{
+              const r=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(smi)}/sdf`,8000);
+              if(r.ok){const t=await r.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=name;}}
+            }catch(e){}
+          }
+        } else if(en.startsWith('CAS:')){
+          const cas=en.slice(4);
+          try{
+            const r=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(cas)}/sdf`,8000);
+            if(r.ok){const t=await r.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=name;}}
+          }catch(e){}
+        } else {
+          // 英語名でPubChem検索
+          try{
+            const r=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(en)}/SDF?record_type=2d`);
+            if(r.ok){sdf2d=await r.text();resolvedName=en;
+              try{const rc=await fetchT(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(en)}/cids/JSON`);
+                if(rc.ok){const cd=await rc.json();cid=cd.IdentifierList?.CID?.[0]||null;}}catch(e){}
+            }
+          }catch(e){}
+          if(!sdf2d){
+            try{
+              const r=await fetchT(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(en)}/sdf`,8000);
+              if(r.ok){const t=await r.text();if(t.includes('V2000')||t.includes('V3000')){sdf2d=t;resolvedName=en;}}
+            }catch(e){}
+          }
+        }
+      }
+      if(sdf2d) resolvedName=resolvedName!==name?`${resolvedName} (${name})`:name;
+    }
 
     // === 多段階名前解決 ===
 
