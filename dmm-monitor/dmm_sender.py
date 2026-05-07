@@ -295,8 +295,8 @@ def append_local_csv(data):
 def firebase_sender_thread():
     """データキューからFirebaseへ非同期送信（バッチ対応）"""
     batch = []
-    BATCH_SIZE = 10
-    BATCH_TIMEOUT = 2.0
+    BATCH_SIZE = 3
+    BATCH_TIMEOUT = 0.8
 
     while running:
         try:

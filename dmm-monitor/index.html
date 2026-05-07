@@ -924,7 +924,9 @@ function onNewData(d){
   const now=d.time||Date.now();
   let v=parseFloat(d.voltage)||0;
   let i=parseFloat(d.current)||0;
-  if(now<=lastUpdate) return;
+  // 完全に同一タイムスタンプのみスキップ（<= だと同秒の別データを落とす）
+  if(now===lastUpdate) return;
+  if(now<lastUpdate && lastUpdate-now<500) return; // 微小な順序逆転は許容
   lastUpdate=now;
 
   // Keithley オーバーフロー値 (9.91E+37) をフィルタ
@@ -1492,8 +1494,7 @@ function finalizeActiveRun(){
     run.endTime=Date.now();
     run.data=dataLog.slice(); // 全データを保存
     run.dataCount=run.data.length;
-    // 測定終了時にHTMLレポートを自動生成（クリックでグラフ確認可能）
-    if(run.data.length>0) generateHTMLReport(run);
+    // レポートは手動でCSVボタンから取得（自動ダウンロードしない）
     // Firebaseにラン情報を保存（データ本体は大きいので概要のみ）
     if(firebaseReady){
       db.ref('dmm/runs/'+run.id).set({
@@ -2166,13 +2167,14 @@ window.addEventListener('load',()=>{
   }
 
   // Firebase クロスデバイス同期 (フォールバック)
-  // WebSocket接続が確立するまでFirebaseで受信
   setupPresence();
   syncSessionFromFirebase();
-  // 少し待ってWS接続を確認してからFirebaseリスナーを起動
-  setTimeout(()=>{
-    if(!useWsForData) startListening();
-  }, 3000);
+  // autoDiscoverWsが既にstartListeningを呼んでいなければ、3秒後に起動
+  if(!firebaseDataListener){
+    setTimeout(()=>{
+      if(!useWsForData && !firebaseDataListener) startListening();
+    }, 3000);
+  }
   watchOutputState();
   loadRunsFromFirebase();
   // 測定完了の復元（ページを閉じていた間に測定が終わった場合）
