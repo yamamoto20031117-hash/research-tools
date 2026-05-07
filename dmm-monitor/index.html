@@ -528,11 +528,57 @@ let wsReconnectTimer=null;
 let wsReconnectDelay=1000;
 let wsConnected=false;
 let wsLatencyHistory=[];
+let useWsForData=false;       // true=WebSocket優先でデータ受信中
+let firebaseDataListener=null; // Firebaseデータリスナー参照
+let firebaseLogListener=null;
 
 function getDefaultWsUrl(){
   // 同じホストのポート8765をデフォルトに
   const h=location.hostname||'localhost';
   return 'ws://'+h+':8765';
+}
+
+// LAN内のsync-serverを自動検出
+function autoDiscoverWs(){
+  // 候補リスト: 現在のホスト、localhost、よくあるLAN IP
+  const candidates=[];
+  const h=location.hostname;
+  if(h && h!=='localhost' && h!=='127.0.0.1') candidates.push('ws://'+h+':8765');
+  candidates.push('ws://localhost:8765');
+  candidates.push('ws://127.0.0.1:8765');
+  // LAN内の典型的なアドレスも試す
+  for(let i=1;i<=5;i++) candidates.push('ws://192.168.1.'+i+':8765');
+  for(let i=1;i<=5;i++) candidates.push('ws://192.168.0.'+i+':8765');
+
+  let found=false;
+  let tried=0;
+  for(const url of candidates){
+    if(found) break;
+    try{
+      const probe=new WebSocket(url);
+      probe.binaryType='arraybuffer';
+      const timeout=setTimeout(()=>{try{probe.close();}catch(e){}}, 2000);
+      probe.onopen=()=>{
+        clearTimeout(timeout);
+        if(!found){
+          found=true;
+          probe.close();
+          document.getElementById('wsUrl').value=url;
+          console.log('[WS] LAN自動検出: '+url);
+          connectWebSocket();
+        }else{
+          probe.close();
+        }
+      };
+      probe.onerror=()=>{clearTimeout(timeout);};
+      probe.onclose=()=>{
+        tried++;
+        if(tried>=candidates.length && !found){
+          console.log('[WS] LAN内にsync-serverが見つかりません。Firebaseで動作します。');
+        }
+      };
+    }catch(e){tried++;}
+  }
 }
 
 function connectWebSocket(){
@@ -555,14 +601,17 @@ function connectWebSocket(){
 
   ws.onopen=()=>{
     wsConnected=true;
+    useWsForData=true;
     wsReconnectDelay=1000;
     ws.send(JSON.stringify({type:'hello',role:'viewer'}));
     // サーバーに履歴データを要求（全端末で同じグラフを表示）
     ws.send(JSON.stringify({type:'sync_request'}));
-    document.getElementById('wsStatus').textContent='接続済み';
+    document.getElementById('wsStatus').textContent='接続済み (LAN高速モード)';
     document.getElementById('wsStatus').style.color='#22c55e';
     const badge=document.getElementById('syncBadge');
     badge.textContent='WS: ON';badge.style.color='#22c55e';badge.style.borderColor='#22c55e';
+    // WebSocket接続時はFirebaseデータリスナーを停止（重複防止）
+    pauseFirebaseData();
     // レイテンシ測定開始
     measureWsLatency();
   };
@@ -586,10 +635,13 @@ function connectWebSocket(){
 
   ws.onclose=(evt)=>{
     wsConnected=false;
-    document.getElementById('wsStatus').textContent='切断 (再接続中...)';
+    useWsForData=false;
+    document.getElementById('wsStatus').textContent='切断 → Firebase自動切替';
     document.getElementById('wsStatus').style.color='#ef4444';
     const badge=document.getElementById('syncBadge');
-    badge.textContent='WS: OFF';badge.style.color='#ef4444';badge.style.borderColor='#ef4444';
+    badge.textContent='Firebase';badge.style.color='#f59e0b';badge.style.borderColor='#f59e0b';
+    // Firebaseデータリスナーを再開
+    resumeFirebaseData();
     // 再接続 (exponential backoff)
     wsReconnectTimer=setTimeout(()=>{
       connectWebSocket();
@@ -735,16 +787,29 @@ function startListening(){
     document.getElementById('fbStatus').style.color='#ef4444';
     return;
   }
+  // WebSocket接続中はFirebaseデータリスナーを起動しない
+  if(useWsForData){
+    document.getElementById('fbStatus').textContent='待機中 (WS優先)';
+    document.getElementById('fbStatus').style.color='#f59e0b';
+    return;
+  }
+  startFirebaseDataListeners();
+}
+
+function startFirebaseDataListeners(){
+  if(!firebaseReady) return;
   const path=document.getElementById('fbPath').value||'dmm/live';
   if(listener) listener();
 
   const ref=db.ref(path);
   ref.on('value',snap=>{
+    if(useWsForData) return; // WS中はスキップ
     const d=snap.val();
     if(!d) return;
     onNewData(d);
   });
   listener=()=>ref.off('value');
+  firebaseDataListener=listener;
 
   // 直近のログデータを取得（ページ再訪問時も過去データを復元、上限5000件でフリーズ防止）
   db.ref('dmm/log').orderByKey().limitToLast(5000).once('value').then(snap=>{
@@ -770,16 +835,39 @@ function startListening(){
       }
     }
     // 全データ取得後にリアルタイム監視開始
-    db.ref('dmm/log').orderByKey().limitToLast(1).on('child_added',snap=>{
+    const logRef=db.ref('dmm/log').orderByKey().limitToLast(1);
+    logRef.on('child_added',snap=>{
+      if(useWsForData) return; // WS中はスキップ
       const e=snap.val();
       if(e && e.time > lastUpdate) onNewData(e);
     });
+    firebaseLogListener=()=>logRef.off('child_added');
   });
 
   document.getElementById('fbStatus').textContent='接続中';
   document.getElementById('fbStatus').style.color='#22c55e';
   document.getElementById('statusDot').className='status-dot live';
   document.getElementById('statusText').textContent='リアルタイム監視中';
+}
+
+// WebSocket接続時: Firebaseデータリスナーを一時停止
+function pauseFirebaseData(){
+  if(firebaseDataListener){ firebaseDataListener(); firebaseDataListener=null; }
+  if(firebaseLogListener){ firebaseLogListener(); firebaseLogListener=null; }
+  if(listener){ listener(); listener=null; }
+  if(firebaseReady){
+    document.getElementById('fbStatus').textContent='待機中 (WS優先)';
+    document.getElementById('fbStatus').style.color='#f59e0b';
+  }
+  document.getElementById('statusDot').className='status-dot live';
+  document.getElementById('statusText').textContent='LAN高速モードで監視中';
+  console.log('[Sync] WebSocket優先 → Firebaseデータリスナー停止');
+}
+
+// WebSocket切断時: Firebaseデータリスナーを再開
+function resumeFirebaseData(){
+  console.log('[Sync] WebSocket切断 → Firebaseにフォールバック');
+  startFirebaseDataListeners();
 }
 
 // ===== レンダリングスロットル（長時間測定のフリーズ防止） =====
@@ -2035,12 +2123,22 @@ tbody.innerHTML=rows;
 // ===== 初期化 =====
 window.addEventListener('load',()=>{
   // WebSocket同期 (最速パス、ローカルネットワーク)
-  connectWebSocket();
+  // まず手動設定のURLを試し、なければLAN自動検出
+  const manualUrl=document.getElementById('wsUrl').value;
+  if(manualUrl){
+    connectWebSocket();
+  }else{
+    autoDiscoverWs();
+  }
 
-  // Firebase クロスデバイス同期 (プライマリ)
+  // Firebase クロスデバイス同期 (フォールバック)
+  // WebSocket接続が確立するまでFirebaseで受信
   setupPresence();
   syncSessionFromFirebase();
-  startListening();
+  // 少し待ってWS接続を確認してからFirebaseリスナーを起動
+  setTimeout(()=>{
+    if(!useWsForData) startListening();
+  }, 3000);
   watchOutputState();
   loadRunsFromFirebase();
   // 測定完了の復元（ページを閉じていた間に測定が終わった場合）

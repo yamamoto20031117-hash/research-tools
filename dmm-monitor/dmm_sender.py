@@ -610,7 +610,7 @@ signal.signal(signal.SIGINT, signal_handler)
 
 # ===== メインループ =====
 def main():
-    global running, output_on, auto_stop_time
+    global running, output_on, auto_stop_time, interval
 
     mode = "test"
     if "--live" in sys.argv:
