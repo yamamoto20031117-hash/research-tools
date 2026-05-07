@@ -283,6 +283,11 @@
       <option value="0">全データ</option>
     </select>
     <button onclick="resetZoom()" id="btnResetZoom" style="display:none">ズームリセット</button>
+    <span style="margin-left:12px;font-size:.78rem;color:#999">X軸範囲(秒):</span>
+    <input id="xRangeMin" type="number" placeholder="開始" style="width:70px;padding:2px 6px;background:#1a1f2e;color:#ccc;border:1px solid #333;border-radius:4px;font-size:.78rem">
+    <span style="color:#666">〜</span>
+    <input id="xRangeMax" type="number" placeholder="終了" style="width:70px;padding:2px 6px;background:#1a1f2e;color:#ccc;border:1px solid #333;border-radius:4px;font-size:.78rem">
+    <button onclick="applyXRange()" style="padding:2px 10px;font-size:.78rem">適用</button>
     <button onclick="clearChart()">グラフクリア</button>
     <button onclick="clearData()">全データクリア</button>
     <button onclick="exportCSV()">CSV出力</button>
@@ -1822,7 +1827,23 @@ const chartMargin={top:14,right:16,bottom:36,left:64};
 
 function resetZoom(){
   zoomXMin=null;zoomXMax=null;
+  document.getElementById('xRangeMin').value='';
+  document.getElementById('xRangeMax').value='';
   redrawChart();
+}
+
+function applyXRange(){
+  const data=viewingRunId!==null?(runs.find(r=>r.id===viewingRunId)||{}).data||[]:dataLog;
+  if(data.length===0) return;
+  const t0=data[0].time;
+  const minSec=parseFloat(document.getElementById('xRangeMin').value);
+  const maxSec=parseFloat(document.getElementById('xRangeMax').value);
+  if(isNaN(minSec)&&isNaN(maxSec)) return;
+  // 開始時刻からの秒数をタイムスタンプに変換
+  zoomXMin=isNaN(minSec)?null:t0+minSec*1000;
+  zoomXMax=isNaN(maxSec)?null:t0+maxSec*1000;
+  redrawChart();
+  document.getElementById('btnResetZoom').style.display='inline-block';
 }
 
 function initChartInteraction(){
