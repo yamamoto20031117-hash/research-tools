@@ -172,6 +172,7 @@
     <span class="status-dot offline" id="statusDot"></span>
     <span class="status-text" id="statusText">データ待機中...</span>
     <span style="font-size:.65rem;color:#555;padding:2px 8px;border:1px solid #333;border-radius:4px" id="syncBadge">WS: ---</span>
+    <span style="font-size:.65rem;color:#22c55e;padding:2px 8px;border:1px solid #22c55e;border-radius:4px;display:none" id="viewerBadge">👁 1</span>
     <button class="chart-controls" style="padding:4px 12px;background:rgba(88,166,255,0.15);color:#58a6ff;border:1px solid rgba(88,166,255,0.3);border-radius:4px;font-size:.75rem;cursor:pointer" onclick="toggleSettings()">&#9881; 設定</button>
   </div>
 </header>
@@ -328,9 +329,11 @@
       <div class="setting-row"><label>接続者数:</label><span id="wsClients" style="color:#888">---</span></div>
     </div>
     <div class="setting-group">
-      <h3>Firebase 接続 (バックアップ)</h3>
+      <h3>Firebase 同期 (クロスデバイス)</h3>
       <div class="setting-row"><label>ステータス:</label><span id="fbStatus" style="color:#22c55e">確認中...</span></div>
       <div class="setting-row"><label>データパス:</label><input id="fbPath" value="dmm/live" onchange="reconnect()"></div>
+      <div class="setting-row"><label>接続デバイス:</label><span id="fbViewers" style="color:#888">確認中...</span></div>
+      <div class="setting-row"><label>セッション同期:</label><span id="fbSessionSync" style="color:#888">---</span></div>
     </div>
     <div class="setting-group">
       <h3>表示設定</h3>
@@ -341,7 +344,7 @@
   </div>
 </div>
 
-<footer>DMM Monitor v1.1 — Keithley 2400 SourceMeter — Research Tools</footer>
+<footer>DMM Monitor v1.2 — Keithley 2400 SourceMeter — Research Tools — クロスデバイス同期対応</footer>
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -372,6 +375,144 @@ let listener=null;
 let outputState=false;
 let timerInterval=null;
 let timerEndTime=0;
+
+// ===== Firebase プレゼンス & クロスデバイス同期 =====
+let myViewerId=null;
+let viewerCount=0;
+
+function setupPresence(){
+  if(!firebaseReady) return;
+  // 一意のビューアIDを生成
+  myViewerId='v_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  const myRef=db.ref('dmm/viewers/'+myViewerId);
+  const connRef=db.ref('.info/connected');
+
+  connRef.on('value',snap=>{
+    if(snap.val()===true){
+      // 接続時にプレゼンスを登録
+      myRef.set({
+        joinedAt: firebase.database.ServerValue.TIMESTAMP,
+        userAgent: navigator.userAgent.slice(0,60),
+        device: /Mobile|Android|iPhone/i.test(navigator.userAgent)?'mobile':'desktop'
+      });
+      // 切断時に自動削除
+      myRef.onDisconnect().remove();
+      document.getElementById('fbStatus').textContent='接続中';
+      document.getElementById('fbStatus').style.color='#22c55e';
+    } else {
+      document.getElementById('fbStatus').textContent='切断';
+      document.getElementById('fbStatus').style.color='#ef4444';
+    }
+  });
+
+  // ビューア数を監視
+  db.ref('dmm/viewers').on('value',snap=>{
+    const viewers=snap.val();
+    viewerCount=viewers?Object.keys(viewers).length:0;
+    const badge=document.getElementById('viewerBadge');
+    const fbV=document.getElementById('fbViewers');
+    if(viewerCount>0){
+      badge.style.display='';
+      badge.textContent='\u{1F441} '+viewerCount;
+      fbV.textContent=viewerCount+'台 接続中';
+      fbV.style.color='#22c55e';
+    } else {
+      badge.style.display='none';
+      fbV.textContent='0台';
+      fbV.style.color='#888';
+    }
+  });
+}
+
+// セッション状態をFirebaseで同期（リモートデバイス用）
+let lastLocalPublish=0; // ローカル発信の重複防止
+function syncSessionFromFirebase(){
+  if(!firebaseReady) return;
+
+  // dmm/session ノードでタイマー・モード情報を全デバイスに配信
+  db.ref('dmm/session').on('value',snap=>{
+    const s=snap.val();
+    if(!s) return;
+    // 自分が発信したばかりの更新は無視（2秒以内）
+    if(Date.now()-lastLocalPublish<2000) return;
+    const syncEl=document.getElementById('fbSessionSync');
+
+    if(s.active){
+      syncEl.textContent='測定中: '+s.label;
+      syncEl.style.color='#22c55e';
+      setOutputUI(true);
+      if(s.mode) setSrcMode(s.mode);
+
+      // タイマー同期
+      if(s.endTime && s.endTime>Date.now()){
+        timerEndTime=s.endTime;
+        startTimer();
+      } else if(!s.endTime || s.endTime===0){
+        document.getElementById('timerDisplay').textContent='∞';
+      }
+
+      // アクティブランがなければ作成（リモートデバイス向け）
+      if(activeRunId===null && s.startTime){
+        const runId=s.startTime;
+        const run={
+          id:runId, startTime:runId, endTime:null,
+          label:s.label||'', data:dataLog.filter(d=>d.time>=runId),
+          mode:s.mode, value:s.value, compliance:s.compliance
+        };
+        if(!runs.find(r=>r.id===runId)){
+          runs.push(run);
+        }
+        activeRunId=runId;
+        viewingRunId=null;
+        document.getElementById('timeRange').value='0';
+        zoomXMin=null;zoomXMax=null;
+        renderRuns();
+      }
+    } else {
+      syncEl.textContent='待機中';
+      syncEl.style.color='#888';
+      setOutputUI(false);
+      stopTimer();
+      document.getElementById('timerDisplay').textContent='--:--';
+
+      // 測定ラン終了（リモートデバイス向け）
+      if(activeRunId!==null){
+        const run=runs.find(r=>r.id===activeRunId);
+        if(run){
+          run.endTime=s.endedAt||Date.now();
+          run.data=dataLog.filter(d=>d.time>=run.startTime&&d.time<=run.endTime);
+          run.dataCount=run.data.length;
+        }
+        activeRunId=null;
+        renderRuns();
+      }
+    }
+  });
+}
+
+// セッション状態をFirebaseに書き込み（測定開始/終了時に呼ぶ）
+function publishSessionState(active, params){
+  if(!firebaseReady) return;
+  lastLocalPublish=Date.now();
+  if(active){
+    db.ref('dmm/session').set({
+      active: true,
+      startTime: params.startTime||Date.now(),
+      endTime: params.endTime||0,
+      mode: params.mode||'CURR',
+      value: params.value||0,
+      compliance: params.compliance||21,
+      label: params.label||'',
+      updatedAt: firebase.database.ServerValue.TIMESTAMP
+    });
+  } else {
+    db.ref('dmm/session').set({
+      active: false,
+      endedAt: Date.now(),
+      updatedAt: firebase.database.ServerValue.TIMESTAMP
+    });
+  }
+}
 
 // ===== WebSocket 同期 (超低レイテンシ) =====
 // 測定ラン履歴
@@ -1151,12 +1292,23 @@ function startSource(){
   renderRuns();
 
   // タイマー開始
+  const endTimeMs=durationSec>0?Date.now()+durationSec*1000:0;
   if(durationSec>0){
-    timerEndTime=Date.now()+durationSec*1000;
+    timerEndTime=endTimeMs;
     startTimer();
   } else {
     document.getElementById('timerDisplay').textContent='∞';
   }
+
+  // クロスデバイス同期: セッション状態を全端末に配信
+  publishSessionState(true, {
+    startTime: runId,
+    endTime: endTimeMs,
+    mode: mode,
+    value: value,
+    compliance: compliance,
+    label: modeStr+' '+dispVal
+  });
 }
 
 function emergencyStop(){
@@ -1168,6 +1320,9 @@ function emergencyStop(){
   setOutputUI(false);
   stopTimer();
   document.getElementById('timerDisplay').textContent='--:--';
+
+  // クロスデバイス同期: セッション終了を全端末に配信
+  publishSessionState(false);
 
   // 測定ラン終了
   finalizeActiveRun();
@@ -1879,10 +2034,12 @@ tbody.innerHTML=rows;
 
 // ===== 初期化 =====
 window.addEventListener('load',()=>{
-  // WebSocket同期 (最速パス)
+  // WebSocket同期 (最速パス、ローカルネットワーク)
   connectWebSocket();
 
-  // Firebase (バックアップ / ログ取得)
+  // Firebase クロスデバイス同期 (プライマリ)
+  setupPresence();
+  syncSessionFromFirebase();
   startListening();
   watchOutputState();
   loadRunsFromFirebase();
@@ -1899,6 +2056,12 @@ window.addEventListener('load',()=>{
   },5000);
 });
 window.addEventListener('resize',()=>redrawChart());
+window.addEventListener('beforeunload',()=>{
+  // プレゼンス手動クリーンアップ（onDisconnectが遅れる場合のバックアップ）
+  if(firebaseReady&&myViewerId){
+    db.ref('dmm/viewers/'+myViewerId).remove();
+  }
+});
 
 // バックグラウンド復帰時にデータを再取得・再描画
 document.addEventListener('visibilitychange',()=>{

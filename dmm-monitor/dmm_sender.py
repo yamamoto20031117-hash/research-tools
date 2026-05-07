@@ -118,6 +118,28 @@ def update_output_status(on):
     firebase_put("dmm/status", {"output": on, "time": int(time.time()*1000)})
 
 
+def publish_session_state(active, mode="CURR", value=0, compliance=21, duration=0, label=""):
+    """セッション状態をFirebaseに配信（クロスデバイス同期用）"""
+    if active:
+        end_time = int((time.time() + duration) * 1000) if duration > 0 else 0
+        firebase_put("dmm/session", {
+            "active": True,
+            "startTime": int(time.time() * 1000),
+            "endTime": end_time,
+            "mode": mode,
+            "value": value,
+            "compliance": compliance,
+            "label": label,
+            "updatedAt": int(time.time() * 1000)
+        })
+    else:
+        firebase_put("dmm/session", {
+            "active": False,
+            "endedAt": int(time.time() * 1000),
+            "updatedAt": int(time.time() * 1000)
+        })
+
+
 # ===== RS-232 ユーティリティ =====
 def flush_buffer(smu):
     """RS-232入力バッファをクリア"""
@@ -342,6 +364,7 @@ def firebase_command_thread(smu):
                     auto_stop_time = 0
                     output_on = False
                     update_output_status(False)
+                    publish_session_state(False)
                     command_queue.put(("OFF", None))
 
                 elif action == "OUTPUT_ON":
@@ -379,6 +402,12 @@ def firebase_command_thread(smu):
                     output_on = True
                     update_output_status(True)
 
+                    # クロ��デバイス同期: セッション状態を配信
+                    mode_str = "CC" if src_mode == "CURR" else "CV"
+                    label = f"{mode_str} {value:.4e}"
+                    publish_session_state(True, mode=src_mode, value=value,
+                                         compliance=compliance, duration=duration, label=label)
+
                     if duration > 0:
                         auto_stop_time = time.time() + duration
                         print(f"  自動停止: {datetime.fromtimestamp(auto_stop_time).strftime('%H:%M:%S')}")
@@ -395,6 +424,7 @@ def firebase_command_thread(smu):
                 auto_stop_time = 0
                 output_on = False
                 update_output_status(False)
+                publish_session_state(False)
                 command_queue.put(("OFF", None))
 
         except Exception as e:
@@ -685,7 +715,9 @@ def main():
                                 if smu: safe_write(smu, ":OUTP OFF", 0.2)
                             auto_stop_time = 0
                             output_on = False
-                            if USE_FIREBASE: update_output_status(False)
+                            if USE_FIREBASE:
+                                update_output_status(False)
+                                publish_session_state(False)
                         elif action == "SOURCE_START":
                             src_mode = cmd_data.get("mode", "CURR")
                             value = float(cmd_data.get("value", 0))
@@ -697,7 +729,12 @@ def main():
                             output_on = True
                             if duration > 0:
                                 auto_stop_time = time.time() + duration
-                            if USE_FIREBASE: update_output_status(True)
+                            if USE_FIREBASE:
+                                update_output_status(True)
+                                mode_str = "CC" if src_mode == "CURR" else "CV"
+                                publish_session_state(True, mode=src_mode, value=value,
+                                                     compliance=compliance, duration=duration,
+                                                     label=f"{mode_str} {value:.4e}")
                             print(f"\n  *** WS: SOURCE START ({src_mode}) ***")
                         elif action == "SET_INTERVAL":
                             interval = max(0.1, min(float(cmd_data.get("interval", 1.0)), 60.0))
