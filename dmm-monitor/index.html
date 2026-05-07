@@ -540,6 +540,12 @@ function getDefaultWsUrl(){
 
 // LAN内のsync-serverを自動検出
 function autoDiscoverWs(){
+  // HTTPS環境ではws://は混合コンテンツになるのでスキップ
+  if(location.protocol==='https:'){
+    console.log('[WS] HTTPS環境のためLAN自動検出をスキップ。Firebaseで動作します。');
+    if(!useWsForData) startListening();
+    return;
+  }
   // 候補リスト: 現在のホスト、localhost、よくあるLAN IP
   const candidates=[];
   const h=location.hostname;
@@ -585,6 +591,13 @@ function connectWebSocket(){
   if(ws && (ws.readyState===WebSocket.CONNECTING||ws.readyState===WebSocket.OPEN)) return;
 
   const url=document.getElementById('wsUrl').value||getDefaultWsUrl();
+  // HTTPS環境でws://は混合コンテンツエラーになるのでブロック
+  if(location.protocol==='https:' && url.startsWith('ws://')){
+    console.log('[WS] HTTPS環境ではws://接続不可。Firebaseを使用。');
+    document.getElementById('wsStatus').textContent='HTTPS (Firebase使用)';
+    document.getElementById('wsStatus').style.color='#f59e0b';
+    return;
+  }
   document.getElementById('wsUrl').value=url;
 
   try{
