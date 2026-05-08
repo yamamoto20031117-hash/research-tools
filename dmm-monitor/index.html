@@ -1904,25 +1904,30 @@ async function exportRunExcel(runId){
   await _downloadExcel(run.data, fname, run.mode);
 }
 
-// Firebaseからラン履歴を復元
-function loadRunsFromFirebase(){
+// Firebaseからラン履歴を復元（データが存在するもののみ）
+async function loadRunsFromFirebase(){
   if(!firebaseReady) return;
-  db.ref('dmm/runs').orderByKey().limitToLast(10).once('value').then(snap=>{
-    const d=snap.val();
-    if(!d) return;
-    const loaded=Object.values(d).sort((a,b)=>b.startTime-a.startTime);
-    // 既にメモリにあるランと重複しないように
-    for(const r of loaded){
-      if(!runs.find(x=>x.id===r.id)){
-        runs.push({
-          id:r.id, startTime:r.startTime, endTime:r.endTime,
-          label:r.label, mode:r.mode, data:[], // データ本体はFirebase logから取得
-          dataCount:r.dataCount||0
-        });
-      }
+  const snap=await db.ref('dmm/runs').orderByKey().limitToLast(10).once('value');
+  const d=snap.val();
+  if(!d) return;
+  const loaded=Object.values(d).sort((a,b)=>b.startTime-a.startTime);
+  for(const r of loaded){
+    if(runs.find(x=>x.id===r.id)) continue;
+    // dmm/logに実データがあるか確認
+    const endKey=String(r.endTime||Date.now());
+    const logSnap=await db.ref('dmm/log').orderByKey().startAt(String(r.startTime)).endAt(endKey).limitToFirst(1).once('value');
+    if(!logSnap.val()){
+      // データなし → dmm/runsからも削除
+      db.ref('dmm/runs/'+r.id).remove();
+      continue;
     }
-    renderRuns();
-  });
+    runs.push({
+      id:r.id, startTime:r.startTime, endTime:r.endTime,
+      label:r.label, mode:r.mode, data:[],
+      dataCount:r.dataCount||0
+    });
+  }
+  renderRuns();
 }
 
 // OUTPUT状態の監視
