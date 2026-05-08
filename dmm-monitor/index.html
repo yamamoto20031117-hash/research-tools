@@ -351,8 +351,9 @@
 
 <footer>DMM Monitor v1.2 — Keithley 2400 SourceMeter — Research Tools — クロスデバイス同期対応</footer>
 
-<!-- SheetJS (Excel出力) -->
+<!-- SheetJS + JSZip (Excel出力+チャート) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
@@ -1271,30 +1272,156 @@ function exportExcel(){
   _downloadExcel(dataLog, 'dmm_data_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
-function _downloadExcel(data, filename){
-  const mode=document.getElementById('srcMode').value;
-  // CC: source=current(Y), compliance=voltage(X)
-  // CV: source=voltage(Y), compliance=current(X)
-  const srcLabel=mode==='CURR'?'Source Current (A)':'Source Voltage (V)';
-  const compLabel=mode==='CURR'?'Measured Voltage (V)':'Measured Current (A)';
-  const t0=data[0].time;
+async function _downloadExcel(data, filename, runMode){
+  const mode=runMode||document.getElementById('srcMode').value;
+  const isCC=mode==='CURR';
+  const xLabel=isCC?'Voltage (V)':'Current (A)';
+  const yLabel=isCC?'Current (A)':'Voltage (V)';
 
-  // ヘッダー行
-  const header=['Time','Elapsed (s)', compLabel+' [X]', srcLabel+' [Y]'];
-  const rows=[header];
+  // データ行: A=compliance(X), B=source(Y)
+  const rows=[[xLabel, yLabel]];
   for(const d of data){
-    const elapsed=((d.time-t0)/1000);
-    const srcVal=mode==='CURR'?d.current:d.voltage;
-    const compVal=mode==='CURR'?d.voltage:d.current;
-    rows.push([new Date(d.time).toISOString(), elapsed, compVal, srcVal]);
+    const xVal=isCC?d.voltage:d.current;
+    const yVal=isCC?d.current:d.voltage;
+    rows.push([xVal, yVal]);
   }
+  const n=data.length;
 
+  // SheetJSでデータシート作成
   const ws=XLSX.utils.aoa_to_sheet(rows);
-  // 列幅設定
-  ws['!cols']=[{wch:26},{wch:12},{wch:22},{wch:22}];
+  ws['!cols']=[{wch:20},{wch:20}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Data');
-  XLSX.writeFile(wb, filename);
+  const wbBuf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+
+  // JSZipで開いてチャートXMLを注入
+  const zip=await JSZip.loadAsync(wbBuf);
+
+  // 1) chart1.xml — 散布図
+  zip.file('xl/charts/chart1.xml',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+ xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<c:chart>
+ <c:autoTitleDeleted val="1"/>
+ <c:plotArea>
+  <c:layout/>
+  <c:scatterChart>
+   <c:scatterStyle val="lineMarker"/>
+   <c:ser>
+    <c:idx val="0"/>
+    <c:order val="0"/>
+    <c:tx><c:strRef><c:f>Data!$B$1</c:f></c:strRef></c:tx>
+    <c:spPr><a:ln w="19050"><a:solidFill><a:srgbClr val="4472C4"/></a:solidFill></a:ln></c:spPr>
+    <c:marker><c:symbol val="circle"/><c:size val="3"/>
+     <c:spPr><a:solidFill><a:srgbClr val="4472C4"/></a:solidFill></c:spPr>
+    </c:marker>
+    <c:xVal><c:numRef><c:f>Data!$A$2:$A$${n+1}</c:f></c:numRef></c:xVal>
+    <c:yVal><c:numRef><c:f>Data!$B$2:$B$${n+1}</c:f></c:numRef></c:yVal>
+    <c:smooth val="0"/>
+   </c:ser>
+   <c:axId val="111111"/>
+   <c:axId val="222222"/>
+  </c:scatterChart>
+  <c:valAx>
+   <c:axId val="111111"/>
+   <c:scaling><c:orientation val="minMax"/></c:scaling>
+   <c:delete val="0"/>
+   <c:axPos val="b"/>
+   <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/>
+    <a:p><a:r><a:rPr lang="en-US" sz="1000"/><a:t>${xLabel}</a:t></a:r></a:p>
+   </c:rich></c:tx><c:overlay val="0"/></c:title>
+   <c:numFmt formatCode="0.00E+00" sourceLinked="0"/>
+   <c:crossAx val="222222"/>
+  </c:valAx>
+  <c:valAx>
+   <c:axId val="222222"/>
+   <c:scaling><c:orientation val="minMax"/></c:scaling>
+   <c:delete val="0"/>
+   <c:axPos val="l"/>
+   <c:title><c:tx><c:rich><a:bodyPr rot="-5400000" vert="horz"/><a:lstStyle/>
+    <a:p><a:r><a:rPr lang="en-US" sz="1000"/><a:t>${yLabel}</a:t></a:r></a:p>
+   </c:rich></c:tx><c:overlay val="0"/></c:title>
+   <c:numFmt formatCode="0.00E+00" sourceLinked="0"/>
+   <c:crossAx val="111111"/>
+  </c:valAx>
+ </c:plotArea>
+ <c:legend><c:legendPos val="r"/></c:legend>
+ <c:plotVisOnly val="1"/>
+</c:chart>
+</c:chartSpace>`);
+
+  // 2) drawing1.xml — チャートをシートに配置
+  zip.file('xl/drawings/drawing1.xml',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+ xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+ <xdr:twoCellAnchor>
+  <xdr:from><xdr:col>3</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+  <xdr:to><xdr:col>16</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>25</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
+  <xdr:graphicFrame macro="">
+   <xdr:nvGraphicFramePr>
+    <xdr:cNvPr id="2" name="Chart 1"/>
+    <xdr:cNvGraphicFramePr/>
+   </xdr:nvGraphicFramePr>
+   <xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>
+   <a:graphic>
+    <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">
+     <c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rId1"/>
+    </a:graphicData>
+   </a:graphic>
+  </xdr:graphicFrame>
+  <xdr:clientData/>
+ </xdr:twoCellAnchor>
+</xdr:wsDr>`);
+
+  // 3) リレーションシップ
+  zip.file('xl/drawings/_rels/drawing1.xml.rels',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+ <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/>
+</Relationships>`);
+
+  // 4) シート→ドローイングのリレーション
+  const sheetRelsPath='xl/worksheets/_rels/sheet1.xml.rels';
+  let sheetRels=zip.file(sheetRelsPath)?await zip.file(sheetRelsPath).async('text'):null;
+  if(sheetRels){
+    sheetRels=sheetRels.replace('</Relationships>',
+      '<Relationship Id="rId_d1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
+  } else {
+    sheetRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+ <Relationship Id="rId_d1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>
+</Relationships>`;
+  }
+  zip.file(sheetRelsPath, sheetRels);
+
+  // 5) シートXMLに<drawing>参照を追加
+  let sheetXml=await zip.file('xl/worksheets/sheet1.xml').async('text');
+  if(!sheetXml.includes('<drawing')){
+    sheetXml=sheetXml.replace('</worksheet>','<drawing r:id="rId_d1"/></worksheet>');
+    zip.file('xl/worksheets/sheet1.xml', sheetXml);
+  }
+
+  // 6) Content_Types にチャート・ドローイングを追加
+  let ct=await zip.file('[Content_Types].xml').async('text');
+  if(!ct.includes('drawingml.chart')){
+    ct=ct.replace('</Types>',
+      '<Override PartName="/xl/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>'+
+      '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>'+
+      '</Types>');
+    zip.file('[Content_Types].xml', ct);
+  }
+
+  // ダウンロード
+  const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // ===== モード切替で単位を更新 =====
@@ -1735,11 +1862,39 @@ function deleteRun(runId){
   else renderRuns();
 }
 
-function exportRunExcel(runId){
+async function exportRunExcel(runId){
   const run=runs.find(r=>r.id===runId);
-  if(!run||run.data.length===0) return;
+  if(!run) return;
+
+  // データが空ならdataLogから復元を試みる
+  if(run.data.length===0){
+    run.data=dataLog.filter(d=>d.time>=run.startTime&&(!run.endTime||d.time<=run.endTime));
+    run.dataCount=run.data.length;
+  }
+
+  // まだ空ならFirebaseから取得
+  if(run.data.length===0 && firebaseReady){
+    try{
+      const snap=await db.ref('dmm/log').orderByKey().startAt(String(run.startTime)).once('value');
+      const logData=snap.val();
+      if(logData){
+        Object.values(logData).sort((a,b)=>a.time-b.time).forEach(e=>{
+          let v=parseFloat(e.voltage)||0, i=parseFloat(e.current)||0;
+          if(Math.abs(v)>1e6) v=0;
+          if(Math.abs(i)>1e6) i=0;
+          if(e.time>=run.startTime&&(!run.endTime||e.time<=run.endTime)){
+            run.data.push({time:e.time,voltage:v,current:i});
+          }
+        });
+        run.dataCount=run.data.length;
+        renderRuns();
+      }
+    }catch(e){console.error('Firebase読込エラー:',e);}
+  }
+
+  if(run.data.length===0){alert('データがありません');return;}
   const fname='run_'+run.label.replace(/\s+/g,'_')+'_'+new Date(run.startTime).toISOString().slice(0,19).replace(/[:-]/g,'')+'.xlsx';
-  _downloadExcel(run.data, fname);
+  await _downloadExcel(run.data, fname, run.mode);
 }
 
 // Firebaseからラン履歴を復元
