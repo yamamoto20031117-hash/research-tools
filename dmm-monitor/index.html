@@ -1866,18 +1866,23 @@ function deleteRun(runId){
 async function exportRunExcel(runId){
   const run=runs.find(r=>r.id===runId);
   if(!run) return;
+  console.log('[Excel] エクスポート開始:', {runId, dataLen:run.data.length, dataCount:run.dataCount, startTime:run.startTime, endTime:run.endTime, firebaseReady});
 
   // データが空ならdataLogから復元を試みる
   if(run.data.length===0){
     run.data=dataLog.filter(d=>d.time>=run.startTime&&(!run.endTime||d.time<=run.endTime));
     run.dataCount=run.data.length;
+    console.log('[Excel] dataLogからの復元:', run.data.length, '件');
   }
 
   // まだ空ならFirebaseから取得
   if(run.data.length===0 && firebaseReady){
+    console.log('[Excel] Firebaseからデータ取得中...');
     try{
-      const snap=await db.ref('dmm/log').orderByKey().startAt(String(run.startTime)).once('value');
+      const endKey=String(run.endTime||Date.now());
+      const snap=await db.ref('dmm/log').orderByKey().startAt(String(run.startTime)).endAt(endKey).once('value');
       const logData=snap.val();
+      console.log('[Excel] Firebase結果:', logData?Object.keys(logData).length+'件':'null');
       if(logData){
         Object.values(logData).sort((a,b)=>a.time-b.time).forEach(e=>{
           let v=parseFloat(e.voltage)||0, i=parseFloat(e.current)||0;
@@ -1888,12 +1893,13 @@ async function exportRunExcel(runId){
           }
         });
         run.dataCount=run.data.length;
+        console.log('[Excel] Firebase復元完了:', run.data.length, '件');
         renderRuns();
       }
-    }catch(e){console.error('Firebase読込エラー:',e);}
+    }catch(e){console.error('[Excel] Firebase読込エラー:',e);}
   }
 
-  if(run.data.length===0){alert('データがありません');return;}
+  if(run.data.length===0){alert('データがありません（Firebaseログが削除された可能性があります）');return;}
   const fname='run_'+run.label.replace(/\s+/g,'_')+'_'+new Date(run.startTime).toISOString().slice(0,19).replace(/[:-]/g,'')+'.xlsx';
   await _downloadExcel(run.data, fname, run.mode);
 }
