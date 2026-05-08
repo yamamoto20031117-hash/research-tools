@@ -485,7 +485,10 @@ function syncSessionFromFirebase(){
         const run=runs.find(r=>r.id===activeRunId);
         if(run){
           run.endTime=s.endedAt||Date.now();
-          run.data=dataLog.filter(d=>d.time>=run.startTime&&d.time<=run.endTime);
+          // run.dataに逐次pushされたデータを使う、なければdataLogから補完
+          if(run.data.length===0){
+            run.data=dataLog.filter(d=>d.time>=run.startTime);
+          }
           run.dataCount=run.data.length;
         }
         activeRunId=null;
@@ -1492,7 +1495,11 @@ function finalizeActiveRun(){
   const run=runs.find(r=>r.id===activeRunId);
   if(run){
     run.endTime=Date.now();
-    run.data=dataLog.slice(); // 全データを保存
+    // run.data にはonNewDataで逐次pushされたデータが入っている
+    // 不足分があればdataLogから補完（startTime以降のデータ）
+    if(run.data.length===0){
+      run.data=dataLog.filter(d=>d.time>=run.startTime);
+    }
     run.dataCount=run.data.length;
     // レポートは手動でCSVボタンから取得（自動ダウンロードしない）
     // Firebaseにラン情報を保存（データ本体は大きいので概要のみ）
@@ -1546,7 +1553,13 @@ function renderRuns(){
 
 function viewRun(runId){
   const run=runs.find(r=>r.id===runId);
-  if(!run||run.data.length<2) return;
+  if(!run) return;
+  // データが空の場合、dataLogから復元を試みる
+  if(run.data.length===0){
+    run.data=dataLog.filter(d=>d.time>=run.startTime&&(!run.endTime||d.time<=run.endTime));
+    run.dataCount=run.data.length;
+  }
+  if(run.data.length<2) return;
   viewingRunId=runId;
   document.getElementById('btnBackToLive').style.display='';
   renderRuns();
