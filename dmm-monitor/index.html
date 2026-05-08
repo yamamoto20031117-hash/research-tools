@@ -1275,15 +1275,16 @@ function exportExcel(){
 async function _downloadExcel(data, filename, runMode){
   const mode=runMode||document.getElementById('srcMode').value;
   const isCC=mode==='CURR';
-  const xLabel=isCC?'Voltage (V)':'Current (A)';
-  const yLabel=isCC?'Current (A)':'Voltage (V)';
+  const xLabel='Time (s)';
+  const yLabel=isCC?'Voltage (V)':'Current (A)';
+  const t0=data[0].time;
 
-  // データ行: A=compliance(X), B=source(Y)
+  // データ行: A=経過時間(X), B=コンプライアンス値(Y)
   const rows=[[xLabel, yLabel]];
   for(const d of data){
-    const xVal=isCC?d.voltage:d.current;
-    const yVal=isCC?d.current:d.voltage;
-    rows.push([xVal, yVal]);
+    const elapsed=(d.time-t0)/1000;
+    const compVal=isCC?d.voltage:d.current;
+    rows.push([elapsed, compVal]);
   }
   const n=data.length;
 
@@ -1332,7 +1333,7 @@ async function _downloadExcel(data, filename, runMode){
    <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/>
     <a:p><a:r><a:rPr lang="en-US" sz="1000"/><a:t>${xLabel}</a:t></a:r></a:p>
    </c:rich></c:tx><c:overlay val="0"/></c:title>
-   <c:numFmt formatCode="0.00E+00" sourceLinked="0"/>
+   <c:numFmt formatCode="0.0" sourceLinked="0"/>
    <c:crossAx val="222222"/>
   </c:valAx>
   <c:valAx>
