@@ -293,42 +293,51 @@ def append_local_csv(data):
 
 # ===== Firebase データ送信スレッド =====
 def firebase_sender_thread():
-    """データキューからFirebaseへ非同期送信（バッチ対応）"""
-    batch = []
-    BATCH_SIZE = 3
-    BATCH_TIMEOUT = 0.8
+    """データキューからFirebaseへ送信 — liveは即時、logはバッチ"""
+    log_batch = []
+    LOG_BATCH_SIZE = 10
+    LOG_FLUSH_INTERVAL = 5.0  # ログは5秒ごとにまとめて送信
+    last_log_flush = time.time()
 
     while running:
         try:
-            data = data_queue.get(timeout=BATCH_TIMEOUT)
+            data = data_queue.get(timeout=0.5)
             if data is None:
-                # 残りのバッチを送信
-                if batch:
-                    _send_batch(batch)
+                if log_batch:
+                    _send_log_batch(log_batch)
                 break
-            batch.append(data)
-            # ローカルCSVにも保存（確実なバックアップ）
+
+            # ローカルCSVにも保存
             append_local_csv(data)
             data_queue.task_done()
 
-            if len(batch) >= BATCH_SIZE:
-                _send_batch(batch)
-                batch = []
+            # ★ dmm/live は毎回即座に送信（リアルタイム表示用）
+            try:
+                firebase_put(FIREBASE_PATH_LIVE, data)
+            except Exception as e:
+                print(f"  [Firebase] live送信エラー: {e}")
+
+            # dmm/log はバッチに溜める（効率化）
+            log_batch.append(data)
+            now = time.time()
+            if len(log_batch) >= LOG_BATCH_SIZE or (now - last_log_flush) >= LOG_FLUSH_INTERVAL:
+                _send_log_batch(log_batch)
+                log_batch = []
+                last_log_flush = now
+
         except queue.Empty:
-            # タイムアウト: 溜まったバッチを送信
-            if batch:
-                _send_batch(batch)
-                batch = []
+            # タイムアウト: 溜まったログバッチを送信
+            if log_batch and (time.time() - last_log_flush) >= LOG_FLUSH_INTERVAL:
+                _send_log_batch(log_batch)
+                log_batch = []
+                last_log_flush = time.time()
         except Exception as e:
             print(f"  [Firebase] 送信エラー: {e}")
 
-def _send_batch(batch):
-    """バッチデータをFirebaseに送信"""
+def _send_log_batch(batch):
+    """ログデータをFirebaseにバッチ送信"""
     if not batch:
         return
-    # 最新値をliveに送信
-    firebase_put(FIREBASE_PATH_LIVE, batch[-1])
-    # ログはバッチでまとめてPATCH
     patch_data = {}
     for d in batch:
         key = str(d["time"])
@@ -341,7 +350,7 @@ def _send_batch(batch):
         )
         urllib.request.urlopen(req, timeout=10)
     except Exception as e:
-        print(f"  [Firebase] バッチ送信エラー ({len(batch)}件): {e}")
+        print(f"  [Firebase] ログ送信エラー ({len(batch)}件): {e}")
 
 
 # ===== Firebase コマンド監視スレッド =====
