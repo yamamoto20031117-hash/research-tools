@@ -8,8 +8,10 @@
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:#080b12;overflow:hidden;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;color:#ccc;
-    -webkit-tap-highlight-color:transparent;touch-action:none;-ms-touch-action:none}
-  #canvas{display:block;width:100vw;height:100vh}
+    -webkit-tap-highlight-color:transparent}
+  /* touch-action:none は canvas だけに限定 (body 全体だと iOS Safari でメニューの <select> や
+     <input type="range"> がタップ/ドラッグできなくなるため) */
+  #canvas{display:block;width:100vw;height:100vh;touch-action:none;-ms-touch-action:none}
 
   #bar{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:8px 14px;
     background:rgba(8,11,18,0.92);backdrop-filter:blur(10px);z-index:20;flex-wrap:wrap;font-size:.8rem}
@@ -143,10 +145,12 @@
   }
 
   /* 横向き推奨オーバーレイ (Android はワンタップで自動回転、iOS は Apple 制限で手動回転を要求) */
-  #rotate-prompt{display:none;position:fixed;inset:0;background:rgba(11,13,21,.94);
+  /* デフォルトで display:none + pointer-events:none、JS で portrait モバイル時のみ表示 */
+  #rotate-prompt{display:none;pointer-events:none;position:fixed;inset:0;background:rgba(11,13,21,.94);
     z-index:10000;flex-direction:column;align-items:center;justify-content:center;
     color:#e3e9f4;text-align:center;padding:24px;box-sizing:border-box;
     backdrop-filter:blur(4px)}
+  #rotate-prompt.shown{display:flex;pointer-events:auto}
   #rotate-prompt .rc{max-width:340px}
   #rotate-prompt .ricon{font-size:72px;margin-bottom:12px;display:inline-block;
     animation:rotHint 2.2s ease-in-out infinite}
@@ -2815,8 +2819,11 @@ if(screen.orientation) screen.orientation.addEventListener('change',()=>window.d
     return touch && window.innerWidth<=900 && window.innerHeight>window.innerWidth;
   }
   function update(){
-    if(dismissed){ prompt.style.display='none'; return; }
-    prompt.style.display=isMobilePortrait()?'flex':'none';
+    if(dismissed || !isMobilePortrait()){
+      prompt.classList.remove('shown');
+    }else{
+      prompt.classList.add('shown');
+    }
   }
 
   // Android 等: フルスクリーン化してから orientation.lock('landscape')
@@ -2839,11 +2846,16 @@ if(screen.orientation) screen.orientation.addEventListener('change',()=>window.d
   dismissBtn.addEventListener('click',()=>{
     dismissed=true;
     sessionStorage.setItem('rotateDismissed','1');
-    prompt.style.display='none';
+    prompt.classList.remove('shown');
   });
   update();
   window.addEventListener('resize',update);
-  window.addEventListener('orientationchange',update);
+  // iOS Safari は orientationchange が innerWidth/Height 更新前に発火するため再評価を保険として複数回
+  window.addEventListener('orientationchange',()=>{
+    update();
+    setTimeout(update,100);
+    setTimeout(update,400);
+  });
 })();
 </script>
 </body>
