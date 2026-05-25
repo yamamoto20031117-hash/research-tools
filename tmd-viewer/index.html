@@ -142,6 +142,30 @@
     #dist-label{font-size:.74rem;padding:3px 8px}
   }
 
+  /* 横向き推奨オーバーレイ (Android はワンタップで自動回転、iOS は Apple 制限で手動回転を要求) */
+  #rotate-prompt{display:none;position:fixed;inset:0;background:rgba(11,13,21,.94);
+    z-index:10000;flex-direction:column;align-items:center;justify-content:center;
+    color:#e3e9f4;text-align:center;padding:24px;box-sizing:border-box;
+    backdrop-filter:blur(4px)}
+  #rotate-prompt .rc{max-width:340px}
+  #rotate-prompt .ricon{font-size:72px;margin-bottom:12px;display:inline-block;
+    animation:rotHint 2.2s ease-in-out infinite}
+  @keyframes rotHint{
+    0%,15%{transform:rotate(0deg)}
+    45%,70%{transform:rotate(-90deg)}
+    100%{transform:rotate(0deg)}
+  }
+  #rotate-prompt h2{font-size:1.05rem;margin:8px 0;color:#fff;font-weight:600}
+  #rotate-prompt p{font-size:.84rem;margin:8px 0 18px;opacity:.85;line-height:1.55}
+  #rotate-prompt .btn-row{display:flex;flex-direction:column;gap:8px;align-items:center}
+  #rotate-prompt button{padding:9px 20px;border-radius:6px;font-size:.85rem;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;border:1px solid #58a6ff;
+    background:rgba(88,166,255,.12);color:#bfdcff}
+  #rotate-prompt button.primary{background:#1f4f8f;color:#fff;font-weight:600}
+  #rotate-prompt button:active{opacity:.7}
+  #rotate-prompt .ios-note{display:none;font-size:.74rem;opacity:.7;margin-top:10px;
+    line-height:1.5}
+
   /* Windows用スクロールバーのスタイル */
   #bar::-webkit-scrollbar{width:4px}
   #bar::-webkit-scrollbar-track{background:transparent}
@@ -150,6 +174,23 @@
 </style>
 </head>
 <body>
+
+<!-- スマホ縦持ち時の横向き促しオーバーレイ -->
+<div id="rotate-prompt" role="dialog" aria-label="横向き推奨">
+  <div class="rc">
+    <div class="ricon">&#128241;</div>
+    <h2>横向きで表示してください</h2>
+    <p>3D 結晶構造ビューアは横画面の方が操作しやすいです。</p>
+    <div class="btn-row">
+      <button id="rotate-lock" class="primary">横向きに自動回転する</button>
+      <button id="rotate-dismiss">そのまま縦で見る</button>
+    </div>
+    <div id="rotate-ios-note" class="ios-note">
+      iPhone / iPad はブラウザの制限で自動回転できません。<br>
+      端末自体を横にしてください（画面回転ロックが ON なら一旦 OFF に）。
+    </div>
+  </div>
+</div>
 
 <button id="bar-toggle" onclick="toggleBar()">&#9776; メニュー</button>
 <div id="bar">
@@ -2751,6 +2792,59 @@ window.addEventListener('resize',()=>{
   updateCam();renderer.setSize(w,h);
 });
 if(screen.orientation) screen.orientation.addEventListener('change',()=>window.dispatchEvent(new Event('resize')));
+
+// ===== モバイル縦持ち時の横向きオーバーレイ + 自動回転 (Android) =====
+(function(){
+  const prompt=document.getElementById('rotate-prompt');
+  const lockBtn=document.getElementById('rotate-lock');
+  const dismissBtn=document.getElementById('rotate-dismiss');
+  const iosNote=document.getElementById('rotate-ios-note');
+  if(!prompt||!lockBtn||!dismissBtn) return;
+
+  // iOS は Apple 仕様で screen.orientation.lock() が使えない (PWA 除く)
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||
+              (navigator.userAgent.includes('Mac') && navigator.maxTouchPoints>1);
+  if(isIOS){
+    lockBtn.style.display='none';
+    iosNote.style.display='block';
+  }
+
+  let dismissed=sessionStorage.getItem('rotateDismissed')==='1';
+  function isMobilePortrait(){
+    const touch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
+    return touch && window.innerWidth<=900 && window.innerHeight>window.innerWidth;
+  }
+  function update(){
+    if(dismissed){ prompt.style.display='none'; return; }
+    prompt.style.display=isMobilePortrait()?'flex':'none';
+  }
+
+  // Android 等: フルスクリーン化してから orientation.lock('landscape')
+  lockBtn.addEventListener('click',async()=>{
+    try{
+      const el=document.documentElement;
+      if(el.requestFullscreen) await el.requestFullscreen();
+      else if(el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+      if(screen.orientation && screen.orientation.lock){
+        await screen.orientation.lock('landscape');
+      }
+      // 成功すれば orientationchange イベントで update() がオーバーレイを消す
+    }catch(err){
+      lockBtn.textContent='自動回転に失敗 — 手動で横にしてください';
+      lockBtn.disabled=true;
+      console.warn('orientation lock failed:',err);
+    }
+  });
+
+  dismissBtn.addEventListener('click',()=>{
+    dismissed=true;
+    sessionStorage.setItem('rotateDismissed','1');
+    prompt.style.display='none';
+  });
+  update();
+  window.addEventListener('resize',update);
+  window.addEventListener('orientationchange',update);
+})();
 </script>
 </body>
 </html>
