@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="robots" content="noindex, nofollow">
-<title>TMD 結晶構造ビューア — 1T / 2H / 1T' / 3R + インターカレーション</title>
+<title>TMD 結晶構造ビューア — 1T / 2H / 1T' / 3R / MPS₃ + インターカレーション</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:#080b12;overflow:hidden;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo',sans-serif;color:#ccc;
@@ -190,6 +190,12 @@
         <option value="NbSe2_3R">NbSe₂ (3R)</option>
         <option value="TaS2_3R">TaS₂ (3R)</option>
       </optgroup>
+      <optgroup label="MPS₃ (磁性 2D)">
+        <option value="NiPS3">NiPS₃</option>
+        <option value="FePS3">FePS₃</option>
+        <option value="MnPS3">MnPS₃</option>
+        <option value="CoPS3">CoPS₃</option>
+      </optgroup>
     </select>
   </div>
 
@@ -337,6 +343,7 @@
 <div id="legend">
   <span><span class="dot" id="leg-m"></span><span id="leg-m-name">V</span></span>
   <span><span class="dot" id="leg-x"></span><span id="leg-x-name">Se</span></span>
+  <span id="leg-p" style="display:none"><span class="dot" id="leg-p-dot"></span><span id="leg-p-name">P</span></span>
   <span><span class="bline" style="background:rgba(150,200,240,.6)"></span>結合</span>
   <span id="leg-inter" style="display:none"><span class="dot" id="leg-i-dot"></span><span id="leg-i-name"></span></span>
 </div>
@@ -402,11 +409,21 @@ const DB = {
   NbS2_3R:  { m:'Nb', x:'S',  defPhase:'3R', a:3.321, c1T:5.88, c2H:11.76, c3R:17.64, bond:2.50 },
   NbSe2_3R: { m:'Nb', x:'Se', defPhase:'3R', a:3.442, c1T:6.27, c2H:12.55, c3R:18.93, bond:2.60 },
   TaS2_3R:  { m:'Ta', x:'S',  defPhase:'3R', a:3.340, c1T:5.90, c2H:12.10, c3R:17.90, bond:2.48 },
+  // --- MPS₃ ファミリー (M=Ni/Fe/Mn/Co、P₂S₆²⁻ ユニット、層内 M ハニカム + P₂ ダイマー) ---
+  // 単斜晶 C2/m。表示は hex 風プリミティブ (a ≈ b/√3 ≈ √3 × a_TMD) の 1 層モデル。
+  // cMPS3 = 層 1 つ + vdW gap 1 つの実効厚 (= c_bulk × sin β / Z_layer)
+  // dxm は MPS3 用に bond と a から自動計算 (= √(bond² − (a/3)²))。hpp = P-P/2。
+  NiPS3: { m:'Ni', x:'S', defPhase:'MPS3', a:5.812, cMPS3:6.342, bond:2.46, bond_pp:2.20, bond_ps:2.04, hpp:1.10, isMPS3:true },
+  FePS3: { m:'Fe', x:'S', defPhase:'MPS3', a:5.934, cMPS3:6.430, bond:2.54, bond_pp:2.20, bond_ps:2.03, hpp:1.10, isMPS3:true },
+  MnPS3: { m:'Mn', x:'S', defPhase:'MPS3', a:6.077, cMPS3:6.490, bond:2.62, bond_pp:2.20, bond_ps:2.03, hpp:1.10, isMPS3:true },
+  CoPS3: { m:'Co', x:'S', defPhase:'MPS3', a:5.901, cMPS3:6.370, bond:2.51, bond_pp:2.18, bond_ps:2.04, hpp:1.10, isMPS3:true },
 };
-const MCOL_DEFAULT = { V:0x2e8bc0,Ti:0x7799aa,Mo:0x8855bb,W:0x4466aa,Nb:0x22aa88,Ta:0x667788,Pt:0xaabbcc,Zr:0x55aa77,Re:0xaa6644 };
+const MCOL_DEFAULT = { V:0x2e8bc0,Ti:0x7799aa,Mo:0x8855bb,W:0x4466aa,Nb:0x22aa88,Ta:0x667788,Pt:0xaabbcc,Zr:0x55aa77,Re:0xaa6644,Ni:0x4cb16d,Fe:0xcc6644,Mn:0xa05ab8,Co:0x3a78c4 };
 const XCOL_DEFAULT = { S:0xddc000, Se:0xd48a00, Te:0xcc7722 };
+const PCOL_DEFAULT = { P:0xff8833 };  // MPS₃ ファミリー用
 const MCOL = {...MCOL_DEFAULT};
 const XCOL = {...XCOL_DEFAULT};
+const PCOL = {...PCOL_DEFAULT};
 // カスタム色上書き（カラーピッカーから）
 let customMCol=null, customXCol=null;
 
@@ -639,7 +656,7 @@ function takeScreenshot() {
   renderer.render(scene, camera);
   const a=document.createElement('a');
   const info=DB[curMat];
-  a.download=`${info.m}${info.x}2_${curPhase}_structure.png`;
+  a.download=`${info.isMPS3?info.m+'PS3':info.m+info.x+'2'}_${curPhase}_structure.png`;
   a.href=canvas.toDataURL('image/png');
   a.click();
 }
@@ -650,12 +667,17 @@ function exportCIF(){
   const expansion=parseFloat(document.getElementById('sl-gap').value);
   const interKey=document.getElementById('sel-inter').value;
   const inter=INTER[interKey];
-  const Na=parseInt(document.getElementById('sl-na').value);
-  const Nb=parseInt(document.getElementById('sl-nb').value);
+  const Na_raw_e=parseInt(document.getElementById('sl-na').value);
+  const Nb_raw_e=parseInt(document.getElementById('sl-nb').value);
+  // MPS₃ プリミティブセルは √3 × TMD (面積 3 倍)。同じ Na/Nb だと 3 倍書き出されるので半分にする
+  const Na=phase==='MPS3'?Math.max(1,Math.ceil(Na_raw_e/2)):Na_raw_e;
+  const Nb=phase==='MPS3'?Math.max(1,Math.ceil(Nb_raw_e/2)):Nb_raw_e;
 
-  const c_layer=phase==='2H'?info.c2H/2:phase==='3R'?(info.c3R||info.c2H*1.5)/3:phase==='1Tp'?(info.c1Tp||info.c1T*2)/(info.nlc||2):info.c1T;
+  const c_layer=phase==='2H'?info.c2H/2:phase==='3R'?(info.c3R||info.c2H*1.5)/3:phase==='1Tp'?(info.c1Tp||info.c1T*2)/(info.nlc||2):phase==='MPS3'?(info.cMPS3||6.3):info.c1T;
   const r_inp=a/S3;
-  const d_xm=info.dxm||Math.sqrt(Math.max(bond*bond-r_inp*r_inp,0.1));
+  const d_xm=info.dxm||(phase==='MPS3'
+    ? Math.sqrt(Math.max(bond*bond-(a/3)*(a/3),0.1))
+    : Math.sqrt(Math.max(bond*bond-r_inp*r_inp,0.1)));
   const sandwich=2*d_xm;
   const normalGap=c_layer-sandwich;
   const effExpansion=Math.max(expansion, inter.minGap);
@@ -1000,11 +1022,13 @@ function buildStructure() {
   const interKey=document.getElementById('sel-inter').value;
   const inter=INTER[interKey];
 
-  const c_layer=phase==='2H'?info.c2H/2:phase==='3R'?(info.c3R||info.c2H*1.5)/3:phase==='1Tp'?(info.c1Tp||info.c1T*2)/(info.nlc||2):info.c1T;
+  const c_layer=phase==='2H'?info.c2H/2:phase==='3R'?(info.c3R||info.c2H*1.5)/3:phase==='1Tp'?(info.c1Tp||info.c1T*2)/(info.nlc||2):phase==='MPS3'?(info.cMPS3||6.3):info.c1T;
   const aEff=phase==='1Tp'?(info.a1Tp||info.a):info.a;
   const bEff=phase==='1Tp'?(info.b1Tp||info.a):info.a;
   const r_inp=a/S3;
-  const d_xm=info.dxm||Math.sqrt(Math.max(bond*bond-r_inp*r_inp,0.1));
+  const d_xm=info.dxm||(phase==='MPS3'
+    ? Math.sqrt(Math.max(bond*bond-(a/3)*(a/3),0.1))
+    : Math.sqrt(Math.max(bond*bond-r_inp*r_inp,0.1)));
   const sandwich=2*d_xm;
   const normalGap=c_layer-sandwich;
   const effExpansion=Math.max(expansion, inter.minGap);
@@ -1022,6 +1046,7 @@ function buildStructure() {
   if(customXCol!==null) XCOL[info.x]=customXCol;
   const matM=new THREE.MeshPhongMaterial({color:MCOL[info.m],shininess:80,specular:0x446688});
   const matX=new THREE.MeshPhongMaterial({color:XCOL[info.x],shininess:60,specular:0x888844});
+  const matP=new THREE.MeshPhongMaterial({color:PCOL.P,shininess:60,specular:0x886633});
   const matBond=new THREE.MeshPhongMaterial({color:0x8abbdd,transparent:true,opacity:0.55});
   const scaleM=parseFloat(document.getElementById('sl-atom-m').value)||1.0;
   const scaleX=parseFloat(document.getElementById('sl-atom-x').value)||1.0;
@@ -1029,12 +1054,16 @@ function buildStructure() {
   const bondScale=parseFloat(document.getElementById('sl-bond-r').value)||1.0;
   const geoM=new THREE.SphereGeometry(0.45*scaleM,24,24);
   const geoX=new THREE.SphereGeometry(0.36*scaleX,20,20);
+  const geoP=new THREE.SphereGeometry(0.30*scaleX,20,20);
 
-  const Na=parseInt(document.getElementById('sl-na').value);
+  const Na_raw=parseInt(document.getElementById('sl-na').value);
   const Nb_raw=parseInt(document.getElementById('sl-nb').value);
   // Triclinic cells are 2×2 hex supercells (b≈2×standard), so halve Nb for comparable display
-  const Nb=(phase==='1Tp'&&info.triclinic)?Math.max(1,Math.ceil(Nb_raw/2)):Nb_raw;
-  const mAtoms=[], xAtoms=[];
+  const Nb_tric=(phase==='1Tp'&&info.triclinic)?Math.max(1,Math.ceil(Nb_raw/2)):Nb_raw;
+  // MPS₃ プリミティブセルは √3 × TMD (面積 3 倍)。同じ Na/Nb だと原子が 3 倍見えるので半分にして密度を揃える
+  const Na=phase==='MPS3'?Math.max(1,Math.ceil(Na_raw/2)):Na_raw;
+  const Nb=phase==='MPS3'?Math.max(1,Math.ceil(Nb_tric/2)):Nb_tric;
+  const mAtoms=[], xAtoms=[], pAtoms=[];
 
   // For triclinic cells, sheared grid needs extra cells in i-direction
   const iExtra=(phase==='1Tp'&&info.triclinic)?Math.ceil(Nb*Math.abs(Math.cos((info.gamma||119)*Math.PI/180))*bEff/aEff):0;
@@ -1097,6 +1126,24 @@ function buildStructure() {
         const[xx,xz]=fracToXZ(i+xf1,j+xf2,a);
         xAtoms.push(new THREE.Vector3(xx,yC+d_xm,xz));
         xAtoms.push(new THREE.Vector3(xx,yC-d_xm,xz));
+      } else if(phase==='MPS3'){
+        // MPS₃: √3 hex プリミティブ (a ≈ 5.8 Å) で
+        //   2 M ハニカム (TMD 1T の X 位置 (1/3,2/3), (2/3,1/3)) +
+        //   2 P (hex (0,0) を中心に z=±hpp の P₂ ダイマー) +
+        //   6 S (TMD 1T の chalcogen を √3 化した三角副格子位置)
+        // S を三角副格子に置くと Ni-S 八面体配位が全 Ni で 6 配位になる。
+        // P-S 結合はセル境界を跨ぐ (各 P の S 隣接 3 個が異なるセルにいる) のが MPS₃ の正しい姿。
+        const hpp=info.hpp||1.10;
+        const[m1x,m1z]=fracToXZ(i+1/3,j+2/3,a); mAtoms.push(new THREE.Vector3(m1x,yC,m1z));
+        const[m2x,m2z]=fracToXZ(i+2/3,j+1/3,a); mAtoms.push(new THREE.Vector3(m2x,yC,m2z));
+        const[px,pz]=fracToXZ(i,j,a);
+        pAtoms.push(new THREE.Vector3(px,yC+hpp,pz));
+        pAtoms.push(new THREE.Vector3(px,yC-hpp,pz));
+        // S top: 三角副格子 (1/3,1/3), (2/3,0), (0,2/3) ; S bot: (1/3,0), (2/3,2/3), (0,1/3)
+        const topFracs=[[1/3,1/3],[2/3,0],[0,2/3]];
+        const botFracs=[[1/3,0],[2/3,2/3],[0,1/3]];
+        topFracs.forEach(([f1,f2])=>{const[sx,sz]=fracToXZ(i+f1,j+f2,a);xAtoms.push(new THREE.Vector3(sx,yC+d_xm,sz));});
+        botFracs.forEach(([f1,f2])=>{const[sx,sz]=fracToXZ(i+f1,j+f2,a);xAtoms.push(new THREE.Vector3(sx,yC-d_xm,sz));});
       } else {
         // 2H: AB stacking trigonal prismatic
         const mf=l%2===0?[1/3,2/3]:[2/3,1/3], xf=l%2===0?[2/3,1/3]:[1/3,2/3];
@@ -1142,9 +1189,10 @@ function buildStructure() {
   const cx=(dXMin+dXMax)/2, cy=((numLayers-1)*layerStep+sandwich)/2, cz=(dZMin+dZMax)/2;
   const off=new THREE.Vector3(-cx,-cy,-cz);
 
-  const visM=mAtoms.filter(inB), visX=xAtoms.filter(inB);
+  const visM=mAtoms.filter(inB), visX=xAtoms.filter(inB), visP=pAtoms.filter(inB);
   visM.forEach(p=>{const m=new THREE.Mesh(geoM,matM);m.position.copy(p).add(off);m.userData={isAtom:true,el:info.m};structGroup.add(m);});
   visX.forEach(p=>{const m=new THREE.Mesh(geoX,matX);m.position.copy(p).add(off);m.userData={isAtom:true,el:info.x};structGroup.add(m);});
+  visP.forEach(p=>{const m=new THREE.Mesh(geoP,matP);m.position.copy(p).add(off);m.userData={isAtom:true,el:'P'};structGroup.add(m);});
 
   // Metal-Metal bonds for 1T' (zigzag chains / diamond clusters)
   const mmGroup=new THREE.Group(); mmGroup.name='mmBonds';
@@ -1222,6 +1270,33 @@ function buildStructure() {
       }
     }
   });
+
+  // MPS₃: P-P ダイマー結合 + P-S 結合 (P-P は強調色、P-S は通常結合と同色)
+  if(phase==='MPS3'){
+    const matPP=new THREE.MeshPhongMaterial({color:0xff6644,transparent:true,opacity:0.75});
+    // P-P: 連続ペアを dimer として描画
+    for(let i=0;i<pAtoms.length;i+=2){
+      if(i+1<pAtoms.length){
+        const a1=pAtoms[i], a2=pAtoms[i+1];
+        if(inB(a1)||inB(a2)){
+          const c=makeCyl(a1.clone().add(off),a2.clone().add(off),0.08*bondScale,matPP);
+          if(c) structGroup.add(c);
+        }
+      }
+    }
+    // P-S: 距離カットオフでフィルタ
+    const psCut=(info.bond_ps||2.04)+0.3, psCut2=psCut*psCut;
+    pAtoms.forEach(pp=>{
+      if(!inB(pp)) return;
+      xAtoms.forEach(xp=>{
+        const d2=pp.distanceToSquared(xp);
+        if(d2>0.01 && d2<psCut2 && inB(xp)){
+          const c=makeCyl(pp.clone().add(off),xp.clone().add(off),0.05*bondScale,matBond);
+          if(c) structGroup.add(c);
+        }
+      });
+    });
+  }
 
   // ===================== Intercalant molecules =====================
   // 層間圧縮モデル:
@@ -1442,6 +1517,27 @@ function buildStructure() {
 //  Info / Legend
 // =====================================================
 function updateInfo(info,phase,cL,dxm,gap,bond,interKey,effExp) {
+  // MPS₃ ファミリーは TMD と組成・空間群が異なるので専用パス
+  if(phase==='MPS3'){
+    const f=info.m+'PS₃';
+    let html=`<strong>${f} — MPS₃</strong><br>`+
+      `空間群: <span class="hl">C2/m (No.12)</span><br>構造型: P₂S₆²⁻ ユニット (${info.m} ハニカム + P₂ ダイマー)<br>`+
+      `a = ${info.a.toFixed(3)} Å, c (実効) = ${(info.cMPS3||6.3).toFixed(2)} Å<br>`+
+      `${info.m}–S 結合長: <span class="hl">${bond.toFixed(2)} Å</span><br>`+
+      `P–P ダイマー: <span class="hl">${(info.bond_pp||2.20).toFixed(2)} Å</span>, P–S: ${(info.bond_ps||2.04).toFixed(2)} Å<br>`+
+      `配位: ${info.m} 歪み八面体 (6 S), P 四面体 (3 S + 1 P)<br>`+
+      `層間 (vdW gap): ${gap.toFixed(2)} Å`;
+    if(interKey!=='none'){
+      const inter=INTER[interKey];
+      html+=`<br><span class="hl">挿入: ${inter.name}</span>`;
+      if(effExp>1) html+=` (${effExp.toFixed(1)}× 拡大)`;
+      const cf2=window._lastCompF||1;
+      if(cf2<0.999) html+=`<br><span style="color:#ff8844">層間圧縮: ${(cf2*100).toFixed(0)}%</span>`;
+    }
+    html+=`<br><span style="color:#555;font-size:.68rem">Wyckoff (hex 風近似): ${info.m} 2d(⅓,⅔,0)+(⅔,⅓,0), P 2c(0,0,±z), S 6i</span>`;
+    document.getElementById('info').innerHTML=html;
+    return;
+  }
   let sg,pt,cd;
   if(phase==='1Tp'&&info.triclinic){
     sg='P-1 (No.2)'; pt='歪み八面体 (三斜晶 / Re₄クラスター)'; cd='歪み八面体 (6配位)';
@@ -1492,13 +1588,21 @@ function updateInfo(info,phase,cL,dxm,gap,bond,interKey,effExp) {
   document.getElementById('info').innerHTML=html;
 }
 
-const MNAME={V:'バナジウム',Ti:'チタン',Mo:'モリブデン',W:'タングステン',Nb:'ニオブ',Ta:'タンタル',Pt:'白金',Zr:'ジルコニウム',Re:'レニウム'};
+const MNAME={V:'バナジウム',Ti:'チタン',Mo:'モリブデン',W:'タングステン',Nb:'ニオブ',Ta:'タンタル',Pt:'白金',Zr:'ジルコニウム',Re:'レニウム',Ni:'ニッケル',Fe:'鉄',Mn:'マンガン',Co:'コバルト'};
 const XNAME={S:'硫黄',Se:'セレン',Te:'テルル'};
+const PNAME={P:'リン'};
 function updateLegend(info,interKey) {
   document.getElementById('leg-m').style.background='#'+MCOL[info.m].toString(16).padStart(6,'0');
   document.getElementById('leg-x').style.background='#'+XCOL[info.x].toString(16).padStart(6,'0');
-  document.getElementById('leg-m-name').textContent=info.m+' ('+MNAME[info.m]+')';
-  document.getElementById('leg-x-name').textContent=info.x+' ('+XNAME[info.x]+')';
+  document.getElementById('leg-m-name').textContent=info.m+' ('+(MNAME[info.m]||info.m)+')';
+  document.getElementById('leg-x-name').textContent=info.x+' ('+(XNAME[info.x]||info.x)+')';
+  // MPS₃ 系は P の凡例を表示
+  const lp=document.getElementById('leg-p');
+  if(info.isMPS3){
+    lp.style.display='flex';
+    document.getElementById('leg-p-dot').style.background='#'+PCOL.P.toString(16).padStart(6,'0');
+    document.getElementById('leg-p-name').textContent='P ('+PNAME.P+')';
+  } else lp.style.display='none';
   const li=document.getElementById('leg-inter');
   if(interKey!=='none'){
     li.style.display='flex';
@@ -1897,9 +2001,11 @@ document.getElementById('v-gap-abs').addEventListener('change',function(){
   if(isNaN(targetDist)||targetDist<=0) return;
   // 現在の材料のパラメータ
   const info=DB[curMat], phase=curPhase;
-  const c_layer=phase==='2H'?info.c2H/2:phase==='3R'?(info.c3R||info.c2H*1.5)/3:phase==='1Tp'?(info.c1Tp||info.c1T*2)/(info.nlc||2):info.c1T;
+  const c_layer=phase==='2H'?info.c2H/2:phase==='3R'?(info.c3R||info.c2H*1.5)/3:phase==='1Tp'?(info.c1Tp||info.c1T*2)/(info.nlc||2):phase==='MPS3'?(info.cMPS3||6.3):info.c1T;
   const r_inp=info.a/S3;
-  const d_xm=info.dxm||Math.sqrt(Math.max(info.bond*info.bond-r_inp*r_inp,0.1));
+  const d_xm=info.dxm||(phase==='MPS3'
+    ? Math.sqrt(Math.max(info.bond*info.bond-(info.a/3)*(info.a/3),0.1))
+    : Math.sqrt(Math.max(info.bond*info.bond-r_inp*r_inp,0.1)));
   const sandwich=2*d_xm;
   const normalGap=c_layer-sandwich;
   if(normalGap<=0) return;
@@ -2542,7 +2648,7 @@ function runOptimize(){
   const matInfo=DB[curMat], phase=curPhase;
   const r_inp=matInfo.a/S3;
   const d_xm=matInfo.dxm||Math.sqrt(Math.max(matInfo.bond*matInfo.bond-r_inp*r_inp,0.1));
-  const c_layer=phase==='2H'?matInfo.c2H/2:phase==='3R'?(matInfo.c3R||matInfo.c2H*1.5)/3:phase==='1Tp'?(matInfo.c1Tp||matInfo.c1T*2)/(matInfo.nlc||2):matInfo.c1T;
+  const c_layer=phase==='2H'?matInfo.c2H/2:phase==='3R'?(matInfo.c3R||matInfo.c2H*1.5)/3:phase==='1Tp'?(matInfo.c1Tp||matInfo.c1T*2)/(matInfo.nlc||2):phase==='MPS3'?(matInfo.cMPS3||6.3):matInfo.c1T;
   const normalGap=c_layer-2*d_xm;
 
   const panel=document.getElementById('opt-panel');
