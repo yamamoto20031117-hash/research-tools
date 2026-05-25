@@ -69,7 +69,7 @@ git clone https://github.com/yamamoto20031117-hash/research-tools.git
 1. `start_all.bat` をダブルクリック
 2. 「DMM-SyncServer」という別ウィンドウが開き、`WebSocket: ws://0.0.0.0:8765` と表示される
 3. メインウィンドウで Keithley に接続され、測定データが流れ始める
-4. ブラウザで https://research-tools-six.vercel.app/dmm-monitor/ を開き、データが表示されることを確認
+4. ブラウザで https://research-tools-theta.vercel.app/dmm-monitor/ を開き、データが表示されることを確認
 5. **別の端末（スマホ等）** で同じURLを開き、同じグラフが表示されれば同期成功
 
 ---

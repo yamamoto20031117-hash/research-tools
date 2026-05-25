@@ -3,7 +3,7 @@
 研究室向けの計測・解析・可視化ツールを集めた**静的 Web サイト**。各ツールは独立した
 1 枚の `index.html`（ビルド工程なし）。Vercel にデプロイされている。
 
-- 本番 URL: https://research-tools-six.vercel.app/
+- 本番 URL: https://research-tools-theta.vercel.app/
 - リポジトリ: https://github.com/yamamoto20031117-hash/research-tools （`main`）
 - 想定ユーザー: 研究室メンバー（分子スピントロニクス / TMD・VSe2 系の物性測定）
 
