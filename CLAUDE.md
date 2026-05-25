@@ -19,12 +19,28 @@
 | `dmm-viewer/` | DMM データビューア（測定データ解析） | 作成中 |
 | `squid-plotter/` | SQUID 磁化データプロッター | 作成中 |
 | `cfms-plotter/` | CFMS 低温物性データプロッター | 作成中 |
-| `qe-calculator/` | QE 計算ランチャー（Quantum ESPRESSO via AiiDAlab） | 作成中 |
+| `qe-calculator/` | QE 計算ランチャー（旧 AiiDA REST 投入版は凍結 — 下記参照） | 凍結 |
 | `Temudraw/` | 化学構造エディタ | 作成中 |
 | `showcase/` | ショーケースページ | 公開 |
 
 各ツールフォルダには `index.html`（本体）と、ものによって `manual.html`（使い方）、
 データ送信用の Python スクリプト（`*_sender.py`）が入っている。
+
+## qe-calculator の現状（重要）
+
+このディレクトリのブラウザ実装（CIF → AiiDAlab REST API へ relax/SCF/NSCF/bands を
+投入）は **凍結**。原因：標準の AiiDA REST API は基本**読み取り専用**で、ワーク
+フローの「投入」ができない（aiida-restapi 別パッケージでも限定的）ため、根本的に
+動かない設計だった。
+
+**QE 自動化の本実装は別プロジェクト `~/Projects/qe-auto/` に移管済**（AiiDA 本格採用、
+構造アセンブリ＋入力生成＋収束テスト＋ワークフロー＋電荷移動解析の 7 フェーズ Python
+パッケージ）。詳細は `~/Projects/qe-auto/docs/PLAN.md`。
+
+`qe-calculator/` ディレクトリ自体は**残す**。将来 `qe-auto` の Phase 5 完了後に、
+AiiDA REST API を**読み取り専用**で叩く「結果データベース横断ビュー」（host × molecule
+マトリクス、各セル：エネルギー / バンド / DOS / Δρ サマリ）に転用する想定。REST は
+読み取りは得意なので、既存 UI 資産（カード／スレッド板等）は活かせる。
 
 ## 技術スタック
 
