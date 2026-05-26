@@ -1,15 +1,141 @@
 {
-  "generated_at": "2026-05-26T21:20:54.148244",
-  "n_results": 23,
+  "generated_at": "2026-05-26T21:39:59.019402",
+  "n_results": 33,
   "results": [
+    {
+      "pk": 691,
+      "label": "TiSe2",
+      "process_label": "QeFullWorkChain",
+      "state": "excepted",
+      "finished_ok": false,
+      "ctime": "2026-05-26T12:39:25.936663+00:00",
+      "mtime": "2026-05-26T12:39:26.937676+00:00",
+      "extras": {
+        "_aiida_hash": "8361dd6f60d0ca7eb937ff98c012e70530dfe8774c4593e5b35733951ac616bc"
+      }
+    },
+    {
+      "pk": 679,
+      "label": "VSe2",
+      "process_label": "QeFullWorkChain",
+      "state": "excepted",
+      "finished_ok": false,
+      "ctime": "2026-05-26T12:39:23.046314+00:00",
+      "mtime": "2026-05-26T12:39:24.184273+00:00",
+      "extras": {
+        "_aiida_hash": "f4ba94f12d8c95b91c6edfdd71090227c1cef593769d19f113f2b1ad927d18ee"
+      }
+    },
+    {
+      "pk": 667,
+      "label": "WSe2",
+      "process_label": "QeFullWorkChain",
+      "state": "excepted",
+      "finished_ok": false,
+      "ctime": "2026-05-26T12:39:20.337968+00:00",
+      "mtime": "2026-05-26T12:39:21.267560+00:00",
+      "extras": {
+        "_aiida_hash": "09d2ae0f2ec906c9d796f69b8bf10d68cd6d890640d18b140118f4d98b75a347"
+      }
+    },
+    {
+      "pk": 656,
+      "label": "WS2",
+      "process_label": "QeFullWorkChain",
+      "state": "excepted",
+      "finished_ok": false,
+      "ctime": "2026-05-26T12:39:17.627908+00:00",
+      "mtime": "2026-05-26T12:39:18.525437+00:00",
+      "extras": {
+        "_aiida_hash": "4166f568a14b05c0f1c6f3b0df488602d1af04998ef58e45fc200091621913bd"
+      }
+    },
+    {
+      "pk": 645,
+      "label": "MoSe2",
+      "process_label": "QeFullWorkChain",
+      "state": "excepted",
+      "finished_ok": false,
+      "ctime": "2026-05-26T12:39:14.950822+00:00",
+      "mtime": "2026-05-26T12:39:15.858715+00:00",
+      "extras": {
+        "_aiida_hash": "d34d6c07b7101f834df08585b8c2fa380e63faaa1db87638ff61159581f82daf"
+      }
+    },
+    {
+      "pk": 634,
+      "label": "MoS2",
+      "process_label": "QeFullWorkChain",
+      "state": "excepted",
+      "finished_ok": false,
+      "ctime": "2026-05-26T12:39:12.263035+00:00",
+      "mtime": "2026-05-26T12:39:13.184571+00:00",
+      "extras": {
+        "_aiida_hash": "d45c514c9e71edd26d111be057d1400025cad8cf1a5b20b212d5aa74621b439c"
+      }
+    },
+    {
+      "pk": 594,
+      "label": "\u2014",
+      "process_label": "PwBaseWorkChain",
+      "state": "killed",
+      "finished_ok": false,
+      "ctime": "2026-05-26T12:34:01.395208+00:00",
+      "mtime": "2026-05-26T12:38:07.130763+00:00",
+      "extras": {
+        "_aiida_hash": "88c5c02a1cca6e2db1ae8dc08f05bb976102b5baa0a131afed6c38f2af0bc088"
+      }
+    },
+    {
+      "pk": 584,
+      "label": "\u2014",
+      "process_label": "PwBaseWorkChain",
+      "state": "killed",
+      "finished_ok": false,
+      "ctime": "2026-05-26T12:33:56.413276+00:00",
+      "mtime": "2026-05-26T12:38:07.052725+00:00",
+      "extras": {
+        "_aiida_hash": "def8473063a53bdc5fc8a5a17b9a6c18df469eb2cdd827c740984a37c4af87f6"
+      }
+    },
+    {
+      "pk": 565,
+      "label": "\u2014",
+      "process_label": "PwBaseWorkChain",
+      "state": "finished",
+      "finished_ok": true,
+      "ctime": "2026-05-26T12:27:28.862895+00:00",
+      "mtime": "2026-05-26T12:34:00.857629+00:00",
+      "extras": {
+        "_aiida_hash": "bb42b3a0db28b80366cf448c442bb692a0b14dfe1deb2dfe3df50cc3a010ee38"
+      },
+      "fermi_energy_ev": 8.7765,
+      "total_magnetization": 2.3182681714676e-05,
+      "total_energy_ev": -2803.4063424807
+    },
+    {
+      "pk": 563,
+      "label": "\u2014",
+      "process_label": "PwBaseWorkChain",
+      "state": "finished",
+      "finished_ok": true,
+      "ctime": "2026-05-26T12:27:27.989706+00:00",
+      "mtime": "2026-05-26T12:33:56.117784+00:00",
+      "extras": {
+        "_aiida_hash": "1ba49b736ef9d793641cbc7cdb6fb9e423d565ab25e50f4870ca395a7ba4d2e2"
+      },
+      "fermi_energy_ev": 8.7765,
+      "total_magnetization": 2.3181563466028e-05,
+      "total_energy_ev": -2803.4063424467
+    },
     {
       "pk": 523,
       "label": "\u2014",
       "process_label": "PwBaseWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T12:12:35.276655+00:00",
-      "mtime": "2026-05-26T12:12:36.896389+00:00",
+      "mtime": "2026-05-26T12:38:05.238252+00:00",
       "extras": {
         "_aiida_hash": "85439f68f8d9d398dcfffb2c87ada7c8208c352cd78f87116de6517057656409"
       }
@@ -18,13 +144,16 @@
       "pk": 509,
       "label": "\u2014",
       "process_label": "PwBaseWorkChain",
-      "state": "waiting",
-      "finished_ok": false,
+      "state": "finished",
+      "finished_ok": true,
       "ctime": "2026-05-26T11:50:59.375340+00:00",
-      "mtime": "2026-05-26T11:51:00.999943+00:00",
+      "mtime": "2026-05-26T12:27:23.727186+00:00",
       "extras": {
         "_aiida_hash": "76d3aa85626a79647354afc722b3eff211a95f9634ae7ef0dd775bfec119b12b"
-      }
+      },
+      "fermi_energy_ev": 8.7765,
+      "total_magnetization": -2.253049749479e-06,
+      "total_energy_ev": -2803.4063424801
     },
     {
       "pk": 494,
@@ -45,22 +174,25 @@
       "pk": 492,
       "label": "\u2014",
       "process_label": "PwRelaxWorkChain",
-      "state": "waiting",
-      "finished_ok": false,
+      "state": "finished",
+      "finished_ok": true,
       "ctime": "2026-05-26T10:29:52.750546+00:00",
-      "mtime": "2026-05-26T11:50:59.805739+00:00",
+      "mtime": "2026-05-26T12:27:24.572770+00:00",
       "extras": {
         "_aiida_hash": "c377b9ef11f34653a652df5b95816f3a5a2b649f60c049a567c3134ffa7f3740"
-      }
+      },
+      "fermi_energy_ev": 8.7765,
+      "total_magnetization": -2.253049749479e-06,
+      "total_energy_ev": -2803.4063793995
     },
     {
       "pk": 475,
       "label": "TiSe2",
       "process_label": "QeFullWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:29:50.902626+00:00",
-      "mtime": "2026-05-26T10:29:53.501522+00:00",
+      "mtime": "2026-05-26T12:38:06.762882+00:00",
       "extras": {
         "_aiida_hash": "a5a81f3f4fd45f748d7448bb32bdcd4b8f37ba29197c69abe1b7f2ded05f65ed"
       }
@@ -81,10 +213,10 @@
       "pk": 462,
       "label": "\u2014",
       "process_label": "PwRelaxWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:29:49.003745+00:00",
-      "mtime": "2026-05-26T12:12:35.665026+00:00",
+      "mtime": "2026-05-26T12:38:05.138545+00:00",
       "extras": {
         "_aiida_hash": "2254629de201b14bd0b5de88b34a5b8136484168e646bc969a9d032071cbaf40"
       }
@@ -93,10 +225,10 @@
       "pk": 450,
       "label": "VSe2",
       "process_label": "QeFullWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:29:47.880009+00:00",
-      "mtime": "2026-05-26T10:29:49.794600+00:00",
+      "mtime": "2026-05-26T12:38:05.056530+00:00",
       "extras": {
         "_aiida_hash": "5c71224c74e672f304f39370a32069cb9e32761671984370225081fe62514de5"
       }
@@ -117,10 +249,10 @@
       "pk": 420,
       "label": "\u2014",
       "process_label": "PwBaseWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:27:07.726287+00:00",
-      "mtime": "2026-05-26T10:27:10.278584+00:00",
+      "mtime": "2026-05-26T12:38:03.626884+00:00",
       "extras": {
         "_aiida_hash": "adca7d8dc0b0aa3025ebae2682497e9d197ca1ce70ef61736735d33b0c89384b"
       }
@@ -141,10 +273,10 @@
       "pk": 402,
       "label": "\u2014",
       "process_label": "PwRelaxWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:27:05.023806+00:00",
-      "mtime": "2026-05-26T10:27:08.099099+00:00",
+      "mtime": "2026-05-26T12:38:03.528882+00:00",
       "extras": {
         "_aiida_hash": "4750181445eb9ba4385cefa436c2adb777b9d75e1967198fc347b64dc99a7ae7"
       }
@@ -153,10 +285,10 @@
       "pk": 389,
       "label": "\u2014",
       "process_label": "PwBaseWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:27:03.980458+00:00",
-      "mtime": "2026-05-26T10:27:06.873968+00:00",
+      "mtime": "2026-05-26T12:38:02.243816+00:00",
       "extras": {
         "_aiida_hash": "60bb347944bff5a3af44fd509359c5392da17065899760bd93979728c58f9495"
       }
@@ -165,10 +297,10 @@
       "pk": 387,
       "label": "WSe2",
       "process_label": "QeFullWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:27:03.020467+00:00",
-      "mtime": "2026-05-26T10:27:05.728861+00:00",
+      "mtime": "2026-05-26T12:38:03.451259+00:00",
       "extras": {
         "_aiida_hash": "38572632acc8e8f31e3ac04c5b1ae220c3bacf5eccf17155ee55ad9643f81ee9"
       }
@@ -177,10 +309,10 @@
       "pk": 372,
       "label": "\u2014",
       "process_label": "PwRelaxWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:27:01.770706+00:00",
-      "mtime": "2026-05-26T10:27:04.344168+00:00",
+      "mtime": "2026-05-26T12:38:01.826076+00:00",
       "extras": {
         "_aiida_hash": "aec0816fa8c82553715077a15f23b39e223a3c445f69a0248e31c8b48b119be3"
       }
@@ -189,10 +321,10 @@
       "pk": 360,
       "label": "\u2014",
       "process_label": "PwBaseWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:27:00.711260+00:00",
-      "mtime": "2026-05-26T10:27:03.531012+00:00",
+      "mtime": "2026-05-26T12:38:00.287267+00:00",
       "extras": {
         "_aiida_hash": "d7146ebddb4a16b250601357d99b386c0a8289dce7d4992381190f8d34de7f21"
       }
@@ -201,10 +333,10 @@
       "pk": 358,
       "label": "WS2",
       "process_label": "QeFullWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:27:00.262376+00:00",
-      "mtime": "2026-05-26T10:27:02.561085+00:00",
+      "mtime": "2026-05-26T12:38:01.745735+00:00",
       "extras": {
         "_aiida_hash": "4a44adeb6432e525ab31934c95234ed078603a4be9509d1d4336da1330c2914d"
       }
@@ -213,10 +345,10 @@
       "pk": 343,
       "label": "\u2014",
       "process_label": "PwRelaxWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:26:58.577601+00:00",
-      "mtime": "2026-05-26T10:27:01.068613+00:00",
+      "mtime": "2026-05-26T12:38:00.185819+00:00",
       "extras": {
         "_aiida_hash": "1a557356b64bcf9a32e115230537450451fc5c7b5b7952f9289264ec11e4dea8"
       }
@@ -225,10 +357,10 @@
       "pk": 331,
       "label": "\u2014",
       "process_label": "PwBaseWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:26:57.750588+00:00",
-      "mtime": "2026-05-26T10:27:00.278431+00:00",
+      "mtime": "2026-05-26T12:37:58.391586+00:00",
       "extras": {
         "_aiida_hash": "dccc11aa467cf8b16f2ac7b6f0ba0d3caeb2906f9a9497b527860e94258c6ffa"
       }
@@ -237,10 +369,10 @@
       "pk": 329,
       "label": "MoSe2",
       "process_label": "QeFullWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:26:57.467798+00:00",
-      "mtime": "2026-05-26T10:26:59.360514+00:00",
+      "mtime": "2026-05-26T12:38:00.077415+00:00",
       "extras": {
         "_aiida_hash": "365f2bcffc86282409f5c4f14251f763bc3bb0ca657776c6bcb998c7ec224a4e"
       }
@@ -249,10 +381,10 @@
       "pk": 320,
       "label": "\u2014",
       "process_label": "PwRelaxWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:26:56.550893+00:00",
-      "mtime": "2026-05-26T10:26:58.139763+00:00",
+      "mtime": "2026-05-26T12:37:58.268018+00:00",
       "extras": {
         "_aiida_hash": "4a60b919a28d7f5f3e34fa50f28c647cd1bd9d9fdffd4fe0947ecf74092c2c66"
       }
@@ -261,10 +393,10 @@
       "pk": 307,
       "label": "MoS2",
       "process_label": "QeFullWorkChain",
-      "state": "waiting",
+      "state": "killed",
       "finished_ok": false,
       "ctime": "2026-05-26T10:26:54.736281+00:00",
-      "mtime": "2026-05-26T10:26:57.332702+00:00",
+      "mtime": "2026-05-26T12:37:58.176834+00:00",
       "extras": {
         "_aiida_hash": "5e5697b26ddf2a5c3b96cf4b7f0c6a9210188d959327ebe44e975c698c5df83b"
       }
