@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QE 計算結果 — qe-auto ダッシュボード</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#080b12;color:#ccc;font-family:'Helvetica Neue',Arial,'Meiryo',sans-serif;min-height:100vh}
+  #top{position:sticky;top:0;background:rgba(8,11,18,0.92);backdrop-filter:blur(10px);padding:12px 18px;border-bottom:1px solid #1a2030;z-index:10;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  #top a{color:#58a6ff;text-decoration:none;font-size:.9rem}
+  #top h1{font-size:1.05rem;color:#fff;margin-right:8px}
+  #top .meta{font-size:.76rem;color:#888}
+  #top button{padding:5px 14px;font-size:.82rem;background:rgba(88,166,255,.15);color:#9ad0ff;border:1px solid #58a6ff;border-radius:5px;cursor:pointer}
+  #top button:hover{background:rgba(88,166,255,.25)}
+  #top select{background:#181d27;color:#ddd;border:1px solid #2a3040;border-radius:5px;padding:4px 8px;font-size:.82rem}
+  main{padding:16px 22px;max-width:1280px;margin:0 auto}
+  .summary{display:flex;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+  .stat{background:#10141c;border:1px solid #1f2638;border-radius:8px;padding:10px 16px;min-width:130px}
+  .stat-label{font-size:.7rem;color:#888;text-transform:uppercase;letter-spacing:.5px}
+  .stat-val{font-size:1.5rem;font-weight:600;color:#fff;margin-top:3px;font-variant-numeric:tabular-nums}
+  table{width:100%;border-collapse:collapse;font-size:.84rem}
+  th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #1a2030;font-variant-numeric:tabular-nums}
+  th{background:#101521;color:#9ad0ff;font-weight:600;font-size:.74rem;text-transform:uppercase;letter-spacing:.5px;position:sticky;top:64px;z-index:5}
+  tr:hover{background:rgba(88,166,255,0.05)}
+  td.pk{color:#888;font-size:.74rem}
+  .badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:600;text-transform:uppercase}
+  .badge-finished{background:rgba(56,178,108,.18);color:#5fd592;border:1px solid #38b26c}
+  .badge-running{background:rgba(255,191,73,.15);color:#ffcc55;border:1px solid #ffbf49}
+  .badge-waiting{background:rgba(120,140,180,.13);color:#aabad6;border:1px solid #5a6a8c}
+  .badge-failed{background:rgba(220,80,80,.15);color:#ff7a7a;border:1px solid #c14444}
+  .badge-other{background:rgba(160,160,160,.12);color:#aaa;border:1px solid #555}
+  details{margin:6px 0;border-top:1px solid #1a2030;padding-top:6px}
+  details pre{background:#0c0f15;border:1px solid #1a2030;border-radius:4px;padding:8px 10px;font-size:.72rem;overflow-x:auto;color:#9ad0ff}
+  .empty{padding:32px;text-align:center;color:#666}
+  .err{color:#ff7a7a;font-size:.78rem;margin-top:8px}
+  @media (max-width:600px){
+    main{padding:10px}
+    th,td{padding:5px 6px;font-size:.76rem}
+    .stat{padding:8px 12px;min-width:110px}
+  }
+</style>
+</head>
+<body>
+
+<div id="top">
+  <a href="/" title="Research Tools トップ">&#8592;</a>
+  <h1>QE 計算結果</h1>
+  <span class="meta" id="gen-at">—</span>
+  <button id="refresh">&#x21bb; 再読込</button>
+  <label class="meta">
+    フィルタ:
+    <select id="filter">
+      <option value="all">全部</option>
+      <option value="QeFullWorkChain">QeFullWorkChain のみ</option>
+      <option value="finished">完了のみ</option>
+      <option value="running">実行中</option>
+      <option value="failed">失敗</option>
+    </select>
+  </label>
+</div>
+
+<main>
+  <div class="summary" id="stats"></div>
+  <div id="table-wrap"></div>
+  <div id="err" class="err"></div>
+</main>
+
+<script>
+const STATE_BADGE = {
+  finished: 'finished', created: 'waiting', waiting: 'waiting',
+  running: 'running', killed: 'failed', excepted: 'failed', unknown: 'other'
+};
+
+async function load() {
+  document.getElementById('err').textContent = '';
+  try {
+    const res = await fetch('data/results.json?_=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    render(data);
+  } catch (e) {
+    document.getElementById('err').textContent =
+      '読み込み失敗: ' + e.message + ' (data/results.json が無いか、まだ生成されてないかも)';
+    document.getElementById('table-wrap').innerHTML =
+      '<div class="empty">まだ結果がありません。Ubuntu で <code>verdi run scripts/export_results.py</code> を走らせて、JSON を取得してください。</div>';
+  }
+}
+
+function render(data) {
+  document.getElementById('gen-at').textContent =
+    '生成: ' + new Date(data.generated_at).toLocaleString('ja-JP') + ` (${data.n_results} 件)`;
+
+  const filter = document.getElementById('filter').value;
+  let rows = data.results || [];
+  if (filter === 'QeFullWorkChain') rows = rows.filter(r => r.process_label === 'QeFullWorkChain');
+  else if (filter === 'finished') rows = rows.filter(r => r.finished_ok);
+  else if (filter === 'running') rows = rows.filter(r => ['running', 'waiting', 'created'].includes(r.state));
+  else if (filter === 'failed') rows = rows.filter(r => ['excepted', 'killed'].includes(r.state));
+
+  // Stats
+  const total = data.results.length;
+  const done = data.results.filter(r => r.finished_ok).length;
+  const running = data.results.filter(r => ['running','waiting','created'].includes(r.state)).length;
+  const failed = data.results.filter(r => ['excepted','killed'].includes(r.state)).length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-label">total</div><div class="stat-val">${total}</div></div>
+    <div class="stat"><div class="stat-label">完了</div><div class="stat-val" style="color:#5fd592">${done}</div></div>
+    <div class="stat"><div class="stat-label">実行中</div><div class="stat-val" style="color:#ffcc55">${running}</div></div>
+    <div class="stat"><div class="stat-label">失敗</div><div class="stat-val" style="color:#ff7a7a">${failed}</div></div>
+  `;
+
+  if (rows.length === 0) {
+    document.getElementById('table-wrap').innerHTML =
+      '<div class="empty">フィルタ「' + filter + '」に該当するエントリがありません。</div>';
+    return;
+  }
+
+  const headers = ['PK', 'Label', 'WorkChain', '状態', 'Formula', '原子数', 'E_tot [eV]', 'E_F [eV]', 'Gap [eV]', 'M [μB]', '作成日時'];
+  let html = '<table><thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+  for (const r of rows) {
+    const stateKey = STATE_BADGE[r.state] || 'other';
+    const badge = `<span class="badge badge-${stateKey}">${r.state}</span>`;
+    html += '<tr>' +
+      `<td class="pk">${r.pk}</td>` +
+      `<td><strong>${escape(r.label)}</strong></td>` +
+      `<td><span style="color:#888;font-size:.76rem">${escape(r.process_label||'')}</span></td>` +
+      `<td>${badge}</td>` +
+      `<td>${escape(r.formula||'-')}</td>` +
+      `<td>${r.natoms||'-'}</td>` +
+      `<td>${r.total_energy_ev !== undefined ? r.total_energy_ev.toFixed(4) : '-'}</td>` +
+      `<td>${r.fermi_energy_ev !== undefined ? r.fermi_energy_ev.toFixed(4) : '-'}</td>` +
+      `<td>${r.band_gap_ev !== undefined ? (r.is_metallic ? 'metal' : r.band_gap_ev.toFixed(3)) : '-'}</td>` +
+      `<td>${r.total_magnetization !== undefined ? r.total_magnetization.toFixed(3) : '-'}</td>` +
+      `<td><span style="color:#888;font-size:.74rem">${r.ctime ? new Date(r.ctime).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-'}</span></td>` +
+      '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('table-wrap').innerHTML = html;
+}
+
+function escape(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+}
+
+document.getElementById('refresh').addEventListener('click', load);
+document.getElementById('filter').addEventListener('change', () => load());
+load();
+</script>
+
+</body>
+</html>

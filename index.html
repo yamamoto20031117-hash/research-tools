@@ -487,12 +487,14 @@
       <div class="icon">&#9883;</div>
       <div>
         <h2>QE 計算ランチャー <span class="tag wip">作成中</span></h2>
-        <p>Quantum ESPRESSO による第一原理計算を AiiDAlab REST API 経由で自動化。TMD ビューアで作成した CIF ファイルを投入し、構造最適化→バンド計算を一括実行。Bearer トークン認証でセキュリティを確保。</p>
+        <p>Quantum ESPRESSO による第一原理計算を AiiDA で自動化。ホスト × 分子のインターカレーション計算を qe-auto CLI（Ubuntu ワークステーション）で投入し、結果を「QE 計算結果」ダッシュボードで一覧表示。</p>
         <div class="tags">
-          <span class="tag">Quantum ESPRESSO</span><span class="tag">AiiDAlab</span>
-          <span class="tag">バンド計算</span><span class="tag">REST API</span>
+          <span class="tag">Quantum ESPRESSO</span><span class="tag">AiiDA</span>
+          <span class="tag">バンド計算</span><span class="tag">DOS/PDOS</span>
+          <span class="tag">MAE/J/DMI</span>
         </div>
-        <a class="launch" href="/qe-calculator/">ツールを開く &#8594;</a>
+        <a class="launch" href="/qe-calculator/results.html">QE 計算結果を見る &#8594;</a>
+        <a class="launch" href="/qe-calculator/" style="margin-left:8px;background:rgba(120,140,180,.15);color:#aabad6;border:1px solid #5a6a8c">旧ランチャー (凍結) &#8594;</a>
       </div>
     </div>
   </div>
