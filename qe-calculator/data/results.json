@@ -1,7 +1,106 @@
 {
-  "generated_at": "2026-05-26T19:28:39.744916",
-  "n_results": 15,
+  "generated_at": "2026-05-26T21:20:54.148244",
+  "n_results": 23,
   "results": [
+    {
+      "pk": 523,
+      "label": "\u2014",
+      "process_label": "PwBaseWorkChain",
+      "state": "waiting",
+      "finished_ok": false,
+      "ctime": "2026-05-26T12:12:35.276655+00:00",
+      "mtime": "2026-05-26T12:12:36.896389+00:00",
+      "extras": {
+        "_aiida_hash": "85439f68f8d9d398dcfffb2c87ada7c8208c352cd78f87116de6517057656409"
+      }
+    },
+    {
+      "pk": 509,
+      "label": "\u2014",
+      "process_label": "PwBaseWorkChain",
+      "state": "waiting",
+      "finished_ok": false,
+      "ctime": "2026-05-26T11:50:59.375340+00:00",
+      "mtime": "2026-05-26T11:51:00.999943+00:00",
+      "extras": {
+        "_aiida_hash": "76d3aa85626a79647354afc722b3eff211a95f9634ae7ef0dd775bfec119b12b"
+      }
+    },
+    {
+      "pk": 494,
+      "label": "\u2014",
+      "process_label": "PwBaseWorkChain",
+      "state": "finished",
+      "finished_ok": true,
+      "ctime": "2026-05-26T10:29:54.365499+00:00",
+      "mtime": "2026-05-26T11:50:59.086795+00:00",
+      "extras": {
+        "_aiida_hash": "8ccedc7ba64492d7ce629b4d7ff9fbd39c20c788df549220178ae0c18dcc6abd"
+      },
+      "fermi_energy_ev": 8.7602,
+      "total_magnetization": -1.3373578130421e-06,
+      "total_energy_ev": -2803.4063793995
+    },
+    {
+      "pk": 492,
+      "label": "\u2014",
+      "process_label": "PwRelaxWorkChain",
+      "state": "waiting",
+      "finished_ok": false,
+      "ctime": "2026-05-26T10:29:52.750546+00:00",
+      "mtime": "2026-05-26T11:50:59.805739+00:00",
+      "extras": {
+        "_aiida_hash": "c377b9ef11f34653a652df5b95816f3a5a2b649f60c049a567c3134ffa7f3740"
+      }
+    },
+    {
+      "pk": 475,
+      "label": "TiSe2",
+      "process_label": "QeFullWorkChain",
+      "state": "waiting",
+      "finished_ok": false,
+      "ctime": "2026-05-26T10:29:50.902626+00:00",
+      "mtime": "2026-05-26T10:29:53.501522+00:00",
+      "extras": {
+        "_aiida_hash": "a5a81f3f4fd45f748d7448bb32bdcd4b8f37ba29197c69abe1b7f2ded05f65ed"
+      }
+    },
+    {
+      "pk": 465,
+      "label": "\u2014",
+      "process_label": "PwBaseWorkChain",
+      "state": "finished",
+      "finished_ok": false,
+      "ctime": "2026-05-26T10:29:50.465984+00:00",
+      "mtime": "2026-05-26T12:12:34.980689+00:00",
+      "extras": {
+        "_aiida_hash": "d16efcbf9497b39ed1a9f4be949a096d6d5a282d6d6084be7429219437fde359"
+      }
+    },
+    {
+      "pk": 462,
+      "label": "\u2014",
+      "process_label": "PwRelaxWorkChain",
+      "state": "waiting",
+      "finished_ok": false,
+      "ctime": "2026-05-26T10:29:49.003745+00:00",
+      "mtime": "2026-05-26T12:12:35.665026+00:00",
+      "extras": {
+        "_aiida_hash": "2254629de201b14bd0b5de88b34a5b8136484168e646bc969a9d032071cbaf40"
+      }
+    },
+    {
+      "pk": 450,
+      "label": "VSe2",
+      "process_label": "QeFullWorkChain",
+      "state": "waiting",
+      "finished_ok": false,
+      "ctime": "2026-05-26T10:29:47.880009+00:00",
+      "mtime": "2026-05-26T10:29:49.794600+00:00",
+      "extras": {
+        "_aiida_hash": "5c71224c74e672f304f39370a32069cb9e32761671984370225081fe62514de5"
+      }
+    },
     {
       "pk": 432,
       "label": "TiSe2",
