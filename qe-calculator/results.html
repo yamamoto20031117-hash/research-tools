@@ -82,7 +82,8 @@
   <label class="meta">
     フィルタ:
     <select id="filter">
-      <option value="QeFullWorkChain">親 WorkChain のみ (デフォルト)</option>
+      <option value="hi-level">主要 WorkChain (デフォルト)</option>
+      <option value="QeFullWorkChain">親のみ (QeFullWorkChain)</option>
       <option value="all">全部</option>
       <option value="finished">完了のみ</option>
       <option value="running">実行中</option>
@@ -196,17 +197,22 @@ async function load() {
 // AND either finished OK or has band_gap_ev already computed.
 function hasBandStructure(r) {
   const pl = r.process_label || '';
-  if (!['QeFullWorkChain', 'PwBandsWorkChain'].includes(pl)) return false;
-  return r.finished_ok || r.band_gap_ev !== undefined;
+  // QeFullWorkChain may have band data via descendants even before it's fully finished,
+  // so always offer the button — the modal will report nicely if nothing is found.
+  if (pl === 'QeFullWorkChain') return true;
+  if (pl === 'PwBandsWorkChain') return r.finished_ok || r.band_gap_ev !== undefined;
+  return false;
 }
 
 function render(data) {
   document.getElementById('gen-at').textContent =
     '生成: ' + new Date(data.generated_at).toLocaleString('ja-JP') + ` (${data.n_results} 件)`;
 
+  const HI_LEVEL = ['QeFullWorkChain', 'PwRelaxWorkChain', 'PwBandsWorkChain', 'PdosWorkChain'];
   const filter = document.getElementById('filter').value;
   let rows = data.results || [];
-  if (filter === 'QeFullWorkChain') rows = rows.filter(r => r.process_label === 'QeFullWorkChain');
+  if (filter === 'hi-level') rows = rows.filter(r => HI_LEVEL.includes(r.process_label));
+  else if (filter === 'QeFullWorkChain') rows = rows.filter(r => r.process_label === 'QeFullWorkChain');
   else if (filter === 'finished') rows = rows.filter(r => r.finished_ok);
   else if (filter === 'running') rows = rows.filter(r => ['running', 'waiting', 'created'].includes(r.state));
   else if (filter === 'failed') rows = rows.filter(r => ['excepted', 'killed'].includes(r.state));
