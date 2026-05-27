@@ -14,6 +14,12 @@
   #top button{padding:5px 14px;font-size:.82rem;background:rgba(88,166,255,.15);color:#9ad0ff;border:1px solid #58a6ff;border-radius:5px;cursor:pointer}
   #top button:hover{background:rgba(88,166,255,.25)}
   #top select{background:#181d27;color:#ddd;border:1px solid #2a3040;border-radius:5px;padding:4px 8px;font-size:.82rem}
+  #mode{display:inline-flex;align-items:center;gap:5px;font-size:.74rem;padding:3px 8px;border-radius:4px;font-weight:600}
+  #mode.live{background:rgba(56,178,108,.18);color:#5fd592;border:1px solid #38b26c}
+  #mode.cached{background:rgba(120,140,180,.13);color:#aabad6;border:1px solid #5a6a8c}
+  #mode .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  #mode.live .dot{animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
   main{padding:16px 22px;max-width:1280px;margin:0 auto}
   .summary{display:flex;gap:14px;margin-bottom:16px;flex-wrap:wrap}
   .stat{background:#10141c;border:1px solid #1f2638;border-radius:8px;padding:10px 16px;min-width:130px}
@@ -46,6 +52,7 @@
 <div id="top">
   <a href="/" title="Research Tools トップ">&#8592;</a>
   <h1>QE 計算結果</h1>
+  <span id="mode" class="cached" title="データの取得方法"><span class="dot"></span><span id="mode-label">—</span></span>
   <span class="meta" id="gen-at">—</span>
   <button id="refresh">&#x21bb; 再読込</button>
   <label class="meta">
@@ -57,6 +64,10 @@
       <option value="running">実行中</option>
       <option value="failed">失敗</option>
     </select>
+  </label>
+  <label class="meta" title="ライブ取得成功時のみ有効">
+    <input type="checkbox" id="auto" checked>
+    自動更新 (5s)
   </label>
 </div>
 
@@ -72,19 +83,70 @@ const STATE_BADGE = {
   running: 'running', killed: 'failed', excepted: 'failed', unknown: 'other'
 };
 
+// Live endpoint (Tailscale-only). Falls back to static snapshot for everyone else.
+const LIVE_URL = 'https://ubuntu26.tail74586a.ts.net/results.json';
+const STATIC_URL = 'data/results.json';
+const LIVE_TIMEOUT_MS = 2000;
+const AUTO_REFRESH_MS = 5000;
+
+let autoTimer = null;
+let isLive = false;
+
+async function fetchWithTimeout(url, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url + (url.includes('?') ? '&' : '?') + '_=' + Date.now(), {signal: ctrl.signal});
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function setMode(live) {
+  isLive = live;
+  const el = document.getElementById('mode');
+  const lbl = document.getElementById('mode-label');
+  if (live) {
+    el.className = 'live';
+    lbl.textContent = 'LIVE (Tailscale)';
+    el.title = 'Ubuntu ワークステーションから直接取得 (5 秒ごと自動更新)';
+  } else {
+    el.className = 'cached';
+    lbl.textContent = 'CACHED';
+    el.title = '静的スナップショット (refresh_dashboard.sh 実行時の状態)';
+  }
+}
+
+function scheduleAuto() {
+  if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+  if (!isLive) return;
+  if (!document.getElementById('auto').checked) return;
+  autoTimer = setTimeout(load, AUTO_REFRESH_MS);
+}
+
 async function load() {
   document.getElementById('err').textContent = '';
+  let data;
   try {
-    const res = await fetch('data/results.json?_=' + Date.now());
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    render(data);
-  } catch (e) {
-    document.getElementById('err').textContent =
-      '読み込み失敗: ' + e.message + ' (data/results.json が無いか、まだ生成されてないかも)';
-    document.getElementById('table-wrap').innerHTML =
-      '<div class="empty">まだ結果がありません。Ubuntu で <code>verdi run scripts/export_results.py</code> を走らせて、JSON を取得してください。</div>';
+    data = await fetchWithTimeout(LIVE_URL, LIVE_TIMEOUT_MS);
+    setMode(true);
+  } catch (eLive) {
+    try {
+      data = await fetchWithTimeout(STATIC_URL, 5000);
+      setMode(false);
+    } catch (eStatic) {
+      setMode(false);
+      document.getElementById('err').textContent =
+        '読み込み失敗: ' + eStatic.message + ' (静的 JSON も無い)';
+      document.getElementById('table-wrap').innerHTML =
+        '<div class="empty">まだ結果がありません。Ubuntu で <code>verdi run scripts/export_results.py</code> を走らせて、JSON を取得してください。</div>';
+      return;
+    }
   }
+  render(data);
+  scheduleAuto();
 }
 
 function render(data) {
@@ -148,6 +210,10 @@ function escape(s) {
 
 document.getElementById('refresh').addEventListener('click', load);
 document.getElementById('filter').addEventListener('change', () => load());
+document.getElementById('auto').addEventListener('change', () => {
+  if (document.getElementById('auto').checked) scheduleAuto();
+  else if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+});
 load();
 </script>
 
