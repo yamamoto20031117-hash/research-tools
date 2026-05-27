@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>QE 計算結果 — qe-auto ダッシュボード</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:#080b12;color:#ccc;font-family:'Helvetica Neue',Arial,'Meiryo',sans-serif;min-height:100vh}
@@ -36,14 +37,37 @@
   .badge-waiting{background:rgba(120,140,180,.13);color:#aabad6;border:1px solid #5a6a8c}
   .badge-failed{background:rgba(220,80,80,.15);color:#ff7a7a;border:1px solid #c14444}
   .badge-other{background:rgba(160,160,160,.12);color:#aaa;border:1px solid #555}
+  .chart-btn{padding:3px 8px;font-size:.78rem;background:rgba(150,200,255,.1);color:#9ad0ff;border:1px solid #2a3850;border-radius:4px;cursor:pointer}
+  .chart-btn:hover{background:rgba(150,200,255,.22);border-color:#58a6ff}
+  .chart-btn:disabled{opacity:.4;cursor:not-allowed}
   details{margin:6px 0;border-top:1px solid #1a2030;padding-top:6px}
   details pre{background:#0c0f15;border:1px solid #1a2030;border-radius:4px;padding:8px 10px;font-size:.72rem;overflow-x:auto;color:#9ad0ff}
   .empty{padding:32px;text-align:center;color:#666}
   .err{color:#ff7a7a;font-size:.78rem;margin-top:8px}
+
+  /* Modal */
+  #modal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+  #modal[hidden]{display:none}
+  .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(6px)}
+  .dialog{position:relative;background:#0c0f15;border:1px solid #1a2030;border-radius:10px;padding:18px;max-width:1100px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .dialog-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #1a2030;gap:14px;flex-wrap:wrap}
+  .dialog-head h2{font-size:1rem;color:#fff;font-weight:600}
+  .dialog-head .close{background:transparent;color:#888;border:none;font-size:1.4rem;cursor:pointer;padding:0 8px;line-height:1}
+  .dialog-head .close:hover{color:#fff}
+  .dialog-info{display:flex;gap:18px;font-size:.78rem;color:#aabad6;flex-wrap:wrap}
+  .dialog-info b{color:#fff;font-weight:600}
+  .dialog-info code{background:#181d27;padding:1px 6px;border-radius:3px;color:#9ad0ff}
+  #plot-area{flex:1;min-height:480px;margin-top:12px}
+  .loading{padding:50px;text-align:center;color:#888}
+  .loading .spin{display:inline-block;width:20px;height:20px;border:2px solid #2a3850;border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
   @media (max-width:600px){
     main{padding:10px}
     th,td{padding:5px 6px;font-size:.76rem}
     .stat{padding:8px 12px;min-width:110px}
+    .dialog{padding:12px}
+    #plot-area{min-height:380px}
   }
 </style>
 </head>
@@ -58,8 +82,8 @@
   <label class="meta">
     フィルタ:
     <select id="filter">
+      <option value="QeFullWorkChain">親 WorkChain のみ (デフォルト)</option>
       <option value="all">全部</option>
-      <option value="QeFullWorkChain">QeFullWorkChain のみ</option>
       <option value="finished">完了のみ</option>
       <option value="running">実行中</option>
       <option value="failed">失敗</option>
@@ -77,6 +101,21 @@
   <div id="err" class="err"></div>
 </main>
 
+<!-- Band-structure modal -->
+<div id="modal" hidden>
+  <div class="backdrop"></div>
+  <div class="dialog">
+    <div class="dialog-head">
+      <div>
+        <h2 id="modal-title">バンド構造</h2>
+        <div class="dialog-info" id="modal-info"></div>
+      </div>
+      <button class="close" id="modal-close" aria-label="閉じる">&times;</button>
+    </div>
+    <div id="plot-area"></div>
+  </div>
+</div>
+
 <script>
 const STATE_BADGE = {
   finished: 'finished', created: 'waiting', waiting: 'waiting',
@@ -84,7 +123,8 @@ const STATE_BADGE = {
 };
 
 // Live endpoint (Tailscale-only). Falls back to static snapshot for everyone else.
-const LIVE_URL = 'https://ubuntu26.tail74586a.ts.net/results.json';
+const LIVE_BASE = 'https://ubuntu26.tail74586a.ts.net';
+const LIVE_URL = LIVE_BASE + '/results.json';
 const STATIC_URL = 'data/results.json';
 const LIVE_TIMEOUT_MS = 2000;
 const AUTO_REFRESH_MS = 5000;
@@ -123,6 +163,8 @@ function scheduleAuto() {
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
   if (!isLive) return;
   if (!document.getElementById('auto').checked) return;
+  // Don't auto-refresh while modal is open (would close the chart user is viewing)
+  if (!document.getElementById('modal').hidden) return;
   autoTimer = setTimeout(load, AUTO_REFRESH_MS);
 }
 
@@ -149,6 +191,15 @@ async function load() {
   scheduleAuto();
 }
 
+// Detect rows that should expose a band-structure chart button.
+// A row qualifies if it's a band-bearing WorkChain (QeFullWorkChain, PwBandsWorkChain)
+// AND either finished OK or has band_gap_ev already computed.
+function hasBandStructure(r) {
+  const pl = r.process_label || '';
+  if (!['QeFullWorkChain', 'PwBandsWorkChain'].includes(pl)) return false;
+  return r.finished_ok || r.band_gap_ev !== undefined;
+}
+
 function render(data) {
   document.getElementById('gen-at').textContent =
     '生成: ' + new Date(data.generated_at).toLocaleString('ja-JP') + ` (${data.n_results} 件)`;
@@ -160,11 +211,12 @@ function render(data) {
   else if (filter === 'running') rows = rows.filter(r => ['running', 'waiting', 'created'].includes(r.state));
   else if (filter === 'failed') rows = rows.filter(r => ['excepted', 'killed'].includes(r.state));
 
-  // Stats
-  const total = data.results.length;
-  const done = data.results.filter(r => r.finished_ok).length;
-  const running = data.results.filter(r => ['running','waiting','created'].includes(r.state)).length;
-  const failed = data.results.filter(r => ['excepted','killed'].includes(r.state)).length;
+  // Stats — always over the full dataset, not the filtered subset
+  const all = data.results || [];
+  const total = all.length;
+  const done = all.filter(r => r.finished_ok).length;
+  const running = all.filter(r => ['running','waiting','created'].includes(r.state)).length;
+  const failed = all.filter(r => ['excepted','killed'].includes(r.state)).length;
   document.getElementById('stats').innerHTML = `
     <div class="stat"><div class="stat-label">total</div><div class="stat-val">${total}</div></div>
     <div class="stat"><div class="stat-label">完了</div><div class="stat-val" style="color:#5fd592">${done}</div></div>
@@ -174,15 +226,19 @@ function render(data) {
 
   if (rows.length === 0) {
     document.getElementById('table-wrap').innerHTML =
-      '<div class="empty">フィルタ「' + filter + '」に該当するエントリがありません。</div>';
+      '<div class="empty">フィルタに該当するエントリがありません。</div>';
     return;
   }
 
-  const headers = ['PK', 'Label', 'WorkChain', '状態', 'Formula', '原子数', 'E_tot [eV]', 'E_F [eV]', 'Gap [eV]', 'M [μB]', '作成日時'];
+  const headers = ['PK', 'Label', 'WorkChain', '状態', 'Formula', '原子数', 'E_tot [eV]', 'E_F [eV]', 'Gap [eV]', 'M [μB]', '作成日時', 'バンド図'];
   let html = '<table><thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
   for (const r of rows) {
     const stateKey = STATE_BADGE[r.state] || 'other';
     const badge = `<span class="badge badge-${stateKey}">${r.state}</span>`;
+    const canPlot = hasBandStructure(r) && isLive;  // requires live server for /bands/<pk>
+    const plotCell = canPlot
+      ? `<button class="chart-btn" data-pk="${r.pk}" data-label="${escape(r.label||'')}">📊 表示</button>`
+      : (hasBandStructure(r) ? '<span class="meta" title="LIVE 接続が必要">(live のみ)</span>' : '-');
     html += '<tr>' +
       `<td class="pk">${r.pk}</td>` +
       `<td><strong>${escape(r.label)}</strong></td>` +
@@ -195,10 +251,16 @@ function render(data) {
       `<td>${r.band_gap_ev !== undefined ? (r.is_metallic ? 'metal' : r.band_gap_ev.toFixed(3)) : '-'}</td>` +
       `<td>${r.total_magnetization !== undefined ? r.total_magnetization.toFixed(3) : '-'}</td>` +
       `<td><span style="color:#888;font-size:.74rem">${r.ctime ? new Date(r.ctime).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-'}</span></td>` +
+      `<td>${plotCell}</td>` +
       '</tr>';
   }
   html += '</tbody></table>';
   document.getElementById('table-wrap').innerHTML = html;
+
+  // Attach chart-button handlers
+  document.querySelectorAll('.chart-btn').forEach(b => {
+    b.addEventListener('click', () => openBandChart(parseInt(b.dataset.pk, 10), b.dataset.label));
+  });
 }
 
 function escape(s) {
@@ -207,6 +269,154 @@ function escape(s) {
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   })[c]);
 }
+
+// =========================
+// Band structure modal
+// =========================
+
+async function openBandChart(pk, label) {
+  const modal = document.getElementById('modal');
+  modal.hidden = false;
+  document.getElementById('modal-title').textContent = `バンド構造 — PK ${pk} (${label || '—'})`;
+  document.getElementById('modal-info').innerHTML = '';
+  document.getElementById('plot-area').innerHTML =
+    '<div class="loading"><span class="spin"></span> 読み込み中…</div>';
+
+  // Pause auto-refresh while modal is open
+  if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+
+  let bands;
+  try {
+    const res = await fetch(`${LIVE_BASE}/bands/${pk}?_=${Date.now()}`);
+    bands = await res.json();
+    if (!res.ok) throw new Error(bands.error || ('HTTP ' + res.status));
+  } catch (e) {
+    document.getElementById('plot-area').innerHTML =
+      `<div class="empty" style="color:#ff7a7a">取得失敗: ${escape(e.message)}<br><span style="font-size:.74rem;color:#888">(/bands/${pk} エンドポイントから読めなかった)</span></div>`;
+    return;
+  }
+
+  renderBandChart(bands);
+}
+
+function renderBandChart(bands) {
+  const fermi = bands.fermi ?? 0;
+  const distances = bands.distances;
+  const spinUp = bands.spin_up;          // [n_kpts][n_bands]
+  const spinDown = bands.spin_down;      // null or [n_kpts][n_bands]
+  const nBands = bands.n_bands;
+  const labels = bands.labels || [];
+
+  function bandTraces(matrix, color, name) {
+    const traces = [];
+    for (let b = 0; b < nBands; b++) {
+      const y = matrix.map(kpt => kpt[b] - fermi);
+      traces.push({
+        x: distances, y,
+        type: 'scattergl', mode: 'lines',
+        line: {color, width: 1.5},
+        name: b === 0 ? name : undefined,
+        showlegend: b === 0 && spinDown !== null,
+        hovertemplate: 'k=%{x:.3f}<br>E−E_F=%{y:.3f} eV<extra>band ' + (b+1) + '</extra>',
+        legendgroup: name,
+      });
+    }
+    return traces;
+  }
+
+  const traces = bandTraces(spinUp, spinDown ? '#5fd592' : '#58a6ff', spinDown ? '↑ spin up' : '');
+  if (spinDown) traces.push(...bandTraces(spinDown, '#ff7a7a', '↓ spin down'));
+
+  // Compute sensible y-range: [-6, +6] eV around Fermi, but clipped to data
+  let yMin = Infinity, yMax = -Infinity;
+  for (const kpt of spinUp) for (const e of kpt) {
+    const v = e - fermi;
+    if (v < yMin) yMin = v;
+    if (v > yMax) yMax = v;
+  }
+  if (spinDown) for (const kpt of spinDown) for (const e of kpt) {
+    const v = e - fermi;
+    if (v < yMin) yMin = v;
+    if (v > yMax) yMax = v;
+  }
+  const yLow = Math.max(yMin, -8);
+  const yHigh = Math.min(yMax, 8);
+
+  // High-symmetry point vertical lines
+  const shapes = labels.map(l => ({
+    type: 'line', xref: 'x', yref: 'paper',
+    x0: l.distance, x1: l.distance, y0: 0, y1: 1,
+    line: {color: '#384058', width: 1},
+  }));
+  // Fermi horizontal line
+  shapes.push({
+    type: 'line', xref: 'paper', yref: 'y',
+    x0: 0, x1: 1, y0: 0, y1: 0,
+    line: {color: '#ff7a7a', width: 1.2, dash: 'dash'},
+  });
+
+  const layout = {
+    paper_bgcolor: '#0c0f15',
+    plot_bgcolor: '#0c0f15',
+    font: {color: '#ccc', family: "Helvetica Neue, Arial, sans-serif"},
+    xaxis: {
+      tickmode: 'array',
+      tickvals: labels.map(l => l.distance),
+      ticktext: labels.map(l => l.label.replace('GAMMA','Γ').replace('G','Γ')),
+      gridcolor: '#1a2030',
+      zeroline: false,
+      range: [distances[0], distances[distances.length-1]],
+      showline: true,
+      linecolor: '#384058',
+    },
+    yaxis: {
+      title: {text: 'E − E<sub>F</sub> (eV)', font: {size: 12}},
+      gridcolor: '#1a2030',
+      zeroline: false,
+      range: [yLow, yHigh],
+      showline: true,
+      linecolor: '#384058',
+    },
+    shapes,
+    margin: {l: 60, r: 20, t: 20, b: 40},
+    hovermode: 'closest',
+    annotations: [{
+      x: 0.99, y: 0.02, xref: 'paper', yref: 'paper',
+      text: `E<sub>F</sub> = ${fermi.toFixed(4)} eV (赤い破線がフェルミ準位)`,
+      showarrow: false,
+      font: {size: 10, color: '#ff7a7a'},
+      xanchor: 'right',
+    }],
+  };
+
+  Plotly.newPlot('plot-area', traces, layout, {
+    responsive: true,
+    displaylogo: false,
+    toImageButtonOptions: {filename: `bands_pk${bands.pk}`, format: 'png', width: 1200, height: 700},
+  });
+
+  // Info chips
+  const labelText = labels.length ? labels.map(l => l.label.replace('GAMMA','Γ').replace('G','Γ')).join(' — ') : '(なし)';
+  document.getElementById('modal-info').innerHTML = `
+    <span><b>${bands.formula || '—'}</b></span>
+    <span>E<sub>F</sub> <code>${fermi.toFixed(4)} eV</code></span>
+    <span>k-points <code>${bands.n_kpoints}</code></span>
+    <span>bands <code>${bands.n_bands}</code></span>
+    <span>path <code>${labelText}</code></span>
+  `;
+}
+
+function closeModal() {
+  document.getElementById('modal').hidden = true;
+  document.getElementById('plot-area').innerHTML = '';
+  scheduleAuto();
+}
+
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.querySelector('#modal .backdrop').addEventListener('click', closeModal);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !document.getElementById('modal').hidden) closeModal();
+});
 
 document.getElementById('refresh').addEventListener('click', load);
 document.getElementById('filter').addEventListener('change', () => load());
