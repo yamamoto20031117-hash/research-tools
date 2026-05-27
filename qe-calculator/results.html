@@ -126,7 +126,7 @@ const STATE_BADGE = {
 const LIVE_BASE = 'https://ubuntu26.tail74586a.ts.net';
 const LIVE_URL = LIVE_BASE + '/results.json';
 const STATIC_URL = 'data/results.json';
-const LIVE_TIMEOUT_MS = 2000;
+const LIVE_TIMEOUT_MS = 6000;
 const AUTO_REFRESH_MS = 5000;
 
 let autoTimer = null;
@@ -235,10 +235,11 @@ function render(data) {
   for (const r of rows) {
     const stateKey = STATE_BADGE[r.state] || 'other';
     const badge = `<span class="badge badge-${stateKey}">${r.state}</span>`;
-    const canPlot = hasBandStructure(r) && isLive;  // requires live server for /bands/<pk>
-    const plotCell = canPlot
+    // The /bands/<pk> endpoint is on the Tailscale server. As long as you can reach it
+    // from the browser (independent of the periodic /results.json refresh), the button works.
+    const plotCell = hasBandStructure(r)
       ? `<button class="chart-btn" data-pk="${r.pk}" data-label="${escape(r.label||'')}">📊 表示</button>`
-      : (hasBandStructure(r) ? '<span class="meta" title="LIVE 接続が必要">(live のみ)</span>' : '-');
+      : '-';
     html += '<tr>' +
       `<td class="pk">${r.pk}</td>` +
       `<td><strong>${escape(r.label)}</strong></td>` +
