@@ -81,6 +81,25 @@
   .summary-card .row:last-child{border-bottom:none}
   .summary-card .key{color:#888}
   .summary-card .val{color:#fff;font-variant-numeric:tabular-nums}
+  /* Evaluation tags */
+  .judge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.7rem;font-weight:600;margin-left:6px;font-variant-numeric:tabular-nums}
+  .judge-good{background:rgba(56,178,108,.18);color:#5fd592;border:1px solid #38b26c}
+  .judge-okay{background:rgba(255,191,73,.15);color:#ffcc55;border:1px solid #ffbf49}
+  .judge-bad{background:rgba(220,80,80,.15);color:#ff7a7a;border:1px solid #c14444}
+  .judge-na{background:rgba(160,160,160,.12);color:#aaa;border:1px solid #555}
+  .row-note{display:block;font-size:.68rem;color:#7a8398;line-height:1.35;margin-top:2px;padding-left:0;font-style:italic;font-weight:400}
+  .summary-card .row{display:flex;flex-direction:column;justify-content:space-between;padding:6px 0;border-bottom:1px dotted #1a2030;font-size:.82rem;gap:0}
+  .summary-card .row .main{display:flex;justify-content:space-between;align-items:baseline}
+  .summary-card .ref-tag{font-size:.7rem;color:#7a8398;margin-left:6px}
+  .help-banner{background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.25);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:.8rem;color:#aabad6;line-height:1.55}
+  .help-banner b{color:#9ad0ff}
+  .conv-status{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+  .conv-status-card{background:#10141c;border:1px solid #1f2638;border-radius:6px;padding:8px 14px;font-size:.78rem;min-width:170px}
+  .conv-status-card .label{color:#888;font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+  .conv-status-card .val{color:#fff;font-weight:600;font-variant-numeric:tabular-nums}
+  .conv-status-card.good{border-color:#38b26c}
+  .conv-status-card.okay{border-color:#ffbf49}
+  .conv-status-card.bad{border-color:#c14444}
   .loading{padding:50px;text-align:center;color:#888}
   .loading .spin{display:inline-block;width:20px;height:20px;border:2px solid #2a3850;border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -377,6 +396,145 @@ function setError(container, msg) {
 }
 
 // =========================================================
+// Reference values & evaluation helpers
+// =========================================================
+
+// Per-material reference values from literature. Keyed by normalized formula.
+// Each entry: {lattice: {a/b/c/gamma: {exp, dft_pbe}}, expected_state, mag, gap, notes}
+const REFERENCE = {
+  'C':   { // graphene primitive cell
+    pretty: 'グラフェン (2D)',
+    lattice: {a: {exp: 2.460, dft_pbe: 2.466}, gamma: 120},
+    expected_state: '半金属 (Dirac semimetal)',
+    band_gap_eV: 0.0,
+    mag_total: 0.0,
+    notes: 'K 点で π/π* バンドが線形交差 (Dirac cone)。バンドギャップ 0、Pauli 常磁性。',
+    citations: 'Wallace, PR 71 (1947) 622',
+  },
+  'VSe2': {
+    pretty: '1T-VSe₂ (バルク)',
+    lattice: {a: {exp: 3.355, dft_pbe: 3.35}, c: {exp: 6.105, dft_pbe: 6.10}, gamma: 120},
+    expected_state: '金属 (Pauli 常磁性)',
+    band_gap_eV: 0.0,
+    mag_total: 0.0,
+    notes: 'V 3d バンドが E_F を横切る金属。CDW 転移 110 K（DFT 静的では出ない）。単層 FM 報告は controversial。',
+    citations: 'Bayard & Sienko, JSSC 19 (1976) 325 / Bonilla NN 13 (2018) 289',
+  },
+  'TiSe2': {
+    pretty: '1T-TiSe₂ (バルク)',
+    lattice: {a: {exp: 3.540, dft_pbe: 3.52}, c: {exp: 6.010, dft_pbe: 6.05}, gamma: 120},
+    expected_state: '半金属 / 小ギャップ半導体 (実験 ~0.15 eV)',
+    band_gap_eV: 0.0, // PBE では金属判定が普通
+    mag_total: 0.0,
+    notes: 'PBE では metallic 判定だが実験では微小ギャップ。CDW 200 K、励起子絶縁体候補。',
+    citations: 'Di Salvo PRB 14 (1976) 4321',
+  },
+  'MoS2': {
+    pretty: '2H-MoS₂ (バルク)',
+    lattice: {a: {exp: 3.160, dft_pbe: 3.18}, c: {exp: 12.295, dft_pbe: 12.4}, gamma: 120},
+    expected_state: '間接バンドギャップ半導体',
+    band_gap_eV: 0.9, // PBE typical
+    mag_total: 0.0,
+    notes: '実験 E_g = 1.23 eV、PBE で 0.85–1.0 eV（過小評価 30%）。K 点 SOC 分裂 ~0.15 eV。',
+    citations: 'Mak PRL 105 (2010) 136805 / Yun PRB 85 (2012) 033305',
+  },
+  'MoSe2': {
+    pretty: '2H-MoSe₂ (バルク)',
+    lattice: {a: {exp: 3.289, dft_pbe: 3.29}, c: {exp: 12.927, dft_pbe: 12.9}, gamma: 120},
+    expected_state: '間接バンドギャップ半導体',
+    band_gap_eV: 0.9,
+    mag_total: 0.0,
+    notes: '実験 E_g = 1.10 eV、PBE で 0.85–0.95 eV。K 点 SOC 分裂 ~0.18 eV。',
+    citations: 'Tongay Sci. Rep. 3 (2013) 2657',
+  },
+  'WS2': {
+    pretty: '2H-WS₂ (バルク)',
+    lattice: {a: {exp: 3.153, dft_pbe: 3.15}, c: {exp: 12.323, dft_pbe: 12.3}, gamma: 120},
+    expected_state: '間接バンドギャップ半導体',
+    band_gap_eV: 1.05,
+    mag_total: 0.0,
+    notes: '実験 E_g = 1.3 eV、PBE で 1.0–1.1 eV。K 点 SOC 分裂 ~0.4 eV（W 5d で大）。',
+    citations: 'Gusakova Phys. Status Solidi A 214 (2017) 1700218',
+  },
+  'WSe2': {
+    pretty: '2H-WSe₂ (バルク)',
+    lattice: {a: {exp: 3.282, dft_pbe: 3.28}, c: {exp: 12.961, dft_pbe: 13.0}, gamma: 120},
+    expected_state: '間接バンドギャップ半導体',
+    band_gap_eV: 0.9,
+    mag_total: 0.0,
+    notes: '実験 E_g = 1.2 eV、PBE で 0.8–1.0 eV。K 点 SOC 分裂 ~0.46 eV（SOC ベンチマーク用）。',
+    citations: 'Yun PRB 85 (2012) 033305',
+  },
+  'Si': {
+    pretty: 'シリコン (ダイヤモンド構造)',
+    lattice: {a: {exp: 5.431, dft_pbe: 5.46}},
+    expected_state: '間接バンドギャップ半導体',
+    band_gap_eV: 0.6, // PBE
+    mag_total: 0.0,
+    notes: '実験 E_g = 1.17 eV、PBE で 0.5–0.7 eV (過小評価 40-50%)。X 点近傍の伝導帯端。',
+    citations: 'Kittel; 標準テストケース',
+  },
+};
+
+// Normalize formula: "Se2V" or "VSe2" → canonical key.
+function normalizeFormula(formula) {
+  if (!formula) return null;
+  // Strip subscript numbers, sort by element to get a "signature"
+  const re = /([A-Z][a-z]?)(\d*)/g;
+  const counts = {};
+  let m;
+  while ((m = re.exec(formula)) !== null) {
+    if (!m[1]) continue;
+    counts[m[1]] = (counts[m[1]] || 0) + (parseInt(m[2]) || 1);
+  }
+  // Try direct match for VSe2-like keys
+  // Reduce by GCD if all counts share one
+  const vals = Object.values(counts);
+  const gcd = vals.reduce((a, b) => {
+    while (b) { [a, b] = [b, a % b]; } return a;
+  }, vals[0] || 1);
+  const reduced = Object.fromEntries(Object.entries(counts).map(([k, v]) => [k, v/gcd]));
+  // Canonical sort: metals first (V, Ti, Mo, W, Si, C, etc.), then chalcogens
+  const order = ['V','Ti','Mo','W','Si','Ni','Fe','Mn','Co','C','N','O','S','Se','Te','H','P','F'];
+  const sorted = Object.keys(reduced).sort((a,b) => {
+    const ia = order.indexOf(a); const ib = order.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+  return sorted.map(k => k + (reduced[k] > 1 ? reduced[k] : '')).join('');
+}
+
+function getMaterialRef(formula) {
+  const key = normalizeFormula(formula);
+  return REFERENCE[key] || null;
+}
+
+// Judge value against expected/reference. Returns {judge: 'good'|'okay'|'bad'|'na', err_pct, badge}
+function judgeAgainst(value, ref_value, opts={}) {
+  if (value === null || value === undefined || ref_value === null || ref_value === undefined) {
+    return {judge: 'na', err_pct: null, badge: ''};
+  }
+  const tol_good = opts.tol_good ?? 0.01;   // 1%
+  const tol_okay = opts.tol_okay ?? 0.05;   // 5%
+  const err = Math.abs((value - ref_value) / (ref_value || 1));
+  if (err <= tol_good) return {judge: 'good', err_pct: err*100, badge: `<span class="judge judge-good">◯ ±${(err*100).toFixed(2)}%</span>`};
+  if (err <= tol_okay) return {judge: 'okay', err_pct: err*100, badge: `<span class="judge judge-okay">△ ±${(err*100).toFixed(2)}%</span>`};
+  return {judge: 'bad', err_pct: err*100, badge: `<span class="judge judge-bad">✗ ±${(err*100).toFixed(1)}%</span>`};
+}
+
+// Judge absolute-tolerance (e.g. magmom)
+function judgeAbs(value, ref_value, opts={}) {
+  if (value === null || value === undefined || ref_value === null || ref_value === undefined) {
+    return {judge: 'na', badge: ''};
+  }
+  const tol_good = opts.tol_good ?? 0.1;
+  const tol_okay = opts.tol_okay ?? 0.5;
+  const err = Math.abs(value - ref_value);
+  if (err <= tol_good) return {judge: 'good', badge: `<span class="judge judge-good">◯</span>`};
+  if (err <= tol_okay) return {judge: 'okay', badge: `<span class="judge judge-okay">△</span>`};
+  return {judge: 'bad', badge: `<span class="judge judge-bad">✗</span>`};
+}
+
+// =========================================================
 // Tab: Bands
 // =========================================================
 
@@ -575,29 +733,66 @@ function renderStructure(data) {
 
   // Side info
   const side = document.getElementById('struct-side');
-  // Element counts
   const counts = {};
   for (const s of data.sites) counts[s.kind] = (counts[s.kind]||0) + 1;
   const elemRow = Object.entries(counts).map(([k,v]) => `${k}<sub>${v}</sub>`).join('');
 
+  const ref = getMaterialRef(data.formula);
+  const refKey = normalizeFormula(data.formula);
+  const refPretty = ref ? ref.pretty : `${escape(data.formula)} (文献値未登録)`;
+
+  // Lattice rows with evaluation
+  function lattRow(label, value, ref_param) {
+    if (!ref || !ref.lattice || !ref.lattice[ref_param]) {
+      return `<div class="row"><div class="main"><span class="key">${label}</span><span class="val">${value.toFixed(4)} Å</span></div></div>`;
+    }
+    const r = ref.lattice[ref_param];
+    const target = r.dft_pbe ?? r.exp;
+    const j = judgeAgainst(value, target);
+    let refLine = '';
+    if (r.exp !== undefined) refLine += `実験 ${r.exp.toFixed(3)} Å`;
+    if (r.dft_pbe !== undefined) refLine += (refLine ? ' / ' : '') + `DFT-PBE ${r.dft_pbe.toFixed(3)} Å`;
+    return `<div class="row">
+      <div class="main"><span class="key">${label}</span><span class="val">${value.toFixed(4)} Å ${j.badge}</span></div>
+      <span class="row-note">文献 → ${refLine}</span>
+    </div>`;
+  }
+
+  function gammaRow(value) {
+    if (!ref || ref.lattice?.gamma === undefined) {
+      return `<div class="row"><div class="main"><span class="key">γ</span><span class="val">${value.toFixed(2)}°</span></div></div>`;
+    }
+    const j = judgeAbs(value, ref.lattice.gamma, {tol_good: 0.2, tol_okay: 1.0});
+    return `<div class="row">
+      <div class="main"><span class="key">γ</span><span class="val">${value.toFixed(2)}° ${j.badge}</span></div>
+      <span class="row-note">期待 ${ref.lattice.gamma}° (六方/三方 = 120°)</span>
+    </div>`;
+  }
+
   side.innerHTML = `
+    <div class="help-banner">
+      <b>${refPretty}</b><br>
+      ${ref ? ref.notes : '文献値が登録されていない系。a/b/c の数値だけ表示します。'}
+      ${ref ? `<br><span style="color:#7a8398;font-size:.7rem">出典: ${escape(ref.citations)}</span>` : ''}
+    </div>
     <div class="summary-card">
-      <h3>緩和後の格子</h3>
-      <div class="row"><span class="key">a</span><span class="val">${data.a.toFixed(4)} Å</span></div>
-      <div class="row"><span class="key">b</span><span class="val">${data.b.toFixed(4)} Å</span></div>
-      <div class="row"><span class="key">c</span><span class="val">${data.c.toFixed(4)} Å</span></div>
-      <div class="row"><span class="key">α</span><span class="val">${data.alpha.toFixed(2)}°</span></div>
-      <div class="row"><span class="key">β</span><span class="val">${data.beta.toFixed(2)}°</span></div>
-      <div class="row"><span class="key">γ</span><span class="val">${data.gamma.toFixed(2)}°</span></div>
+      <h3>緩和後の格子定数</h3>
+      ${lattRow('a', data.a, 'a')}
+      ${lattRow('b', data.b, 'a')}
+      ${lattRow('c', data.c, 'c')}
+      <div class="row"><div class="main"><span class="key">α</span><span class="val">${data.alpha.toFixed(2)}°</span></div></div>
+      <div class="row"><div class="main"><span class="key">β</span><span class="val">${data.beta.toFixed(2)}°</span></div></div>
+      ${gammaRow(data.gamma)}
     </div>
     <div class="summary-card">
       <h3>組成</h3>
-      <div class="row"><span class="key">化学式</span><span class="val">${escape(data.formula)}</span></div>
-      <div class="row"><span class="key">構成元素</span><span class="val">${elemRow}</span></div>
-      <div class="row"><span class="key">原子数</span><span class="val">${data.n_atoms}</span></div>
+      <div class="row"><div class="main"><span class="key">化学式</span><span class="val">${escape(data.formula)}</span></div></div>
+      <div class="row"><div class="main"><span class="key">構成元素</span><span class="val">${elemRow}</span></div></div>
+      <div class="row"><div class="main"><span class="key">原子数</span><span class="val">${data.n_atoms}</span></div></div>
     </div>
     <div style="font-size:.72rem;color:#888;padding:4px 6px">
-      🖱️ ドラッグで回転、ホイールでズーム
+      🖱️ ドラッグで回転、ホイールでズーム<br>
+      <span style="color:#5fd592">◯</span> ±1% 以内（最高）/ <span style="color:#ffcc55">△</span> ±5%（許容）/ <span style="color:#ff7a7a">✗</span> >5%（要見直し）
     </div>
   `;
 }
@@ -616,6 +811,66 @@ async function loadConv() {
 }
 
 function renderConvergence(data) {
+  // Build a status panel + explanation banner above the plot
+  const area = document.getElementById('conv-area');
+  // Wrap existing area with our header
+  area.innerHTML = `
+    <div class="help-banner">
+      <b>BFGS 構造最適化の収束過程</b>。各 step で：(1) 原子位置を少し動かす → (2) SCF を解く → (3) 力・応力を計算 → (4) 次の動かし方を決める、を繰り返す。
+      <br>判定：<b>力 |F| < 1×10⁻⁴ Ry/Bohr</b> かつ <b>ΔE < 3×10⁻⁵ Ry</b> で「平衡構造」とみなす。
+    </div>
+    <div class="conv-status" id="conv-status"></div>
+    <div id="conv-plot" style="min-height:420px"></div>
+    <div class="help-banner" style="margin-top:12px;background:rgba(120,140,180,.08)">
+      <b>読み方</b><br>
+      • <span style="color:#58a6ff">青線</span> E_tot：下に向かって収束（単調減少が理想、後半フラットになる）<br>
+      • <span style="color:#ff7a7a">赤線</span> |F|：対数軸、ステップごとに小さくなって行く。<span style="color:#ff7a7a">赤い破線</span> が目標 1×10⁻⁴<br>
+      • <b>振動してる場合</b>：mixing parameter (beta) が大きすぎる or 磁性系で複数の SCF 解候補がある<br>
+      • <b>跳ね上がる場合</b>：BFGS が "探索ステップ" を打ってる（その後また下がる、正常）
+    </div>
+  `;
+
+  // Build status cards based on latest values
+  const stat = document.getElementById('conv-status');
+  const lastE = data.energy ? data.energy[data.energy.length-1] : null;
+  const dE = (data.energy && data.energy.length >= 2)
+    ? Math.abs(data.energy[data.energy.length-1] - data.energy[data.energy.length-2])
+    : null;
+  const lastF = data.total_force ? data.total_force[data.total_force.length-1] : null;
+
+  function statusCard(label, val, unit, judge_class, note) {
+    return `<div class="conv-status-card ${judge_class}">
+      <div class="label">${label}</div>
+      <div class="val">${val !== null && val !== undefined ? val : '—'} ${unit||''}</div>
+      <div style="color:#888;font-size:.7rem;margin-top:2px">${note||''}</div>
+    </div>`;
+  }
+  // Force convergence judgment
+  const F_TARGET = 1e-4;
+  let fJudge = 'okay';
+  let fNote = '';
+  if (lastF !== null) {
+    if (lastF < F_TARGET) { fJudge = 'good'; fNote = '✓ 力収束達成'; }
+    else if (lastF < F_TARGET*10) { fJudge = 'okay'; fNote = '⏳ 収束間近 (10× 以内)'; }
+    else { fJudge = 'bad'; fNote = '⏳ まだ収束遠い'; }
+  }
+  // dE judgment
+  const E_TARGET = 3e-5 * 13.6057;  // Ry → eV
+  let eJudge = 'okay';
+  let eNote = '';
+  if (dE !== null) {
+    if (dE < E_TARGET) { eJudge = 'good'; eNote = '✓ エネルギー収束'; }
+    else if (dE < E_TARGET*10) { eJudge = 'okay'; eNote = '⏳ 近づいてる'; }
+    else { eJudge = 'bad'; eNote = '振動 or 大きく変化中'; }
+  }
+
+  stat.innerHTML = `
+    ${statusCard('BFGS step 数', data.n_steps, '', '', '緩和反復回数')}
+    ${statusCard('|F| (現在)', lastF !== null ? lastF.toExponential(2) : null, 'Ry/Bohr', fJudge, fNote + ' / 目標 < 1e-4')}
+    ${statusCard('ΔE (前→今)', dE !== null ? dE.toExponential(2) : null, 'eV', eJudge, eNote + ' / 目標 < ' + E_TARGET.toExponential(1))}
+    ${statusCard('現在の E_tot', lastE !== null ? lastE.toFixed(4) : null, 'eV', '', '系の絶対値')}
+  `;
+
   const N = data.n_steps;
   const xs = Array.from({length: N}, (_, i) => i);
   const traces = [];
@@ -635,6 +890,12 @@ function renderConvergence(data) {
     traces.push({x: xs, y: data.lattice_c, type: 'scatter', mode: 'lines+markers', name: 'c (Å)', yaxis: 'y4', line: {color: '#c58dff'}, marker: {size: 5}, visible: 'legendonly'});
   }
 
+  const shapes = [{
+    type: 'line', xref: 'paper', yref: 'y2',
+    x0: 0, x1: 1, y0: F_TARGET, y1: F_TARGET,
+    line: {color: '#ff7a7a', width: 1, dash: 'dash'}
+  }];
+
   const layout = {
     paper_bgcolor: '#0c0f15', plot_bgcolor: '#0c0f15', font: {color: '#ccc'},
     xaxis: {title: 'BFGS step (relax iteration)', gridcolor: '#1a2030', zeroline: false},
@@ -642,11 +903,17 @@ function renderConvergence(data) {
     yaxis2: {title: {text: '|F| (Ry/Bohr)', font: {color: '#ff7a7a'}}, overlaying: 'y', side: 'right', type: 'log', color: '#ff7a7a', showgrid: false},
     yaxis3: {overlaying: 'y', visible: false},
     yaxis4: {overlaying: 'y', visible: false},
+    shapes,
     margin: {l: 70, r: 70, t: 20, b: 50},
     hovermode: 'x unified',
     legend: {orientation: 'h', x: 0, y: 1.12},
+    annotations: [{
+      x: 0, y: F_TARGET, xref: 'paper', yref: 'y2',
+      text: '目標 |F| 1e-4', xanchor: 'left', font: {size: 10, color: '#ff7a7a'},
+      showarrow: false, yshift: -12,
+    }],
   };
-  Plotly.newPlot('conv-area', traces, layout, {responsive: true, displaylogo: false});
+  Plotly.newPlot('conv-plot', traces, layout, {responsive: true, displaylogo: false});
 }
 
 // =========================================================
@@ -673,41 +940,119 @@ function renderSummary(data) {
   const v = data.values || {};
   const bs = data.builder_spec || {};
 
-  function card(title, rows) {
-    const inner = rows.map(([k, val]) => `<div class="row"><span class="key">${escape(k)}</span><span class="val">${escape(fmt(val))}</span></div>`).join('');
-    return `<div class="summary-card"><h3>${escape(title)}</h3>${inner}</div>`;
+  // Helper: build a row with description + value + optional badge
+  // row = {label, value, fmt?, unit?, desc, judge?, target?}
+  function richRow(row) {
+    const formatted = row.fmt !== undefined ? row.fmt : fmt(row.value);
+    const badge = row.judge ? row.judge.badge : '';
+    const note = row.desc ? `<span class="row-note">${row.desc}</span>` : '';
+    return `<div class="row">
+      <div class="main">
+        <span class="key">${escape(row.label)}</span>
+        <span class="val">${escape(formatted)} ${row.unit || ''} ${badge}</span>
+      </div>
+      ${note}
+    </div>`;
+  }
+  function card(title, rows, helpHtml) {
+    const help = helpHtml ? `<div style="font-size:.72rem;color:#7a8398;margin-bottom:6px;line-height:1.45">${helpHtml}</div>` : '';
+    return `<div class="summary-card"><h3>${escape(title)}</h3>${help}${rows.map(richRow).join('')}</div>`;
   }
 
+  // Pull reference for the running material
+  // Try to get formula from the structure or relax output.
+  // The /details endpoint doesn't directly include formula; reuse the struct cache if available
+  const formula = (dataCache.struct[currentPK] && dataCache.struct[currentPK].formula) || '';
+  const ref = getMaterialRef(formula);
+
+  // Force judgment
+  const F = v.total_force;
+  const fJudge = F === undefined ? null : (F < 1e-4 ? {badge: '<span class="judge judge-good">◯ 収束</span>'}
+                                          : F < 1e-3 ? {badge: '<span class="judge judge-okay">△ 収束間近</span>'}
+                                          : {badge: '<span class="judge judge-bad">⏳ 未収束</span>'});
+
+  // Magmom judgment vs reference
+  const mJudge = (ref && ref.mag_total !== undefined && v.total_magnetization !== undefined)
+    ? judgeAbs(Math.abs(v.total_magnetization), ref.mag_total, {tol_good: 0.1, tol_okay: 0.5})
+    : null;
+
+  // SOC indicator badge
+  const socBadge = bs.soc
+    ? '<span class="judge judge-good">SOC ON</span>'
+    : '<span class="judge judge-na">SOC OFF (高速 screening)</span>';
+
   document.getElementById('summary-area').innerHTML = `
+    ${ref ? `<div class="help-banner">
+      <b>${ref.pretty}</b> — ${escape(ref.notes)}
+      <br><span style="color:#7a8398;font-size:.7rem">出典: ${escape(ref.citations)}</span>
+    </div>` : ''}
     <div class="summary-grid">
       ${card('エネルギー', [
-        ['全エネルギー [eV]',         v.energy],
-        ['交換相関 [eV]',             v.energy_xc],
-        ['1 電子 [eV]',               v.energy_one_electron],
-        ['Hartree [eV]',              v.energy_hartree],
-        ['Ewald [eV]',                v.energy_ewald],
-        ['smearing 補正 [eV]',        v.energy_smearing],
-        ['E_F [eV]',                  v.fermi_energy],
-      ])}
+        {label: '全エネルギー', value: v.energy, unit: 'eV',
+         desc: '系全体の DFT 全エネルギー。関数依存の絶対値で、同じ pseudo/protocol 同士でのみ意味を持つ比較値。'},
+        {label: '交換相関 E_xc', value: v.energy_xc, unit: 'eV',
+         desc: 'PBE 関数の「魂」。電子相関を密度の汎関数で近似する項。'},
+        {label: '1 電子 (kinetic + ext)', value: v.energy_one_electron, unit: 'eV',
+         desc: '電子の運動エネルギー + 外部ポテンシャル（核との引力）。'},
+        {label: 'Hartree', value: v.energy_hartree, unit: 'eV',
+         desc: '電子-電子の古典的なクーロン反発。'},
+        {label: 'Ewald (核-核)', value: v.energy_ewald, unit: 'eV',
+         desc: '周期境界下での核-核反発エネルギー（Ewald 和で計算）。'},
+        {label: 'smearing 補正', value: v.energy_smearing, unit: 'eV',
+         desc: '金属の有限温度的占有（Fermi-Dirac/cold smearing）の自由エネルギー補正。'},
+        {label: 'Fermi 準位 E_F', value: v.fermi_energy, unit: 'eV',
+         desc: '0 K で電子が占有する最高準位。バンド構造の基準点（赤い破線）。'},
+      ], 'eV 単位で全エネルギー成分が分解される。物理的に重要なのは <b>E_F</b>（バンドの基準）と <b>E_tot</b>（系同士の相対比較に使う）。')}
+
       ${card('力 / 応力 / 磁性', [
-        ['全力 [Ry/Bohr]',            v.total_force],
-        ['全磁化 [μB]',               v.total_magnetization],
-        ['絶対磁化 [μB]',             v.absolute_magnetization],
-        ['ストレス対角成分 [kbar]',   v.stress_kbar ? `${v.stress_kbar[0]?.[0]?.toFixed(2)}, ${v.stress_kbar[1]?.[1]?.toFixed(2)}, ${v.stress_kbar[2]?.[2]?.toFixed(2)}` : null],
-        ['電子数',                    v.number_of_electrons],
-        ['バンド数',                  v.number_of_bands],
-        ['原子数',                    v.number_of_atoms],
-      ])}
+        {label: '全力 |F|', value: v.total_force,
+         fmt: v.total_force !== undefined ? v.total_force.toExponential(3) : '—',
+         unit: 'Ry/Bohr',
+         judge: fJudge,
+         desc: '全原子に働く力の RMS。<b>< 1×10⁻⁴ Ry/Bohr で構造収束</b>。relax 完走で十分小さくなる。'},
+        {label: '全磁化', value: v.total_magnetization, unit: 'μB',
+         judge: mJudge,
+         desc: '単位セル中の正味スピン（↑−↓）。' + (ref && ref.mag_total !== undefined ? `期待値 ${ref.mag_total} μB（${ref.expected_state}）。` : '') +
+               '<b>0</b>=反磁性/Pauli, <b>整数</b>≈強磁性的局所モーメント, <b>非整数</b>=フラストレートや弱磁性。'},
+        {label: '絶対磁化', value: v.absolute_magnetization, unit: 'μB',
+         desc: '|↑| + |↓| の積分。total_mag=0 でも abs_mag>0 なら反強磁性（↑↓打ち消し）。'},
+        {label: 'ストレス対角成分',
+         value: v.stress_kbar,
+         fmt: v.stress_kbar ? `${v.stress_kbar[0]?.[0]?.toFixed(2)}, ${v.stress_kbar[1]?.[1]?.toFixed(2)}, ${v.stress_kbar[2]?.[2]?.toFixed(2)}` : '—',
+         unit: 'kbar',
+         desc: '結晶への圧力テンソル σxx, σyy, σzz。vc-relax 後は ~0 になるべき（残圧 < 0.5 kbar）。'},
+        {label: '電子数', value: v.number_of_electrons,
+         desc: '価電子数。VSe₂ なら V(13) + 2×Se(6) = 25 個。'},
+        {label: 'バンド数', value: v.number_of_bands,
+         desc: '計算したバンドの本数。SOC ON だと 2x になる（スピノル波動関数）。'},
+        {label: '原子数', value: v.number_of_atoms,
+         desc: 'ユニットセル中の原子数。'},
+      ], '構造最適化と磁性の主要指標。<b>|F|</b> が収束基準、<b>magmom</b> で物性を読む。')}
+
       ${card('計算条件 (BuilderSpec)', [
-        ['protocol',                  bs.protocol],
-        ['vdW',                       bs.vdw],
-        ['spin',                      bs.spin],
-        ['SOC',                       bs.soc],
-        ['charge mode',               bs.charge_mode],
-        ['intercalant charge',        bs.intercalant_charge],
-      ])}
-      ${v.site_magnetization ? card('原子別磁気モーメント [μB]',
-        v.site_magnetization.map((m, i) => [`atom #${i+1}`, m])
+        {label: 'protocol', value: bs.protocol,
+         desc: 'aiida-quantumespresso のプリセット。<b>fast</b> < <b>moderate</b> < <b>precise</b>（精度 / コスト両方）。'},
+        {label: 'vdW 補正', value: bs.vdw,
+         desc: 'ファンデルワールス分散補正。<b>d3</b>=Grimme D3（標準）、層間距離（c 軸）に効く。'},
+        {label: 'spin タイプ', value: bs.spin,
+         desc: 'none=non-spin-polarized, fm=強磁性初期, afm=反強磁性初期。'},
+        {label: 'SOC', value: bs.soc,
+         fmt: bs.soc ? 'ON' : 'OFF',
+         judge: {badge: socBadge},
+         desc: 'スピン軌道相互作用。重元素 (W 5d ~0.4 eV / V 3d ~0.05 eV) で重要。計算コスト 2-3 倍。'},
+        {label: 'charge mode', value: bs.charge_mode,
+         desc: 'インターカレーション系での電荷取り扱い。host のみなら neutral_complex で OK。'},
+        {label: 'intercalant 電荷', value: bs.intercalant_charge, unit: 'e',
+         desc: 'ゲスト分子の正味電荷（+1 でカチオン）。'},
+      ], '計算の精度・物理モデルの設定。後で結果と比較するときの "計算条件" として残す。')}
+
+      ${v.site_magnetization ? card('原子別磁気モーメント',
+        v.site_magnetization.map((m, i) => {
+          const val = Array.isArray(m) ? `(${m.map(x=>x.toFixed(3)).join(', ')})` : (typeof m === 'number' ? m.toFixed(3) : String(m));
+          return {label: `atom #${i+1}`, value: val, fmt: val, unit: 'μB',
+                  desc: i === 0 ? '各原子サイトの局所磁気モーメント。' + (Array.isArray(m) ? 'SOC 下では (μx, μy, μz) ベクトル。' : 'スカラー（共線スピン）。') : ''};
+        }),
+      '<b>局所磁性</b>の確認用。VSe₂ なら V のみが ~0–1 μB、Se はほぼ 0 のはず。'
       ) : ''}
     </div>
   `;
