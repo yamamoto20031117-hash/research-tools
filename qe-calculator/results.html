@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>QE 計算結果 — qe-auto ダッシュボード</title>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/controls/OrbitControls.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:#080b12;color:#ccc;font-family:'Helvetica Neue',Arial,'Meiryo',sans-serif;min-height:100vh}
@@ -49,15 +51,36 @@
   #modal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
   #modal[hidden]{display:none}
   .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(6px)}
-  .dialog{position:relative;background:#0c0f15;border:1px solid #1a2030;border-radius:10px;padding:18px;max-width:1100px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6)}
-  .dialog-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #1a2030;gap:14px;flex-wrap:wrap}
+  .dialog{position:relative;background:#0c0f15;border:1px solid #1a2030;border-radius:10px;padding:18px;max-width:1180px;width:100%;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .dialog-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #1a2030;gap:14px;flex-wrap:wrap}
   .dialog-head h2{font-size:1rem;color:#fff;font-weight:600}
   .dialog-head .close{background:transparent;color:#888;border:none;font-size:1.4rem;cursor:pointer;padding:0 8px;line-height:1}
   .dialog-head .close:hover{color:#fff}
-  .dialog-info{display:flex;gap:18px;font-size:.78rem;color:#aabad6;flex-wrap:wrap}
+  .dialog-info{display:flex;gap:14px;font-size:.75rem;color:#aabad6;flex-wrap:wrap;margin-top:4px}
   .dialog-info b{color:#fff;font-weight:600}
   .dialog-info code{background:#181d27;padding:1px 6px;border-radius:3px;color:#9ad0ff}
-  #plot-area{flex:1;min-height:480px;margin-top:12px}
+
+  /* Tabs */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid #1a2030;margin-bottom:10px;overflow-x:auto;flex-shrink:0}
+  .tab{padding:8px 16px;font-size:.85rem;color:#888;background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;font-family:inherit}
+  .tab:hover{color:#9ad0ff}
+  .tab.active{color:#58a6ff;border-bottom-color:#58a6ff}
+  .tab-content{flex:1;overflow-y:auto;min-height:480px;position:relative}
+  .tab-pane{display:none}
+  .tab-pane.active{display:block;height:100%}
+  #plot-area, #pdos-area, #conv-area{min-height:480px}
+  #struct-area{min-height:480px;display:flex;gap:14px;align-items:stretch}
+  #struct-canvas-wrap{flex:1;min-height:480px;background:#080b12;border:1px solid #1a2030;border-radius:6px;position:relative;overflow:hidden}
+  #struct-side{flex:0 0 280px;padding:6px 0;display:flex;flex-direction:column;gap:10px;font-size:.78rem}
+  #struct-side table{font-size:.78rem}
+  #struct-side th, #struct-side td{padding:4px 8px;border-bottom:1px solid #161b27}
+  .summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:8px 0}
+  .summary-card{background:#10141c;border:1px solid #1f2638;border-radius:8px;padding:12px 16px}
+  .summary-card h3{font-size:.78rem;color:#9ad0ff;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;font-weight:600}
+  .summary-card .row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dotted #1a2030;font-size:.82rem}
+  .summary-card .row:last-child{border-bottom:none}
+  .summary-card .key{color:#888}
+  .summary-card .val{color:#fff;font-variant-numeric:tabular-nums}
   .loading{padding:50px;text-align:center;color:#888}
   .loading .spin{display:inline-block;width:20px;height:20px;border:2px solid #2a3850;border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -67,7 +90,10 @@
     th,td{padding:5px 6px;font-size:.76rem}
     .stat{padding:8px 12px;min-width:110px}
     .dialog{padding:12px}
-    #plot-area{min-height:380px}
+    #plot-area,#pdos-area,#conv-area,#struct-area{min-height:380px}
+    #struct-area{flex-direction:column}
+    #struct-side{flex:0 0 auto}
+    .summary-grid{grid-template-columns:1fr}
   }
 </style>
 </head>
@@ -102,18 +128,36 @@
   <div id="err" class="err"></div>
 </main>
 
-<!-- Band-structure modal -->
+<!-- Multi-tab detail modal -->
 <div id="modal" hidden>
   <div class="backdrop"></div>
   <div class="dialog">
     <div class="dialog-head">
       <div>
-        <h2 id="modal-title">バンド構造</h2>
+        <h2 id="modal-title">詳細</h2>
         <div class="dialog-info" id="modal-info"></div>
       </div>
       <button class="close" id="modal-close" aria-label="閉じる">&times;</button>
     </div>
-    <div id="plot-area"></div>
+    <div class="tabs">
+      <button class="tab active" data-tab="bands">📊 バンド</button>
+      <button class="tab" data-tab="pdos">📈 PDOS</button>
+      <button class="tab" data-tab="struct">📐 構造</button>
+      <button class="tab" data-tab="conv">⚙️ 収束</button>
+      <button class="tab" data-tab="summary">📋 サマリ</button>
+    </div>
+    <div class="tab-content">
+      <div class="tab-pane active" id="pane-bands"><div id="plot-area"></div></div>
+      <div class="tab-pane" id="pane-pdos"><div id="pdos-area"></div></div>
+      <div class="tab-pane" id="pane-struct">
+        <div id="struct-area">
+          <div id="struct-canvas-wrap"></div>
+          <div id="struct-side"></div>
+        </div>
+      </div>
+      <div class="tab-pane" id="pane-conv"><div id="conv-area"></div></div>
+      <div class="tab-pane" id="pane-summary"><div id="summary-area"></div></div>
+    </div>
   </div>
 </div>
 
@@ -123,7 +167,6 @@ const STATE_BADGE = {
   running: 'running', killed: 'failed', excepted: 'failed', unknown: 'other'
 };
 
-// Live endpoint (Tailscale-only). Falls back to static snapshot for everyone else.
 const LIVE_BASE = 'https://ubuntu26.tail74586a.ts.net';
 const LIVE_URL = LIVE_BASE + '/results.json';
 const STATIC_URL = 'data/results.json';
@@ -132,6 +175,9 @@ const AUTO_REFRESH_MS = 5000;
 
 let autoTimer = null;
 let isLive = false;
+let currentPK = null;
+let currentLabel = null;
+const dataCache = {bands: {}, pdos: {}, struct: {}, conv: {}, summary: {}};
 
 async function fetchWithTimeout(url, ms) {
   const ctrl = new AbortController();
@@ -164,7 +210,6 @@ function scheduleAuto() {
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
   if (!isLive) return;
   if (!document.getElementById('auto').checked) return;
-  // Don't auto-refresh while modal is open (would close the chart user is viewing)
   if (!document.getElementById('modal').hidden) return;
   autoTimer = setTimeout(load, AUTO_REFRESH_MS);
 }
@@ -181,10 +226,7 @@ async function load() {
       setMode(false);
     } catch (eStatic) {
       setMode(false);
-      document.getElementById('err').textContent =
-        '読み込み失敗: ' + eStatic.message + ' (静的 JSON も無い)';
-      document.getElementById('table-wrap').innerHTML =
-        '<div class="empty">まだ結果がありません。Ubuntu で <code>verdi run scripts/export_results.py</code> を走らせて、JSON を取得してください。</div>';
+      document.getElementById('err').textContent = '読み込み失敗: ' + eStatic.message;
       return;
     }
   }
@@ -192,16 +234,9 @@ async function load() {
   scheduleAuto();
 }
 
-// Detect rows that should expose a band-structure chart button.
-// A row qualifies if it's a band-bearing WorkChain (QeFullWorkChain, PwBandsWorkChain)
-// AND either finished OK or has band_gap_ev already computed.
-function hasBandStructure(r) {
-  const pl = r.process_label || '';
-  // QeFullWorkChain may have band data via descendants even before it's fully finished,
-  // so always offer the button — the modal will report nicely if nothing is found.
-  if (pl === 'QeFullWorkChain') return true;
-  if (pl === 'PwBandsWorkChain') return r.finished_ok || r.band_gap_ev !== undefined;
-  return false;
+function hasDetails(r) {
+  // QeFullWorkChain, PwRelaxWorkChain, PwBandsWorkChain, PdosWorkChain — anything with descendants
+  return ['QeFullWorkChain','PwRelaxWorkChain','PwBandsWorkChain','PdosWorkChain'].includes(r.process_label);
 }
 
 function render(data) {
@@ -217,7 +252,6 @@ function render(data) {
   else if (filter === 'running') rows = rows.filter(r => ['running', 'waiting', 'created'].includes(r.state));
   else if (filter === 'failed') rows = rows.filter(r => ['excepted', 'killed'].includes(r.state));
 
-  // Stats — always over the full dataset, not the filtered subset
   const all = data.results || [];
   const total = all.length;
   const done = all.filter(r => r.finished_ok).length;
@@ -231,20 +265,17 @@ function render(data) {
   `;
 
   if (rows.length === 0) {
-    document.getElementById('table-wrap').innerHTML =
-      '<div class="empty">フィルタに該当するエントリがありません。</div>';
+    document.getElementById('table-wrap').innerHTML = '<div class="empty">フィルタに該当するエントリがありません。</div>';
     return;
   }
 
-  const headers = ['PK', 'Label', 'WorkChain', '状態', 'Formula', '原子数', 'E_tot [eV]', 'E_F [eV]', 'Gap [eV]', 'M [μB]', '作成日時', 'バンド図'];
+  const headers = ['PK', 'Label', 'WorkChain', '状態', 'Formula', '原子数', 'E_tot [eV]', 'E_F [eV]', 'Gap [eV]', 'M [μB]', '作成日時', '詳細'];
   let html = '<table><thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
   for (const r of rows) {
     const stateKey = STATE_BADGE[r.state] || 'other';
     const badge = `<span class="badge badge-${stateKey}">${r.state}</span>`;
-    // The /bands/<pk> endpoint is on the Tailscale server. As long as you can reach it
-    // from the browser (independent of the periodic /results.json refresh), the button works.
-    const plotCell = hasBandStructure(r)
-      ? `<button class="chart-btn" data-pk="${r.pk}" data-label="${escape(r.label||'')}">📊 表示</button>`
+    const detailCell = hasDetails(r)
+      ? `<button class="chart-btn" data-pk="${r.pk}" data-label="${escape(r.label||'')}">🔍 開く</button>`
       : '-';
     html += '<tr>' +
       `<td class="pk">${r.pk}</td>` +
@@ -258,59 +289,94 @@ function render(data) {
       `<td>${r.band_gap_ev !== undefined ? (r.is_metallic ? 'metal' : r.band_gap_ev.toFixed(3)) : '-'}</td>` +
       `<td>${r.total_magnetization !== undefined ? r.total_magnetization.toFixed(3) : '-'}</td>` +
       `<td><span style="color:#888;font-size:.74rem">${r.ctime ? new Date(r.ctime).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-'}</span></td>` +
-      `<td>${plotCell}</td>` +
+      `<td>${detailCell}</td>` +
       '</tr>';
   }
   html += '</tbody></table>';
   document.getElementById('table-wrap').innerHTML = html;
 
-  // Attach chart-button handlers
   document.querySelectorAll('.chart-btn').forEach(b => {
-    b.addEventListener('click', () => openBandChart(parseInt(b.dataset.pk, 10), b.dataset.label));
+    b.addEventListener('click', () => openDetailModal(parseInt(b.dataset.pk, 10), b.dataset.label));
   });
 }
 
 function escape(s) {
   if (s === null || s === undefined) return '';
-  return String(s).replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  })[c]);
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 }
 
-// =========================
-// Band structure modal
-// =========================
+// =========================================================
+// Modal + tab management
+// =========================================================
 
-async function openBandChart(pk, label) {
-  const modal = document.getElementById('modal');
-  modal.hidden = false;
-  document.getElementById('modal-title').textContent = `バンド構造 — PK ${pk} (${label || '—'})`;
+function openDetailModal(pk, label) {
+  currentPK = pk;
+  currentLabel = label;
+  document.getElementById('modal').hidden = false;
+  document.getElementById('modal-title').textContent = `詳細 — PK ${pk} (${label || '—'})`;
   document.getElementById('modal-info').innerHTML = '';
-  document.getElementById('plot-area').innerHTML =
-    '<div class="loading"><span class="spin"></span> 読み込み中…</div>';
-
-  // Pause auto-refresh while modal is open
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
 
-  let bands;
-  try {
-    const res = await fetch(`${LIVE_BASE}/bands/${pk}?_=${Date.now()}`);
-    bands = await res.json();
-    if (!res.ok) throw new Error(bands.error || ('HTTP ' + res.status));
-  } catch (e) {
-    document.getElementById('plot-area').innerHTML =
-      `<div class="empty" style="color:#ff7a7a">取得失敗: ${escape(e.message)}<br><span style="font-size:.74rem;color:#888">(/bands/${pk} エンドポイントから読めなかった)</span></div>`;
-    return;
-  }
+  // Switch to bands tab by default
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'bands'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'pane-bands'));
+  loadTab('bands');
+}
 
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    const id = t.dataset.tab;
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'pane-' + id));
+    loadTab(id);
+  });
+});
+
+async function loadTab(tab) {
+  if (currentPK == null) return;
+  switch (tab) {
+    case 'bands':   return loadBands();
+    case 'pdos':    return loadPdos();
+    case 'struct':  return loadStruct();
+    case 'conv':    return loadConv();
+    case 'summary': return loadSummary();
+  }
+}
+
+async function fetchCached(kind, pk) {
+  if (dataCache[kind][pk]) return dataCache[kind][pk];
+  const res = await fetch(`${LIVE_BASE}/${kind}/${pk}?_=${Date.now()}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  dataCache[kind][pk] = data;
+  return data;
+}
+
+function setLoading(container, msg = '読み込み中…') {
+  container.innerHTML = `<div class="loading"><span class="spin"></span> ${msg}</div>`;
+}
+function setError(container, msg) {
+  container.innerHTML = `<div class="empty" style="color:#ff7a7a">${escape(msg)}</div>`;
+}
+
+// =========================================================
+// Tab: Bands
+// =========================================================
+
+async function loadBands() {
+  const area = document.getElementById('plot-area');
+  setLoading(area, 'バンド構造を取得中…');
+  let bands;
+  try { bands = await fetchCached('bands', currentPK); }
+  catch (e) { setError(area, '取得失敗: ' + e.message); return; }
   renderBandChart(bands);
 }
 
 function renderBandChart(bands) {
   const fermi = bands.fermi ?? 0;
   const distances = bands.distances;
-  const spinUp = bands.spin_up;          // [n_kpts][n_bands]
-  const spinDown = bands.spin_down;      // null or [n_kpts][n_bands]
+  const spinUp = bands.spin_up;
+  const spinDown = bands.spin_down;
   const nBands = bands.n_bands;
   const labels = bands.labels || [];
 
@@ -334,75 +400,28 @@ function renderBandChart(bands) {
   const traces = bandTraces(spinUp, spinDown ? '#5fd592' : '#58a6ff', spinDown ? '↑ spin up' : '');
   if (spinDown) traces.push(...bandTraces(spinDown, '#ff7a7a', '↓ spin down'));
 
-  // Compute sensible y-range: [-6, +6] eV around Fermi, but clipped to data
   let yMin = Infinity, yMax = -Infinity;
   for (const kpt of spinUp) for (const e of kpt) {
-    const v = e - fermi;
-    if (v < yMin) yMin = v;
-    if (v > yMax) yMax = v;
+    const v = e - fermi; if (v < yMin) yMin = v; if (v > yMax) yMax = v;
   }
   if (spinDown) for (const kpt of spinDown) for (const e of kpt) {
-    const v = e - fermi;
-    if (v < yMin) yMin = v;
-    if (v > yMax) yMax = v;
+    const v = e - fermi; if (v < yMin) yMin = v; if (v > yMax) yMax = v;
   }
-  const yLow = Math.max(yMin, -8);
-  const yHigh = Math.min(yMax, 8);
+  const yLow = Math.max(yMin, -8), yHigh = Math.min(yMax, 8);
 
-  // High-symmetry point vertical lines
-  const shapes = labels.map(l => ({
-    type: 'line', xref: 'x', yref: 'paper',
-    x0: l.distance, x1: l.distance, y0: 0, y1: 1,
-    line: {color: '#384058', width: 1},
-  }));
-  // Fermi horizontal line
-  shapes.push({
-    type: 'line', xref: 'paper', yref: 'y',
-    x0: 0, x1: 1, y0: 0, y1: 0,
-    line: {color: '#ff7a7a', width: 1.2, dash: 'dash'},
-  });
+  const shapes = labels.map(l => ({type: 'line', xref: 'x', yref: 'paper', x0: l.distance, x1: l.distance, y0: 0, y1: 1, line: {color: '#384058', width: 1}}));
+  shapes.push({type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: 0, y1: 0, line: {color: '#ff7a7a', width: 1.2, dash: 'dash'}});
 
   const layout = {
-    paper_bgcolor: '#0c0f15',
-    plot_bgcolor: '#0c0f15',
+    paper_bgcolor: '#0c0f15', plot_bgcolor: '#0c0f15',
     font: {color: '#ccc', family: "Helvetica Neue, Arial, sans-serif"},
-    xaxis: {
-      tickmode: 'array',
-      tickvals: labels.map(l => l.distance),
-      ticktext: labels.map(l => l.label.replace('GAMMA','Γ').replace('G','Γ')),
-      gridcolor: '#1a2030',
-      zeroline: false,
-      range: [distances[0], distances[distances.length-1]],
-      showline: true,
-      linecolor: '#384058',
-    },
-    yaxis: {
-      title: {text: 'E − E<sub>F</sub> (eV)', font: {size: 12}},
-      gridcolor: '#1a2030',
-      zeroline: false,
-      range: [yLow, yHigh],
-      showline: true,
-      linecolor: '#384058',
-    },
-    shapes,
-    margin: {l: 60, r: 20, t: 20, b: 40},
-    hovermode: 'closest',
-    annotations: [{
-      x: 0.99, y: 0.02, xref: 'paper', yref: 'paper',
-      text: `E<sub>F</sub> = ${fermi.toFixed(4)} eV (赤い破線がフェルミ準位)`,
-      showarrow: false,
-      font: {size: 10, color: '#ff7a7a'},
-      xanchor: 'right',
-    }],
+    xaxis: {tickmode: 'array', tickvals: labels.map(l => l.distance), ticktext: labels.map(l => l.label.replace('GAMMA','Γ').replace('G','Γ')), gridcolor: '#1a2030', zeroline: false, range: [distances[0], distances[distances.length-1]], showline: true, linecolor: '#384058'},
+    yaxis: {title: {text: 'E − E<sub>F</sub> (eV)', font: {size: 12}}, gridcolor: '#1a2030', zeroline: false, range: [yLow, yHigh], showline: true, linecolor: '#384058'},
+    shapes, margin: {l: 60, r: 20, t: 20, b: 40}, hovermode: 'closest',
   };
 
-  Plotly.newPlot('plot-area', traces, layout, {
-    responsive: true,
-    displaylogo: false,
-    toImageButtonOptions: {filename: `bands_pk${bands.pk}`, format: 'png', width: 1200, height: 700},
-  });
+  Plotly.newPlot('plot-area', traces, layout, {responsive: true, displaylogo: false, toImageButtonOptions: {filename: `bands_pk${bands.pk}`, format: 'png', width: 1200, height: 700}});
 
-  // Info chips
   const labelText = labels.length ? labels.map(l => l.label.replace('GAMMA','Γ').replace('G','Γ')).join(' — ') : '(なし)';
   document.getElementById('modal-info').innerHTML = `
     <span><b>${bands.formula || '—'}</b></span>
@@ -413,9 +432,283 @@ function renderBandChart(bands) {
   `;
 }
 
+// =========================================================
+// Tab: PDOS
+// =========================================================
+
+async function loadPdos() {
+  const area = document.getElementById('pdos-area');
+  setLoading(area, 'PDOS データを取得中…');
+  let data;
+  try { data = await fetchCached('pdos', currentPK); }
+  catch (e) { setError(area, '取得失敗: ' + e.message + ' (PDOS workchain がまだ完了していないか、Tier-1 で skip-pdos の可能性)'); return; }
+
+  const fermi = data.fermi ?? 0;
+  const energy = (data.dos_energy || []).map(e => e - fermi);
+  const traces = [];
+
+  if (data.dos_total) {
+    for (const dos of data.dos_total) {
+      traces.push({x: energy, y: dos.y, type: 'scatter', mode: 'lines', name: 'Total DOS', line: {color: '#ddd', width: 2}, hovertemplate: 'E=%{x:.2f} eV<br>DOS=%{y:.3f}<extra></extra>'});
+    }
+  }
+  const palette = ['#58a6ff','#5fd592','#ff7a7a','#ffcc55','#c58dff','#5feacf','#ff9558','#9aaaff'];
+  if (data.pdos_groups) {
+    data.pdos_groups.forEach((g, i) => {
+      const name = `${g.element} ${g.orbital}`;
+      traces.push({x: energy, y: g.y, type: 'scatter', mode: 'lines', name, line: {color: palette[i % palette.length], width: 1.5}, hovertemplate: `${name}<br>E=%{x:.2f} eV<br>%{y:.3f}<extra></extra>`});
+    });
+  }
+
+  if (traces.length === 0) { setError(area, 'PDOS データが空でした'); return; }
+
+  const layout = {
+    paper_bgcolor: '#0c0f15', plot_bgcolor: '#0c0f15',
+    font: {color: '#ccc'},
+    xaxis: {title: {text: 'E − E<sub>F</sub> (eV)', font: {size: 12}}, gridcolor: '#1a2030', zeroline: false, range: [-8, 6]},
+    yaxis: {title: {text: 'DOS (states/eV)', font: {size: 12}}, gridcolor: '#1a2030', zeroline: false, rangemode: 'tozero'},
+    shapes: [{type: 'line', xref: 'x', yref: 'paper', x0: 0, x1: 0, y0: 0, y1: 1, line: {color: '#ff7a7a', width: 1.2, dash: 'dash'}}],
+    margin: {l: 60, r: 20, t: 20, b: 40}, hovermode: 'x unified',
+    legend: {orientation: 'v', x: 1.02, y: 1, font: {size: 11}},
+  };
+  Plotly.newPlot('pdos-area', traces, layout, {responsive: true, displaylogo: false, toImageButtonOptions: {filename: `pdos_pk${currentPK}`, format: 'png', width: 1200, height: 700}});
+}
+
+// =========================================================
+// Tab: Structure (3D viewer + lattice info)
+// =========================================================
+
+let structRenderer = null, structScene = null, structCamera = null, structControls = null, structAnimFrame = null;
+
+async function loadStruct() {
+  const area = document.getElementById('struct-canvas-wrap');
+  const side = document.getElementById('struct-side');
+  area.innerHTML = '<div class="loading"><span class="spin"></span> 構造データ取得中…</div>';
+  side.innerHTML = '';
+  let data;
+  try { data = await fetchCached('struct', currentPK); }
+  catch (e) { setError(area, '取得失敗: ' + e.message); return; }
+  renderStructure(data);
+}
+
+const ATOM_RADII = {H:0.31,C:0.76,N:0.71,O:0.66,F:0.57,P:1.07,S:1.05,V:1.34,Ti:1.36,Mo:1.54,W:1.62,Se:1.20,Te:1.38,Ni:1.24,Fe:1.32,Mn:1.39,Co:1.26};
+const ATOM_COLORS = {H:0xffffff,C:0x666666,N:0x3050f8,O:0xff0d0d,F:0x90e050,P:0xff8000,S:0xffff30,V:0xa6a6ab,Ti:0xbfc2c7,Mo:0x54b5b5,W:0x2194d6,Se:0xffa100,Te:0xd47a00,Ni:0x50d050,Fe:0xe06633,Mn:0x9c7ac7,Co:0xf090a0};
+
+function renderStructure(data) {
+  const wrap = document.getElementById('struct-canvas-wrap');
+  wrap.innerHTML = '';
+  if (structAnimFrame) cancelAnimationFrame(structAnimFrame);
+
+  const W = wrap.clientWidth || 600, H = wrap.clientHeight || 480;
+  structScene = new THREE.Scene();
+  structScene.background = new THREE.Color(0x080b12);
+  structCamera = new THREE.PerspectiveCamera(45, W/H, 0.1, 1000);
+  const cellMax = Math.max(data.a, data.b, data.c);
+  structCamera.position.set(cellMax * 1.5, cellMax * 1.2, cellMax * 2.0);
+  structRenderer = new THREE.WebGLRenderer({antialias: true});
+  structRenderer.setSize(W, H);
+  wrap.appendChild(structRenderer.domElement);
+
+  const amb = new THREE.AmbientLight(0xffffff, 0.5);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+  dir.position.set(5, 10, 7);
+  structScene.add(amb); structScene.add(dir);
+
+  // Cell box
+  const cellBox = new THREE.Group();
+  const cell = data.cell;
+  const o = new THREE.Vector3(0,0,0);
+  const v = cell.map(r => new THREE.Vector3(...r));
+  const cellMat = new THREE.LineBasicMaterial({color: 0x3a4458});
+  function lineSegment(p0, p1) {
+    const g = new THREE.BufferGeometry().setFromPoints([p0, p1]);
+    return new THREE.Line(g, cellMat);
+  }
+  const corners = [o, v[0], v[1], v[2], v[0].clone().add(v[1]), v[0].clone().add(v[2]), v[1].clone().add(v[2]), v[0].clone().add(v[1]).add(v[2])];
+  const edges = [[0,1],[0,2],[0,3],[1,4],[1,5],[2,4],[2,6],[3,5],[3,6],[4,7],[5,7],[6,7]];
+  for (const [i,j] of edges) cellBox.add(lineSegment(corners[i], corners[j]));
+  // Center the cell at origin in scene
+  const center = new THREE.Vector3();
+  corners.forEach(c => center.add(c));
+  center.divideScalar(corners.length);
+  cellBox.position.sub(center);
+  structScene.add(cellBox);
+
+  // Atoms
+  for (const site of data.sites) {
+    const r = (ATOM_RADII[site.kind] ?? 0.7) * 0.5;
+    const color = ATOM_COLORS[site.kind] ?? 0xaaaaaa;
+    const geom = new THREE.SphereGeometry(r, 24, 24);
+    const mat = new THREE.MeshPhongMaterial({color, shininess: 80});
+    const m = new THREE.Mesh(geom, mat);
+    m.position.set(site.x - center.x, site.y - center.y, site.z - center.z);
+    structScene.add(m);
+  }
+
+  structControls = new THREE.OrbitControls(structCamera, structRenderer.domElement);
+  structControls.enableDamping = true;
+  structControls.dampingFactor = 0.08;
+
+  function animate() {
+    structAnimFrame = requestAnimationFrame(animate);
+    structControls.update();
+    structRenderer.render(structScene, structCamera);
+  }
+  animate();
+
+  // Side info
+  const side = document.getElementById('struct-side');
+  // Element counts
+  const counts = {};
+  for (const s of data.sites) counts[s.kind] = (counts[s.kind]||0) + 1;
+  const elemRow = Object.entries(counts).map(([k,v]) => `${k}<sub>${v}</sub>`).join('');
+
+  side.innerHTML = `
+    <div class="summary-card">
+      <h3>緩和後の格子</h3>
+      <div class="row"><span class="key">a</span><span class="val">${data.a.toFixed(4)} Å</span></div>
+      <div class="row"><span class="key">b</span><span class="val">${data.b.toFixed(4)} Å</span></div>
+      <div class="row"><span class="key">c</span><span class="val">${data.c.toFixed(4)} Å</span></div>
+      <div class="row"><span class="key">α</span><span class="val">${data.alpha.toFixed(2)}°</span></div>
+      <div class="row"><span class="key">β</span><span class="val">${data.beta.toFixed(2)}°</span></div>
+      <div class="row"><span class="key">γ</span><span class="val">${data.gamma.toFixed(2)}°</span></div>
+    </div>
+    <div class="summary-card">
+      <h3>組成</h3>
+      <div class="row"><span class="key">化学式</span><span class="val">${escape(data.formula)}</span></div>
+      <div class="row"><span class="key">構成元素</span><span class="val">${elemRow}</span></div>
+      <div class="row"><span class="key">原子数</span><span class="val">${data.n_atoms}</span></div>
+    </div>
+    <div style="font-size:.72rem;color:#888;padding:4px 6px">
+      🖱️ ドラッグで回転、ホイールでズーム
+    </div>
+  `;
+}
+
+// =========================================================
+// Tab: Convergence
+// =========================================================
+
+async function loadConv() {
+  const area = document.getElementById('conv-area');
+  setLoading(area, 'BFGS トラジェクトリ取得中…');
+  let data;
+  try { data = await fetchCached('trajectory', currentPK); }
+  catch (e) { setError(area, '取得失敗: ' + e.message); return; }
+  renderConvergence(data);
+}
+
+function renderConvergence(data) {
+  const N = data.n_steps;
+  const xs = Array.from({length: N}, (_, i) => i);
+  const traces = [];
+  if (data.energy) {
+    traces.push({x: xs, y: data.energy, type: 'scatter', mode: 'lines+markers', name: 'E_tot (eV)', yaxis: 'y', line: {color: '#58a6ff'}, marker: {size: 6}});
+  }
+  if (data.total_force) {
+    traces.push({x: xs, y: data.total_force, type: 'scatter', mode: 'lines+markers', name: '|F| (Ry/Bohr)', yaxis: 'y2', line: {color: '#ff7a7a'}, marker: {size: 6}});
+  }
+  if (data.pressure_kbar) {
+    traces.push({x: xs, y: data.pressure_kbar, type: 'scatter', mode: 'lines+markers', name: 'P (kbar)', yaxis: 'y3', line: {color: '#ffcc55'}, marker: {size: 5}, visible: 'legendonly'});
+  }
+  if (data.lattice_a) {
+    traces.push({x: xs, y: data.lattice_a, type: 'scatter', mode: 'lines+markers', name: 'a (Å)', yaxis: 'y4', line: {color: '#5fd592'}, marker: {size: 5}, visible: 'legendonly'});
+  }
+  if (data.lattice_c) {
+    traces.push({x: xs, y: data.lattice_c, type: 'scatter', mode: 'lines+markers', name: 'c (Å)', yaxis: 'y4', line: {color: '#c58dff'}, marker: {size: 5}, visible: 'legendonly'});
+  }
+
+  const layout = {
+    paper_bgcolor: '#0c0f15', plot_bgcolor: '#0c0f15', font: {color: '#ccc'},
+    xaxis: {title: 'BFGS step (relax iteration)', gridcolor: '#1a2030', zeroline: false},
+    yaxis: {title: {text: 'E_tot (eV)', font: {color: '#58a6ff'}}, gridcolor: '#1a2030', zeroline: false, color: '#58a6ff'},
+    yaxis2: {title: {text: '|F| (Ry/Bohr)', font: {color: '#ff7a7a'}}, overlaying: 'y', side: 'right', type: 'log', color: '#ff7a7a', showgrid: false},
+    yaxis3: {overlaying: 'y', visible: false},
+    yaxis4: {overlaying: 'y', visible: false},
+    margin: {l: 70, r: 70, t: 20, b: 50},
+    hovermode: 'x unified',
+    legend: {orientation: 'h', x: 0, y: 1.12},
+  };
+  Plotly.newPlot('conv-area', traces, layout, {responsive: true, displaylogo: false});
+}
+
+// =========================================================
+// Tab: Summary
+// =========================================================
+
+async function loadSummary() {
+  const area = document.getElementById('summary-area');
+  setLoading(area, 'サマリ取得中…');
+  let data;
+  try { data = await fetchCached('summary', currentPK); }
+  catch (e) {
+    // Try the /details endpoint instead
+    try { data = await fetchCached('details', currentPK); }
+    catch (e2) { setError(area, '取得失敗: ' + e2.message); return; }
+  }
+  renderSummary(data);
+}
+
+function fmt(v, digits=4) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'number') return v.toFixed(digits);
+  if (Array.isArray(v)) return v.map(x => typeof x === 'number' ? x.toFixed(digits) : x).join(', ');
+  return String(v);
+}
+
+function renderSummary(data) {
+  const v = data.values || {};
+  const bs = data.builder_spec || {};
+
+  function card(title, rows) {
+    const inner = rows.map(([k, val]) => `<div class="row"><span class="key">${escape(k)}</span><span class="val">${escape(fmt(val))}</span></div>`).join('');
+    return `<div class="summary-card"><h3>${escape(title)}</h3>${inner}</div>`;
+  }
+
+  document.getElementById('summary-area').innerHTML = `
+    <div class="summary-grid">
+      ${card('エネルギー', [
+        ['全エネルギー [eV]',         v.energy],
+        ['交換相関 [eV]',             v.energy_xc],
+        ['1 電子 [eV]',               v.energy_one_electron],
+        ['Hartree [eV]',              v.energy_hartree],
+        ['Ewald [eV]',                v.energy_ewald],
+        ['smearing 補正 [eV]',        v.energy_smearing],
+        ['E_F [eV]',                  v.fermi_energy],
+      ])}
+      ${card('力 / 応力 / 磁性', [
+        ['全力 [Ry/Bohr]',            v.total_force],
+        ['全磁化 [μB]',               v.total_magnetization],
+        ['絶対磁化 [μB]',             v.absolute_magnetization],
+        ['ストレス対角成分 [kbar]',   v.stress_kbar ? `${v.stress_kbar[0]?.[0]?.toFixed(2)}, ${v.stress_kbar[1]?.[1]?.toFixed(2)}, ${v.stress_kbar[2]?.[2]?.toFixed(2)}` : null],
+        ['電子数',                    v.number_of_electrons],
+        ['バンド数',                  v.number_of_bands],
+        ['原子数',                    v.number_of_atoms],
+      ])}
+      ${card('計算条件 (BuilderSpec)', [
+        ['protocol',                  bs.protocol],
+        ['vdW',                       bs.vdw],
+        ['spin',                      bs.spin],
+        ['SOC',                       bs.soc],
+        ['charge mode',               bs.charge_mode],
+        ['intercalant charge',        bs.intercalant_charge],
+      ])}
+      ${v.site_magnetization ? card('原子別磁気モーメント [μB]',
+        v.site_magnetization.map((m, i) => [`atom #${i+1}`, m])
+      ) : ''}
+    </div>
+  `;
+}
+
+// =========================================================
+// Modal close
+// =========================================================
+
 function closeModal() {
   document.getElementById('modal').hidden = true;
-  document.getElementById('plot-area').innerHTML = '';
+  if (structAnimFrame) { cancelAnimationFrame(structAnimFrame); structAnimFrame = null; }
+  if (structRenderer) { structRenderer.dispose(); structRenderer = null; }
+  currentPK = null;
   scheduleAuto();
 }
 
@@ -431,6 +724,16 @@ document.getElementById('auto').addEventListener('change', () => {
   if (document.getElementById('auto').checked) scheduleAuto();
   else if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
 });
+
+window.addEventListener('resize', () => {
+  if (!structRenderer || document.getElementById('modal').hidden) return;
+  const wrap = document.getElementById('struct-canvas-wrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  structRenderer.setSize(W, H);
+  structCamera.aspect = W/H;
+  structCamera.updateProjectionMatrix();
+});
+
 load();
 </script>
 
