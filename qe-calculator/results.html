@@ -177,7 +177,17 @@ let autoTimer = null;
 let isLive = false;
 let currentPK = null;
 let currentLabel = null;
-const dataCache = {bands: {}, pdos: {}, struct: {}, conv: {}, summary: {}};
+// (cacheKey, urlPath) pairs — cache keys are arbitrary, urlPath matches the
+// server endpoint exactly. Don't conflate them: /structure ≠ /struct etc.
+const ENDPOINT = {
+  bands:   {cache: 'bands',     url: 'bands'},
+  pdos:    {cache: 'pdos',      url: 'pdos'},
+  struct:  {cache: 'struct',    url: 'structure'},
+  conv:    {cache: 'conv',      url: 'trajectory'},
+  summary: {cache: 'summary',   url: 'details'},
+};
+const dataCache = {};
+for (const k of Object.values(ENDPOINT)) dataCache[k.cache] = {};
 
 async function fetchWithTimeout(url, ms) {
   const ctrl = new AbortController();
@@ -343,12 +353,19 @@ async function loadTab(tab) {
   }
 }
 
-async function fetchCached(kind, pk) {
-  if (dataCache[kind][pk]) return dataCache[kind][pk];
-  const res = await fetch(`${LIVE_BASE}/${kind}/${pk}?_=${Date.now()}`);
-  const data = await res.json();
+async function fetchEndpoint(tabKey, pk) {
+  const ep = ENDPOINT[tabKey];
+  if (!ep) throw new Error('unknown endpoint: ' + tabKey);
+  if (dataCache[ep.cache][pk]) return dataCache[ep.cache][pk];
+  const res = await fetch(`${LIVE_BASE}/${ep.url}/${pk}?_=${Date.now()}`);
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    throw new Error(`サーバが空レスポンス (HTTP ${res.status}) — ${ep.url} エンドポイントが古いか、計算がまだそのデータを生成してない可能性`);
+  }
   if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-  dataCache[kind][pk] = data;
+  dataCache[ep.cache][pk] = data;
   return data;
 }
 
@@ -367,7 +384,7 @@ async function loadBands() {
   const area = document.getElementById('plot-area');
   setLoading(area, 'バンド構造を取得中…');
   let bands;
-  try { bands = await fetchCached('bands', currentPK); }
+  try { bands = await fetchEndpoint('bands', currentPK); }
   catch (e) { setError(area, '取得失敗: ' + e.message); return; }
   renderBandChart(bands);
 }
@@ -440,7 +457,7 @@ async function loadPdos() {
   const area = document.getElementById('pdos-area');
   setLoading(area, 'PDOS データを取得中…');
   let data;
-  try { data = await fetchCached('pdos', currentPK); }
+  try { data = await fetchEndpoint('pdos', currentPK); }
   catch (e) { setError(area, '取得失敗: ' + e.message + ' (PDOS workchain がまだ完了していないか、Tier-1 で skip-pdos の可能性)'); return; }
 
   const fermi = data.fermi ?? 0;
@@ -486,7 +503,7 @@ async function loadStruct() {
   area.innerHTML = '<div class="loading"><span class="spin"></span> 構造データ取得中…</div>';
   side.innerHTML = '';
   let data;
-  try { data = await fetchCached('struct', currentPK); }
+  try { data = await fetchEndpoint('struct', currentPK); }
   catch (e) { setError(area, '取得失敗: ' + e.message); return; }
   renderStructure(data);
 }
@@ -593,7 +610,7 @@ async function loadConv() {
   const area = document.getElementById('conv-area');
   setLoading(area, 'BFGS トラジェクトリ取得中…');
   let data;
-  try { data = await fetchCached('trajectory', currentPK); }
+  try { data = await fetchEndpoint('conv', currentPK); }
   catch (e) { setError(area, '取得失敗: ' + e.message); return; }
   renderConvergence(data);
 }
@@ -640,12 +657,8 @@ async function loadSummary() {
   const area = document.getElementById('summary-area');
   setLoading(area, 'サマリ取得中…');
   let data;
-  try { data = await fetchCached('summary', currentPK); }
-  catch (e) {
-    // Try the /details endpoint instead
-    try { data = await fetchCached('details', currentPK); }
-    catch (e2) { setError(area, '取得失敗: ' + e2.message); return; }
-  }
+  try { data = await fetchEndpoint('summary', currentPK); }
+  catch (e) { setError(area, '取得失敗: ' + e.message); return; }
   renderSummary(data);
 }
 
