@@ -880,6 +880,18 @@ function renderConvergence(data) {
   if (data.total_force) {
     traces.push({x: xs, y: data.total_force, type: 'scatter', mode: 'lines+markers', name: '|F| (Ry/Bohr)', yaxis: 'y2', line: {color: '#ff7a7a'}, marker: {size: 6}});
   }
+  // Optional traces — each on its own invisible axis with a *fixed* range
+  // so toggling one in the legend doesn't rescale and visually shift the others.
+  function fixedRange(arr) {
+    if (!arr || !arr.length) return null;
+    const lo = Math.min(...arr), hi = Math.max(...arr);
+    const pad = Math.max((hi - lo) * 0.25, Math.abs(hi) * 0.01, 0.005);
+    return [lo - pad, hi + pad];
+  }
+  const rangeP = fixedRange(data.pressure_kbar);
+  const rangeA = fixedRange(data.lattice_a);
+  const rangeC = fixedRange(data.lattice_c);
+
   if (data.pressure_kbar) {
     traces.push({x: xs, y: data.pressure_kbar, type: 'scatter', mode: 'lines+markers', name: 'P (kbar)', yaxis: 'y3', line: {color: '#ffcc55'}, marker: {size: 5}, visible: 'legendonly'});
   }
@@ -887,7 +899,7 @@ function renderConvergence(data) {
     traces.push({x: xs, y: data.lattice_a, type: 'scatter', mode: 'lines+markers', name: 'a (Å)', yaxis: 'y4', line: {color: '#5fd592'}, marker: {size: 5}, visible: 'legendonly'});
   }
   if (data.lattice_c) {
-    traces.push({x: xs, y: data.lattice_c, type: 'scatter', mode: 'lines+markers', name: 'c (Å)', yaxis: 'y4', line: {color: '#c58dff'}, marker: {size: 5}, visible: 'legendonly'});
+    traces.push({x: xs, y: data.lattice_c, type: 'scatter', mode: 'lines+markers', name: 'c (Å)', yaxis: 'y5', line: {color: '#c58dff'}, marker: {size: 5}, visible: 'legendonly'});
   }
 
   const shapes = [{
@@ -901,8 +913,10 @@ function renderConvergence(data) {
     xaxis: {title: 'BFGS step (relax iteration)', gridcolor: '#1a2030', zeroline: false},
     yaxis: {title: {text: 'E_tot (eV)', font: {color: '#58a6ff'}}, gridcolor: '#1a2030', zeroline: false, color: '#58a6ff'},
     yaxis2: {title: {text: '|F| (Ry/Bohr)', font: {color: '#ff7a7a'}}, overlaying: 'y', side: 'right', type: 'log', color: '#ff7a7a', showgrid: false},
-    yaxis3: {overlaying: 'y', visible: false},
-    yaxis4: {overlaying: 'y', visible: false},
+    // Each optional trace gets its own private axis with a fixed range so toggling is independent.
+    yaxis3: {overlaying: 'y', visible: false, range: rangeP, autorange: false, fixedrange: true},
+    yaxis4: {overlaying: 'y', visible: false, range: rangeA, autorange: false, fixedrange: true},
+    yaxis5: {overlaying: 'y', visible: false, range: rangeC, autorange: false, fixedrange: true},
     shapes,
     margin: {l: 70, r: 70, t: 20, b: 50},
     hovermode: 'x unified',
