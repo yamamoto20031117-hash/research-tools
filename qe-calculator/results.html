@@ -100,6 +100,25 @@
   .conv-status-card.good{border-color:#38b26c}
   .conv-status-card.okay{border-color:#ffbf49}
   .conv-status-card.bad{border-color:#c14444}
+
+  /* Big visual progress panel */
+  .prog-panel{background:linear-gradient(180deg,#0e1620 0%,#10141c 100%);border:1px solid #1f2638;border-radius:8px;padding:14px 18px;margin-bottom:12px}
+  .prog-headline{font-size:1.05rem;color:#fff;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+  .prog-light{font-size:1.35rem}
+  .prog-row{display:flex;align-items:center;gap:14px;padding:8px 0;border-top:1px solid #1a2030}
+  .prog-row:first-of-type{border-top:none}
+  .prog-icon{font-size:1.2rem;width:28px;text-align:center}
+  .prog-label{flex:0 0 80px;font-size:.85rem;color:#ccc}
+  .prog-current{flex:0 0 120px;font-size:.82rem;color:#fff;font-variant-numeric:tabular-nums;font-weight:600}
+  .prog-bar-wrap{flex:1;height:18px;background:#0a0d14;border:1px solid #1a2030;border-radius:9px;position:relative;overflow:hidden;min-width:120px}
+  .prog-bar{height:100%;border-radius:9px;transition:width .4s ease;position:relative}
+  .prog-bar.good{background:linear-gradient(90deg,#2d8557,#5fd592)}
+  .prog-bar.okay{background:linear-gradient(90deg,#a37a18,#ffcc55)}
+  .prog-bar.bad{background:linear-gradient(90deg,#7a2c2c,#ff7a7a)}
+  .prog-bar-target{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;opacity:.6}
+  .prog-bar-target::after{content:'目標';position:absolute;top:-14px;left:-12px;font-size:.62rem;color:#fff;opacity:.7;white-space:nowrap}
+  .prog-ratio{flex:0 0 90px;font-size:.78rem;color:#aabad6;font-variant-numeric:tabular-nums;text-align:right}
+  .prog-summary{margin-top:10px;padding-top:8px;border-top:1px solid #1a2030;font-size:.82rem;color:#aabad6;line-height:1.5}
   .loading{padding:50px;text-align:center;color:#888}
   .loading .spin{display:inline-block;width:20px;height:20px;border:2px solid #2a3850;border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -813,62 +832,87 @@ async function loadConv() {
 function renderConvergence(data) {
   // Build a status panel + explanation banner above the plot
   const area = document.getElementById('conv-area');
-  // Wrap existing area with our header
-  area.innerHTML = `
-    <div class="help-banner">
-      <b>BFGS 構造最適化の収束過程</b>。各 step で：(1) 原子位置を少し動かす → (2) SCF を解く → (3) 力・応力を計算 → (4) 次の動かし方を決める、を繰り返す。
-      <br>判定：<b>力 |F| < 1×10⁻⁴ Ry/Bohr</b> かつ <b>ΔE < 3×10⁻⁵ Ry</b> で「平衡構造」とみなす。
-    </div>
-    <div class="conv-status" id="conv-status"></div>
-    <div id="conv-plot" style="min-height:420px"></div>
-    <div class="help-banner" style="margin-top:12px;background:rgba(120,140,180,.08)">
-      <b>読み方</b><br>
-      • <span style="color:#58a6ff">青線</span> E_tot：下に向かって収束（単調減少が理想、後半フラットになる）<br>
-      • <span style="color:#ff7a7a">赤線</span> |F|：対数軸、ステップごとに小さくなって行く。<span style="color:#ff7a7a">赤い破線</span> が目標 1×10⁻⁴<br>
-      • <b>振動してる場合</b>：mixing parameter (beta) が大きすぎる or 磁性系で複数の SCF 解候補がある<br>
-      • <b>跳ね上がる場合</b>：BFGS が "探索ステップ" を打ってる（その後また下がる、正常）
-    </div>
-  `;
-
-  // Build status cards based on latest values
-  const stat = document.getElementById('conv-status');
-  const lastE = data.energy ? data.energy[data.energy.length-1] : null;
+  // ---- compute key values ----
+  const F_TARGET = 1e-4;
+  const E_TARGET = 3e-5 * 13.6057;   // ~4e-4 eV
+  const lastF = data.total_force ? data.total_force[data.total_force.length-1] : null;
+  const initF = data.total_force ? data.total_force[0] : null;
   const dE = (data.energy && data.energy.length >= 2)
     ? Math.abs(data.energy[data.energy.length-1] - data.energy[data.energy.length-2])
     : null;
-  const lastF = data.total_force ? data.total_force[data.total_force.length-1] : null;
+  const initDE = (data.energy && data.energy.length >= 2)
+    ? Math.abs(data.energy[1] - data.energy[0]) : null;
 
-  function statusCard(label, val, unit, judge_class, note) {
-    return `<div class="conv-status-card ${judge_class}">
-      <div class="label">${label}</div>
-      <div class="val">${val !== null && val !== undefined ? val : '—'} ${unit||''}</div>
-      <div style="color:#888;font-size:.7rem;margin-top:2px">${note||''}</div>
-    </div>`;
+  function judgeMetric(curr, target) {
+    if (curr === null || curr === undefined) return {cls:'na', icon:'⏳', text:'データなし'};
+    if (curr < target) return {cls:'good', icon:'🟢', text:'達成 ✓', ratio:1};
+    const r = curr / target;
+    if (r < 10)  return {cls:'okay', icon:'🟡', text:`あと ${r.toFixed(1)}× 縮める`, ratio:r};
+    if (r < 100) return {cls:'okay', icon:'🟠', text:`あと ${r.toFixed(0)}× 縮める`, ratio:r};
+    return            {cls:'bad',  icon:'🔴', text:`あと ${r.toExponential(1)}× 縮める`, ratio:r};
   }
-  // Force convergence judgment
-  const F_TARGET = 1e-4;
-  let fJudge = 'okay';
-  let fNote = '';
-  if (lastF !== null) {
-    if (lastF < F_TARGET) { fJudge = 'good'; fNote = '✓ 力収束達成'; }
-    else if (lastF < F_TARGET*10) { fJudge = 'okay'; fNote = '⏳ 収束間近 (10× 以内)'; }
-    else { fJudge = 'bad'; fNote = '⏳ まだ収束遠い'; }
-  }
-  // dE judgment
-  const E_TARGET = 3e-5 * 13.6057;  // Ry → eV
-  let eJudge = 'okay';
-  let eNote = '';
-  if (dE !== null) {
-    if (dE < E_TARGET) { eJudge = 'good'; eNote = '✓ エネルギー収束'; }
-    else if (dE < E_TARGET*10) { eJudge = 'okay'; eNote = '⏳ 近づいてる'; }
-    else { eJudge = 'bad'; eNote = '振動 or 大きく変化中'; }
+  function progressFrac(curr, init, target) {
+    if (curr == null || init == null) return 0;
+    if (curr <= target) return 1;
+    if (init <= target) return 1;
+    const p = 1 - Math.log10(curr/target) / Math.log10(init/target);
+    return Math.max(0.05, Math.min(1, p));
   }
 
-  stat.innerHTML = `
-    ${statusCard('BFGS step 数', data.n_steps, '', '', '緩和反復回数')}
-    ${statusCard('|F| (現在)', lastF !== null ? lastF.toExponential(2) : null, 'Ry/Bohr', fJudge, fNote + ' / 目標 < 1e-4')}
-    ${statusCard('ΔE (前→今)', dE !== null ? dE.toExponential(2) : null, 'eV', eJudge, eNote + ' / 目標 < ' + E_TARGET.toExponential(1))}
-    ${statusCard('現在の E_tot', lastE !== null ? lastE.toFixed(4) : null, 'eV', '', '系の絶対値')}
+  const fJ = judgeMetric(lastF, F_TARGET);
+  const eJ = judgeMetric(dE, E_TARGET);
+  const fProg = progressFrac(lastF, initF, F_TARGET);
+  const eProg = progressFrac(dE, initDE, E_TARGET);
+
+  const allGood = fJ.cls === 'good' && eJ.cls === 'good';
+  const overall = allGood ? {emoji:'🟢', text:'構造最適化 完了 ✓'}
+                 : fJ.cls === 'bad' ? {emoji:'🔴', text:'収束まで遠い（序盤）'}
+                 : {emoji:'🟡', text:'収束間近、もう少し'};
+
+  area.innerHTML = `
+    <div class="prog-panel">
+      <div class="prog-headline">
+        <span class="prog-light">${overall.emoji}</span>
+        <span>${overall.text}</span>
+        <span style="color:#888;font-size:.8rem;font-weight:400;margin-left:auto">BFGS step ${data.n_steps}</span>
+      </div>
+
+      <div class="prog-row">
+        <span class="prog-icon">${fJ.icon}</span>
+        <span class="prog-label">力 |F|</span>
+        <span class="prog-current">${lastF != null ? lastF.toExponential(2) : '—'} Ry/Bohr</span>
+        <div class="prog-bar-wrap" title="目標 ${F_TARGET.toExponential(0)} Ry/Bohr">
+          <div class="prog-bar ${fJ.cls}" style="width:${(fProg*100).toFixed(0)}%"></div>
+        </div>
+        <span class="prog-ratio">${fJ.text}</span>
+      </div>
+
+      <div class="prog-row">
+        <span class="prog-icon">${eJ.icon}</span>
+        <span class="prog-label">ΔE</span>
+        <span class="prog-current">${dE != null ? dE.toExponential(2) : '—'} eV</span>
+        <div class="prog-bar-wrap" title="目標 ${E_TARGET.toExponential(1)} eV">
+          <div class="prog-bar ${eJ.cls}" style="width:${(eProg*100).toFixed(0)}%"></div>
+        </div>
+        <span class="prog-ratio">${eJ.text}</span>
+      </div>
+
+      <div class="prog-summary">
+        <b>読み方</b>:バーが <b>右端まで届けば収束</b>。緑=達成、黄=もう少し、赤=まだ遠い。<br>
+        ${allGood ? '✅ 平衡構造に到達。SCF + bands + PDOS に進める。'
+                  : (fJ.cls === 'bad' ? '🔴 まだ序盤。BFGS が原子位置を大きく動かしてる段階。'
+                                       : `🟡 力があと <b>${fJ.ratio?.toFixed(1)}×</b> 縮めば収束。1-2 BFGS step で達成見込み。`)}
+      </div>
+    </div>
+
+    <div class="help-banner">
+      <b>下のグラフが見せてるもの</b>:
+      <span style="color:#58a6ff">青線 E_tot</span> = 全エネルギー /
+      <span style="color:#ff7a7a">赤線 |F|</span> = 力（対数軸） /
+      <span style="color:#ffcc55">P</span>, <span style="color:#5fd592">a</span>, <span style="color:#c58dff">c</span> は凡例クリックで表示。
+      <br><span style="color:#5fd592">緑のゾーン</span>が力収束ゾーン（|F| < 1×10⁻⁴）。グラフの赤線がこのゾーンに入れば収束達成。
+    </div>
+    <div id="conv-plot" style="min-height:420px"></div>
   `;
 
   const N = data.n_steps;
@@ -902,11 +946,35 @@ function renderConvergence(data) {
     traces.push({x: xs, y: data.lattice_c, type: 'scatter', mode: 'lines+markers', name: 'c (Å)', yaxis: 'y5', line: {color: '#c58dff'}, marker: {size: 5}, visible: 'legendonly'});
   }
 
-  const shapes = [{
-    type: 'line', xref: 'paper', yref: 'y2',
-    x0: 0, x1: 1, y0: F_TARGET, y1: F_TARGET,
-    line: {color: '#ff7a7a', width: 1, dash: 'dash'}
-  }];
+  const shapes = [
+    // Shaded "converged zone" — |F| below target
+    {
+      type: 'rect', xref: 'paper', yref: 'y2',
+      x0: 0, x1: 1, y0: 1e-12, y1: F_TARGET,
+      fillcolor: 'rgba(56,178,108,0.12)',
+      line: {width: 0},
+      layer: 'below',
+    },
+    // Target line
+    {
+      type: 'line', xref: 'paper', yref: 'y2',
+      x0: 0, x1: 1, y0: F_TARGET, y1: F_TARGET,
+      line: {color: '#5fd592', width: 1.5, dash: 'dash'}
+    },
+  ];
+
+  // Highlight the latest data point on |F|
+  if (data.total_force && data.total_force.length > 0) {
+    const lastIdx = data.total_force.length - 1;
+    traces.push({
+      x: [lastIdx], y: [data.total_force[lastIdx]],
+      type: 'scatter', mode: 'markers', name: '現在',
+      yaxis: 'y2',
+      marker: {color: '#ffcc55', size: 14, line: {color: '#fff', width: 2}, symbol: 'circle'},
+      showlegend: false,
+      hovertemplate: '現在地<br>step %{x}<br>|F|=%{y:.2e}<extra></extra>',
+    });
+  }
 
   const layout = {
     paper_bgcolor: '#0c0f15', plot_bgcolor: '#0c0f15', font: {color: '#ccc'},
