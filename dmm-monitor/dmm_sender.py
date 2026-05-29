@@ -401,12 +401,23 @@ def firebase_command_thread(smu):
 
                     with smu_lock:
                         if need_reconfig:
-                            print(f"\n  *** Web: SOURCE START (設定変更) ***")
+                            print(f"\n  *** Web: SOURCE START (設定変更) mode={src_mode} value={value} comp={compliance} ***")
                             configure_source(smu, src_mode, value, compliance)
                             last_source_config = new_config
                         else:
-                            print(f"\n  *** Web: SOURCE START (再開) ***")
+                            print(f"\n  *** Web: SOURCE START (再開) mode={src_mode} value={value} comp={compliance} ***")
                         safe_write(smu, ":OUTP ON", 0.3)
+                        # Diagnostic — confirm output actually ON + drain error queue
+                        try:
+                            out = smu.query(":OUTP?").strip()
+                            err = smu.query(":SYST:ERR?").strip()
+                            print(f"  [DIAG] OUTP? = {out}   (1 = ON, 0 = OFF)")
+                            print(f"  [DIAG] ERR?  = {err}   (0,\"No error\" が正常)")
+                            if out == "0":
+                                print("  [警告] :OUTP ON 送信後も OUTP=0 → Keithley が拒否してる可能性")
+                                print("         → コンプライアンス設定、リモートモード、ハードリセットを確認")
+                        except Exception as e:
+                            print(f"  [DIAG] query 失敗: {e}")
 
                     output_on = True
                     update_output_status(True)
@@ -560,6 +571,24 @@ def connect_keithley():
     print("初期設定中...")
     safe_write(smu, "*RST", 2.0)
     safe_write(smu, "*CLS", 0.5)
+    # Force REMOTE mode + LOCAL LOCKOUT so the front panel can't override SCPI.
+    # Many Keithley 2400 firmware revisions silently ignore :OUTP ON when in LOCAL.
+    safe_write(smu, ":SYST:REM", 0.2)
+    safe_write(smu, ":SYST:LLO", 0.2)
+    # Clear any pending error queue from previous session (compliance trips etc.)
+    safe_write(smu, "*CLS", 0.2)
+    try:
+        err0 = smu.query(":SYST:ERR?").strip()
+        if not err0.startswith("0,") and not err0.startswith("+0,"):
+            print(f"  [初期化] Keithley エラーキューに残ってた: {err0}")
+            # Drain the queue
+            for _ in range(20):
+                e = smu.query(":SYST:ERR?").strip()
+                if e.startswith("0,") or e.startswith("+0,"):
+                    break
+    except Exception as e:
+        print(f"  [初期化] err query 失敗: {e}")
+
     safe_write(smu, ":SYST:BEEP:STAT OFF", 0.5)
     safe_write(smu, ":SENS:FUNC:CONC ON", 0.5)
     safe_write(smu, ":SENS:FUNC 'VOLT:DC','CURR:DC'", 0.5)
@@ -735,6 +764,15 @@ def main():
                             with smu_lock:
                                 if smu: configure_source(smu, src_mode, value, compliance)
                                 if smu: safe_write(smu, ":OUTP ON", 0.3)
+                                if smu:
+                                    try:
+                                        out = smu.query(":OUTP?").strip()
+                                        err = smu.query(":SYST:ERR?").strip()
+                                        print(f"  [DIAG] OUTP? = {out}, ERR? = {err}")
+                                        if out == "0":
+                                            print("  [警告] :OUTP ON 送信後も OUTP=0 → Keithley が拒否")
+                                    except Exception as e:
+                                        print(f"  [DIAG] query 失敗: {e}")
                             output_on = True
                             if duration > 0:
                                 auto_stop_time = time.time() + duration
