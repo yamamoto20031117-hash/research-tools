@@ -88,7 +88,64 @@
     return group;
   }
 
-  // === [5]Helicene — procedural, chemically-clean construction ===
+  // === DBPO helicene (C40H22N2O2) — copied directly from tmd-viewer ===
+  // tmd-viewer/index.html has the same molecule with an EXPLICIT bond list,
+  // so we can render it as a properly connected graph instead of relying on
+  // a distance threshold that misses the 'long' single bonds linking the
+  // two helical wings to the central pyrazine/N-oxide core.
+  // Atom order: O O N N (4 heavy core) → C×40 → H×22  (total 66).
+  // Bonds: edge list, indices into the atom array.
+  const HELICENE_DATA = {
+    atoms: [
+      ['O',-2.801,-1.851,-1.733], ['O', 1.663, 3.069, 1.302],
+      ['N',-1.596,-0.274, 0.151], ['N', 0.648, 1.231,-0.496],
+      ['C',-2.063,-1.546, 0.570], ['C',-1.929,-2.055, 1.831],
+      ['C',-2.434,-3.343, 2.148], ['C',-2.316,-3.892, 3.451],
+      ['C',-2.826,-5.131, 3.739], ['C',-3.476,-5.879, 2.741],
+      ['C',-3.592,-5.392, 1.467], ['C',-3.080,-4.113, 1.137],
+      ['C',-3.182,-3.572,-0.169], ['C',-2.686,-2.336,-0.437],
+      ['C',-1.790,-1.000,-2.147], ['C',-1.441,-0.953,-3.457],
+      ['C',-0.468,-0.012,-3.886], ['C',-0.158, 0.145,-5.263],
+      ['C', 0.683, 1.135,-5.689], ['C', 1.253, 2.026,-4.750],
+      ['C', 1.035, 1.864,-3.406], ['C', 0.193, 0.824,-2.927],
+      ['C',-0.074, 0.594,-1.541], ['C',-1.136,-0.207,-1.178],
+      ['C', 2.043, 1.441,-0.481], ['C', 2.954, 0.774,-1.264],
+      ['C', 4.332, 1.120,-1.241], ['C', 5.293, 0.425,-2.015],
+      ['C', 6.621, 0.779,-1.966], ['C', 7.044, 1.849,-1.180],
+      ['C', 6.145, 2.570,-0.440], ['C', 4.761, 2.220,-0.434],
+      ['C', 3.811, 2.869, 0.379], ['C', 2.517, 2.449, 0.402],
+      ['C', 0.494, 2.405, 1.615], ['C',-0.137, 2.706, 2.784],
+      ['C',-1.412, 2.149, 3.048], ['C',-2.178, 2.577, 4.164],
+      ['C',-3.470, 2.157, 4.335], ['C',-4.057, 1.280, 3.393],
+      ['C',-3.325, 0.786, 2.342], ['C',-1.983, 1.195, 2.141],
+      ['C',-1.185, 0.761, 1.033], ['C',-0.033, 1.445, 0.722],
+      ['H',-1.459,-1.526, 2.534], ['H',-1.842,-3.383, 4.149],
+      ['H',-2.676,-5.473, 4.642], ['H',-3.843,-6.741, 2.960],
+      ['H',-4.014,-5.898, 0.737], ['H',-3.692,-4.075,-0.866],
+      ['H',-1.902,-1.509,-4.101], ['H',-0.585,-0.470,-5.933],
+      ['H', 0.869, 1.265,-6.584], ['H', 1.788, 2.777,-5.059],
+      ['H', 1.470, 2.469,-2.764], ['H', 2.628, 0.082,-1.909],
+      ['H', 4.983,-0.316,-2.571], ['H', 7.261, 0.281,-2.487],
+      ['H', 7.981, 2.064,-1.159], ['H', 6.457, 3.345, 0.117],
+      ['H', 4.065, 3.609, 0.959], ['H', 0.273, 3.355, 3.406],
+      ['H',-1.710, 3.207, 4.819], ['H',-3.956, 2.460, 5.127],
+      ['H',-4.996, 1.013, 3.496], ['H',-3.761, 0.173, 1.691],
+    ],
+    bonds: [
+      [0,13],[0,14],[1,33],[1,34],[2,4],[2,23],[2,42],[3,22],[3,24],[3,43],
+      [4,5],[4,13],[5,6],[5,44],[6,7],[6,11],[7,8],[7,45],[8,9],[8,46],
+      [9,10],[9,47],[10,11],[10,48],[11,12],[12,13],[12,49],
+      [14,15],[14,23],[15,16],[15,50],[16,17],[16,21],[17,18],[17,51],
+      [18,19],[18,52],[19,20],[19,53],[20,21],[20,54],[21,22],[22,23],
+      [24,25],[24,33],[25,26],[25,55],[26,27],[26,31],[27,28],[27,56],
+      [28,29],[28,57],[29,30],[29,58],[30,31],[30,59],[31,32],[32,33],[32,60],
+      [34,35],[34,43],[35,36],[35,61],[36,37],[36,41],[37,38],[37,62],
+      [38,39],[38,63],[39,40],[39,64],[40,41],[40,65],[41,42],[42,43],
+    ],
+  };
+
+  // === (procedural [5]helicene fallback — no longer used; kept commented out) ===
+  /*
   // Five ortho-fused benzene rings stacked into a partial helix. Built by
   // hex fusion: ring N+1 shares an edge with ring N (always the "same"
   // local edge so the spiral keeps curling in the same sense), and each
@@ -224,7 +281,7 @@
 
     return [...heavy, ...Hs];
   }
-  const HELICENE = _buildHelicene5();
+  */
 
   // === Jacobi eigen-decomposition for 3x3 symmetric matrix ===
   // Returns [{val,vec}, ...] sorted by eigenvalue descending. Eigenvalues
@@ -271,25 +328,25 @@
     return eigs;
   }
 
-  // === Build helicene mesh group, PCA-aligned to layer normal ===
-  // Largest principal axis  → world Z (visible across viewport)
-  // Medium principal axis   → world X (laterally)
-  // Smallest principal axis → world Y (layer normal, fits in the vdW gap)
+  // === Build helicene mesh group from explicit DBPO data ===
+  // Uses HELICENE_DATA.atoms (66 atoms: O,O,N,N,C×40,H×22) and
+  // HELICENE_DATA.bonds (explicit edge list copied from tmd-viewer).
+  // Sidesteps the distance-based bond detection that misses the long
+  // single bonds connecting the two helicene wings to the central
+  // pyrazine/N-oxide core.
   //
-  // H atoms are KEPT: dropping them leaves 7 aromatic edge C atoms with
-  // only 1 heavy-atom neighbor (their other bond is to H), so the
-  // structure looks fragmented. Render H as small pale spheres + thin
-  // bonds — clutter is minimal at the bg scale, and the molecule reads
-  // as a continuous polycyclic system.
+  // PCA-aligned to put the molecule's thinnest axis along the layer
+  // normal (Y), so it sits flat in the vdW gap between VSe2 sheets.
   function buildHelicene() {
     const group = new THREE.Group();
-    const ptsRaw = HELICENE;   // full 66-atom set
+    const ptsRaw = HELICENE_DATA.atoms;   // 66-atom set
 
     // 1) Centroid (over heavy atoms only — H mass is tiny anyway)
-    const heavy = ptsRaw.filter(p => p[0] !== 'H');
+    const heavyIndices = ptsRaw.map((p, i) => p[0] !== 'H' ? i : -1).filter(i => i >= 0);
     let cx = 0, cy = 0, cz = 0;
-    heavy.forEach(p => { cx += p[1]; cy += p[2]; cz += p[3]; });
-    cx /= heavy.length; cy /= heavy.length; cz /= heavy.length;
+    heavyIndices.forEach(i => { cx += ptsRaw[i][1]; cy += ptsRaw[i][2]; cz += ptsRaw[i][3]; });
+    cx /= heavyIndices.length; cy /= heavyIndices.length; cz /= heavyIndices.length;
+    const heavy = heavyIndices.map(i => ptsRaw[i]);
 
     // 2) Covariance matrix — over heavy atoms only so PCA reflects the
     //    aromatic framework, not the H corona
@@ -348,16 +405,9 @@
       group.add(m);
     });
 
-    // 5) Covalent bonds — different thresholds for X-H vs heavy-heavy
-    //    so we keep the corona consistent and don't false-positive H-H pairs.
-    function bondLimit(e1, e2) {
-      // C-H, N-H, O-H ≈ 1.0-1.1 Å. Heavy-heavy ≤ 1.65 Å.
-      if (e1 === 'H' || e2 === 'H') {
-        if (e1 === 'H' && e2 === 'H') return 0;     // no H-H
-        return 1.25;
-      }
-      return 1.65;
-    }
+    // 5) Bonds — use the explicit edge list from tmd-viewer/DBPO.
+    //    `pts` is already the rotated 66-atom array indexed identically
+    //    to HELICENE_DATA.atoms, so bond indices resolve directly.
     const cylGeoHeavy = new THREE.CylinderGeometry(0.06, 0.06, 1, 6, 1, true);
     const cylGeoH     = new THREE.CylinderGeometry(0.035, 0.035, 1, 5, 1, true);
     const bondMat = new THREE.MeshPhongMaterial({
@@ -367,23 +417,18 @@
       color: 0xc8d0e0, transparent: true, opacity: 0.40, depthWrite: false,
     });
     const up = new THREE.Vector3(0, 1, 0);
-    for (let i = 0; i < pts.length; i++) {
-      for (let j = i + 1; j < pts.length; j++) {
-        const [e1, x1, y1, z1] = pts[i];
-        const [e2, x2, y2, z2] = pts[j];
-        const lim = bondLimit(e1, e2);
-        if (lim === 0) continue;
-        const dx = x1 - x2, dy = y1 - y2, dz = z1 - z2;
-        const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        if (d < lim) {
-          const isH = e1 === 'H' || e2 === 'H';
-          const cyl = new THREE.Mesh(isH ? cylGeoH : cylGeoHeavy, isH ? bondMatH : bondMat);
-          cyl.position.set((x1+x2)/2, (y1+y2)/2, (z1+z2)/2);
-          cyl.quaternion.setFromUnitVectors(up, new THREE.Vector3(x2-x1, y2-y1, z2-z1).normalize());
-          cyl.scale.y = d;
-          group.add(cyl);
-        }
-      }
+
+    for (const [a, b] of HELICENE_DATA.bonds) {
+      const [ea, xa, ya, za] = pts[a];
+      const [eb, xb, yb, zb] = pts[b];
+      const dx = xa - xb, dy = ya - yb, dz = za - zb;
+      const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      const isH = ea === 'H' || eb === 'H';
+      const cyl = new THREE.Mesh(isH ? cylGeoH : cylGeoHeavy, isH ? bondMatH : bondMat);
+      cyl.position.set((xa+xb)/2, (ya+yb)/2, (za+zb)/2);
+      cyl.quaternion.setFromUnitVectors(up, new THREE.Vector3(xb-xa, yb-ya, zb-za).normalize());
+      cyl.scale.y = d;
+      group.add(cyl);
     }
     return group;
   }
