@@ -500,6 +500,9 @@
   onResize();
 
   // === Manual orbit controls — enabled only in bg-only mode ===
+  // Set autoRotate so the scene keeps slowly spinning when the user
+  // isn't actively dragging. autoRotateSpeed=0.7 reproduces the same
+  // ~90 s/orbit cadence the auto-orbit uses in normal mode.
   let controls = null;
   if (typeof THREE.OrbitControls !== 'undefined') {
     controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -509,6 +512,8 @@
     controls.minDistance = 8;
     controls.maxDistance = 200;
     controls.target.set(0, 0, 0);
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.7;
   }
 
   let inBgOnly = false;
