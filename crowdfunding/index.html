@@ -3,223 +3,537 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>クラファンディング — 研究・モノづくり向け一覧</title>
+<title>研究室クラファン — 手数料ゼロの内部資金調達</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:#080b12;color:#ccc;font-family:'Helvetica Neue',Arial,'Meiryo',sans-serif;min-height:100vh}
-  #top{position:sticky;top:0;background:rgba(8,11,18,0.92);backdrop-filter:blur(10px);padding:12px 18px;border-bottom:1px solid #1a2030;z-index:10;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-  #top a{color:#58a6ff;text-decoration:none;font-size:.9rem}
-  #top h1{font-size:1.05rem;color:#fff;margin-right:8px}
-  #top .meta{font-size:.76rem;color:#888}
-  #top select{background:#181d27;color:#ddd;border:1px solid #2a3040;border-radius:5px;padding:4px 8px;font-size:.82rem}
-  main{padding:20px 22px 60px;max-width:1280px;margin:0 auto}
-  .intro{background:#10141c;border:1px solid #1f2638;border-radius:8px;padding:14px 18px;margin-bottom:18px;font-size:.84rem;line-height:1.6;color:#aabad6}
-  .intro b{color:#fff}
-  .intro a{color:#58a6ff}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
-  .card{background:#10141c;border:1px solid #1f2638;border-radius:10px;padding:16px 18px;transition:border-color .2s;display:flex;flex-direction:column;gap:8px}
-  .card:hover{border-color:#3a4a60}
-  .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-  .card h2{font-size:1.05rem;color:#fff;font-weight:600}
-  .card .region{font-size:.7rem;padding:2px 8px;border-radius:3px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-  .region-jp{background:rgba(255,120,120,.12);color:#ff9a9a;border:1px solid #c14444}
-  .region-intl{background:rgba(88,166,255,.13);color:#9ad0ff;border:1px solid #58a6ff}
-  .desc{font-size:.84rem;color:#aabad6;line-height:1.55}
-  .tags{display:flex;gap:6px;flex-wrap:wrap}
-  .tag{font-size:.7rem;background:#1a2030;color:#9ad0ff;padding:2px 8px;border-radius:3px}
-  .meta-row{display:flex;justify-content:space-between;font-size:.74rem;color:#888;padding-top:6px;border-top:1px dotted #1a2030;margin-top:auto}
-  .meta-row .val{color:#ddd;font-weight:600;font-variant-numeric:tabular-nums}
-  .launch{display:inline-block;margin-top:4px;color:#58a6ff;text-decoration:none;font-size:.84rem;font-weight:600}
-  .launch:hover{text-decoration:underline}
+  a{color:#58a6ff;text-decoration:none}
+  a:hover{text-decoration:underline}
 
-  .group-title{font-size:.78rem;color:#888;text-transform:uppercase;letter-spacing:.6px;margin:20px 0 8px;padding-bottom:6px;border-bottom:1px solid #1a2030}
-  .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;font-size:.8rem}
-  .filter-bar label{color:#888;display:flex;gap:6px;align-items:center;cursor:pointer}
-  .filter-bar input{accent-color:#58a6ff}
+  #top{position:sticky;top:0;background:rgba(8,11,18,0.92);backdrop-filter:blur(10px);padding:12px 18px;border-bottom:1px solid #1a2030;z-index:10;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  #top h1{font-size:1.05rem;color:#fff}
+  #top .meta{font-size:.76rem;color:#888}
+  button.primary{padding:6px 14px;font-size:.84rem;background:rgba(88,166,255,.18);color:#9ad0ff;border:1px solid #58a6ff;border-radius:5px;cursor:pointer;font-family:inherit;font-weight:600}
+  button.primary:hover{background:rgba(88,166,255,.3)}
+  button.ghost{padding:5px 12px;font-size:.8rem;background:transparent;color:#aabad6;border:1px solid #2a3040;border-radius:5px;cursor:pointer;font-family:inherit}
+  button.ghost:hover{border-color:#58a6ff;color:#9ad0ff}
+  button.danger{padding:5px 12px;font-size:.78rem;background:rgba(220,80,80,.12);color:#ff7a7a;border:1px solid #c14444;border-radius:5px;cursor:pointer;font-family:inherit}
+
+  main{padding:18px 22px 60px;max-width:1100px;margin:0 auto}
+  .empty{padding:32px;text-align:center;color:#666;background:#10141c;border:1px dashed #1f2638;border-radius:8px}
+  .section-title{font-size:.78rem;color:#888;text-transform:uppercase;letter-spacing:.6px;margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid #1a2030}
+
+  /* Proposal cards (list view) */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  .card{background:#10141c;border:1px solid #1f2638;border-radius:10px;padding:14px;cursor:pointer;transition:border-color .15s, transform .15s;display:flex;flex-direction:column;gap:10px}
+  .card:hover{border-color:#58a6ff;transform:translateY(-2px)}
+  .card-img{width:100%;height:140px;background:#0a0d14;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#444;font-size:2.5rem;background-size:cover;background-position:center;overflow:hidden}
+  .card h3{color:#fff;font-size:1rem;font-weight:600}
+  .card .proposer{font-size:.74rem;color:#888}
+  .progress-wrap{position:relative;height:8px;background:#1a2030;border-radius:4px;overflow:hidden}
+  .progress{height:100%;border-radius:4px;background:linear-gradient(90deg,#3a7d5a,#5fd592);transition:width .5s ease}
+  .progress.done{background:linear-gradient(90deg,#3a7d8c,#9ad0ff)}
+  .progress.gold{background:linear-gradient(90deg,#a37a18,#ffcc55)}
+  .card-stats{display:flex;justify-content:space-between;font-size:.78rem;color:#aabad6}
+  .card-stats .val{color:#fff;font-weight:600;font-variant-numeric:tabular-nums}
+  .badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .badge-open{background:rgba(56,178,108,.18);color:#5fd592;border:1px solid #38b26c}
+  .badge-funded{background:rgba(255,191,73,.15);color:#ffcc55;border:1px solid #ffbf49}
+  .badge-done{background:rgba(120,140,180,.13);color:#aabad6;border:1px solid #5a6a8c}
+  .badge-expired{background:rgba(220,80,80,.13);color:#ff7a7a;border:1px solid #c14444}
+
+  /* Detail view */
+  .detail{background:#10141c;border:1px solid #1f2638;border-radius:10px;padding:22px;margin-top:14px}
+  .detail .back{font-size:.86rem;color:#9ad0ff;margin-bottom:14px;display:inline-block;cursor:pointer}
+  .detail h2{color:#fff;font-size:1.4rem;margin-bottom:6px}
+  .detail .proposer-row{font-size:.84rem;color:#aabad6;margin-bottom:14px;display:flex;gap:14px;flex-wrap:wrap}
+  .detail .img{width:100%;max-height:300px;background:#0a0d14;border-radius:8px;background-size:contain;background-position:center;background-repeat:no-repeat;margin-bottom:14px;min-height:180px}
+  .detail .desc{font-size:.9rem;color:#ddd;line-height:1.6;background:#0a0d14;border-radius:8px;padding:14px;margin-bottom:18px;white-space:pre-wrap}
+  .detail .progress-big-wrap{position:relative;height:24px;background:#1a2030;border-radius:12px;overflow:hidden;margin-bottom:6px}
+  .progress-big{height:100%;border-radius:12px}
+  .detail .progress-label{display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:16px}
+  .detail .progress-label .left{color:#fff;font-weight:600}
+  .detail .progress-label .right{color:#aabad6}
+
+  .pledger-list{margin-bottom:18px}
+  .pledger{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#0c0f15;border:1px solid #161b27;border-radius:6px;margin-bottom:6px;font-size:.86rem}
+  .pledger .name{color:#fff;font-weight:600}
+  .pledger .amount{color:#9ad0ff;font-variant-numeric:tabular-nums;font-weight:600}
+  .pledger .comment{font-size:.78rem;color:#888;margin-left:8px;font-style:italic}
+  .pledger.paid{background:rgba(56,178,108,.06);border-color:#3a7d5a}
+  .pledger .status-chip{font-size:.7rem;padding:1px 7px;border-radius:3px;margin-left:6px}
+  .pledger .status-chip.paid{background:rgba(56,178,108,.18);color:#5fd592;border:1px solid #38b26c}
+  .pledger .status-chip.unpaid{background:rgba(120,140,180,.13);color:#aabad6;border:1px solid #5a6a8c}
+
+  .panel{background:#0c0f15;border:1px solid #1f2638;border-radius:8px;padding:14px 16px;margin-bottom:14px}
+  .panel h3{font-size:.95rem;color:#fff;margin-bottom:10px;font-weight:600}
+  .form-row{margin-bottom:10px}
+  .form-row label{display:block;font-size:.74rem;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+  .form-row input, .form-row textarea, .form-row select{width:100%;background:#181d27;color:#ddd;border:1px solid #2a3040;border-radius:5px;padding:8px 10px;font-size:.86rem;font-family:inherit}
+  .form-row textarea{min-height:80px;resize:vertical}
+  .form-row input:focus, .form-row textarea:focus, .form-row select:focus{outline:none;border-color:#58a6ff}
+  .form-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
+
+  .funded-banner{background:linear-gradient(135deg,rgba(255,191,73,.13),rgba(255,204,85,.06));border:1px solid #ffbf49;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:.9rem;line-height:1.6;color:#ffd680}
+  .funded-banner h3{color:#ffcc55;margin-bottom:8px}
+  .funded-banner code{background:#1a1410;color:#ffcc55;padding:2px 6px;border-radius:3px;font-size:.85em}
+  .funded-banner .contact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px}
+  .funded-banner .contact-card{background:rgba(0,0,0,.25);border-radius:6px;padding:10px 12px;font-size:.84rem;color:#ddd}
+  .funded-banner .contact-card a{color:#5fd592;font-weight:600;word-break:break-all}
+
+  .helper{font-size:.74rem;color:#7a8398;margin-top:4px;line-height:1.45}
 
   @media (max-width:600px){
     main{padding:10px}
     .grid{grid-template-columns:1fr}
+    .detail{padding:14px}
   }
 </style>
 </head>
 <body>
 
 <div id="top">
-  <a href="/" title="Research Tools トップ">&#8592;</a>
-  <h1>クラファンディング</h1>
-  <span class="meta">研究・モノづくり向け プラットフォーム一覧</span>
+  <a href="/" style="font-size:.9rem">&#8592;</a>
+  <h1>研究室クラファン</h1>
+  <span class="meta" id="firebase-status">—</span>
+  <button class="primary" id="btn-new" style="margin-left:auto">+ 新しい提案</button>
 </div>
 
 <main>
-  <div class="intro">
-    研究機材の購入、ラボ立ち上げ、デバイス開発、学術活動などの資金調達に使える
-    <b>クラウドファンディング・プラットフォーム</b> をまとめた早見表です。
-    プロジェクトのタイプ（学術 / 製品 / 一般）と地域（国内 / 海外）で使い分けるのが定石。
-    各リンクは公式サイトに飛びます。
+  <!-- LIST VIEW -->
+  <div id="list-view">
+    <div class="empty" id="list-empty" hidden>
+      まだ提案がありません。「+ 新しい提案」で最初の提案を作成してください。
+    </div>
+
+    <div id="active-group">
+      <div class="section-title">🟢 募集中</div>
+      <div class="grid" id="grid-active"></div>
+    </div>
+    <div id="funded-group">
+      <div class="section-title">🟡 目標達成・送金中</div>
+      <div class="grid" id="grid-funded"></div>
+    </div>
+    <div id="done-group">
+      <div class="section-title">✓ 完了済み</div>
+      <div class="grid" id="grid-done"></div>
+    </div>
+    <div id="expired-group">
+      <div class="section-title">⏱ 期限切れ</div>
+      <div class="grid" id="grid-expired"></div>
+    </div>
   </div>
 
-  <div class="filter-bar">
-    <span style="color:#aabad6">フィルタ:</span>
-    <label><input type="radio" name="reg" value="all" checked> 全部</label>
-    <label><input type="radio" name="reg" value="jp"> 国内のみ</label>
-    <label><input type="radio" name="reg" value="intl"> 海外のみ</label>
-    <span style="margin-left:20px;color:#aabad6">タイプ:</span>
-    <label><input type="checkbox" class="tagf" value="academic" checked> 学術</label>
-    <label><input type="checkbox" class="tagf" value="product" checked> 製品</label>
-    <label><input type="checkbox" class="tagf" value="general" checked> 一般・社会</label>
-    <label><input type="checkbox" class="tagf" value="subscription" checked> サブスク</label>
+  <!-- NEW PROPOSAL FORM -->
+  <div id="new-view" hidden>
+    <div class="detail">
+      <span class="back" onclick="showList()">&#8592; 一覧に戻る</span>
+      <h2 style="margin-bottom:16px">新しい提案を作成</h2>
+
+      <div class="form-row">
+        <label>物品名 *</label>
+        <input type="text" id="np-title" placeholder="例: 超音波洗浄機 ASU-3M" maxlength="80">
+      </div>
+      <div class="form-row">
+        <label>目標金額 (円) *</label>
+        <input type="number" id="np-target" placeholder="15000" min="100" step="100">
+      </div>
+      <div class="form-row">
+        <label>画像 URL (任意)</label>
+        <input type="url" id="np-image" placeholder="https://...">
+        <div class="helper">商品ページの画像 URL を貼り付け。空欄でも OK。</div>
+      </div>
+      <div class="form-row">
+        <label>説明・理由 *</label>
+        <textarea id="np-desc" placeholder="何に使うか、なぜ必要か、どこで買えるか、など。" maxlength="2000"></textarea>
+      </div>
+      <div class="form-row">
+        <label>提案者名 *</label>
+        <input type="text" id="np-proposer" placeholder="山本" maxlength="30">
+      </div>
+      <div class="form-row">
+        <label>PayPay 受け取りリンク (任意)</label>
+        <input type="url" id="np-paypay" placeholder="https://pay.paypay.ne.jp/...">
+        <div class="helper">あなたの PayPay 個人口座の請求書 URL。アプリの「送る・受け取る」→「請求書を作成」で生成できます。手数料ゼロ。</div>
+      </div>
+      <div class="form-row">
+        <label>その他連絡先 (任意)</label>
+        <input type="text" id="np-contact" placeholder="LINE ID / メール / Slack DM など">
+        <div class="helper">PayPay 使ってない人向け。複数書いて OK。</div>
+      </div>
+      <div class="form-row">
+        <label>募集期限 *</label>
+        <input type="date" id="np-deadline">
+      </div>
+
+      <div class="form-actions">
+        <button class="ghost" onclick="showList()">キャンセル</button>
+        <button class="primary" onclick="submitProposal()">提案を投稿</button>
+      </div>
+    </div>
   </div>
 
-  <div class="group-title">🇯🇵 国内</div>
-  <div class="grid" id="grid-jp"></div>
-
-  <div class="group-title">🌐 海外</div>
-  <div class="grid" id="grid-intl"></div>
+  <!-- DETAIL VIEW -->
+  <div id="detail-view" hidden></div>
 </main>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
-const SITES = [
-  // ===== 国内 =====
-  {
-    name: 'academist', region: 'jp', tags: ['academic'],
-    url: 'https://academist-cf.com/',
-    desc: '日本初の学術系クラファン。研究テーマで支援を集める「チャレンジ型」、月額の「ファンクラブ型」あり。研究者・大学院生に最適。',
-    fee: '20%', model: 'All-in / All-or-Nothing 両対応', samples: '大学・公的機関の研究者',
-  },
-  {
-    name: 'READYFOR', region: 'jp', tags: ['general', 'academic'],
-    url: 'https://readyfor.jp/',
-    desc: '社会課題・福祉・教育・研究で実績豊富。日本最古参のクラファン。「実行型」と「All-or-Nothing」が選べる。',
-    fee: '12% + 決済 5%', model: 'All-or-Nothing / 実行型', samples: 'NPO・大学・社会的事業',
-  },
-  {
-    name: 'CAMPFIRE', region: 'jp', tags: ['product', 'general'],
-    url: 'https://camp-fire.jp/',
-    desc: '国内最大級のクラファン。製品開発、ガジェット、漫画、音楽、社会活動など幅広い。プロジェクト数 No.1。',
-    fee: '17% + 決済 5%', model: 'All-or-Nothing / All-in', samples: 'モノづくり全般',
-  },
-  {
-    name: 'Makuake', region: 'jp', tags: ['product'],
-    url: 'https://www.makuake.com/',
-    desc: 'サイバーエージェント系。プロダクトのローンチや新製品先行販売に強い。家電・ガジェット系で実績多数。',
-    fee: '20% (決済込み)', model: 'All-in (実行確約型)', samples: 'スタートアップの新製品',
-  },
-  {
-    name: 'GREEN FUNDING', region: 'jp', tags: ['product', 'general'],
-    url: 'https://greenfunding.jp/',
-    desc: '蔦屋書店系。ガジェット・本・映像・音楽などクリエイティブ系に強い。CCCのプロモーション支援を活用できる。',
-    fee: '20% (決済込み)', model: 'All-in / All-or-Nothing', samples: 'クリエイティブ・本・ガジェット',
-  },
-  {
-    name: 'kibidango (きびだんご)', region: 'jp', tags: ['product'],
-    url: 'https://kibidango.com/',
-    desc: '達成率 80% の高い実行率を誇る、製品ローンチに特化したサイト。事前審査が手厚く、サポートが厚いと評判。',
-    fee: '10% + 決済 5%', model: 'All-or-Nothing', samples: 'ガジェット・テクノロジー製品',
-  },
-  {
-    name: 'JAPANGIVING', region: 'jp', tags: ['general'],
-    url: 'https://japangiving.jp/',
-    desc: '寄付型クラファン。NPO・社会活動・チャリティ向け。リターン無しで支援を集められる。',
-    fee: '15%', model: '寄付型 (All-in)', samples: 'NPO・チャリティ',
-  },
-  {
-    name: 'GoodMorning', region: 'jp', tags: ['general'],
-    url: 'https://camp-fire.jp/goodmorning',
-    desc: 'CAMPFIRE 系の社会活動特化版。災害支援、ジェンダー、環境などソーシャルテーマで集中的。',
-    fee: '9% + 決済 5%', model: 'All-or-Nothing / All-in', samples: '社会活動・寄付型',
-  },
+const firebaseConfig = {
+  apiKey: "AIzaSyB-Imw_zNUz2X7Bc-LJtFh9tlcKDHrZmZk",
+  authDomain: "research-tools-board.firebaseapp.com",
+  databaseURL: "https://research-tools-board-default-rtdb.firebaseio.com",
+  projectId: "research-tools-board",
+  storageBucket: "research-tools-board.firebasestorage.app",
+  messagingSenderId: "1059830866024",
+  appId: "1:1059830866024:web:6f6cb56e3e3b1f9c19a8a4",
+};
 
-  // ===== 海外 =====
-  {
-    name: 'Kickstarter', region: 'intl', tags: ['product'],
-    url: 'https://www.kickstarter.com/',
-    desc: '世界最大級のクラファン。テクノロジー、デザイン、ゲーム、出版で圧倒的実績。英語必須。',
-    fee: '5% + 決済 3-5%', model: 'All-or-Nothing', samples: 'スマートデバイス・ゲーム・出版',
-  },
-  {
-    name: 'Indiegogo', region: 'intl', tags: ['product', 'general'],
-    url: 'https://www.indiegogo.com/',
-    desc: 'Kickstarter と並ぶ国際クラファン。柔軟な集金形式 (Fixed/Flexible)。研究・社会的事業も可。',
-    fee: '5% + 決済 3-5%', model: 'All-or-Nothing / All-in', samples: 'ハードウェア・社会的事業',
-  },
-  {
-    name: 'experiment.com', region: 'intl', tags: ['academic'],
-    url: 'https://experiment.com/',
-    desc: '科学研究に特化した海外クラファン。生命科学、地学、技術、人類学など。論文や DOI と連動するプロジェクトページ。',
-    fee: '8% + 決済 3%', model: 'All-or-Nothing', samples: '科学者・大学院生・ポスドク',
-  },
-  {
-    name: 'GoFundMe', region: 'intl', tags: ['general'],
-    url: 'https://www.gofundme.com/',
-    desc: '個人・チャリティに特化。医療費、災害復旧、社会運動など。プラットフォーム手数料無し（決済料のみ）。',
-    fee: '0% + 決済 2.9%', model: 'All-in', samples: '個人・社会・医療支援',
-  },
-  {
-    name: 'Patreon', region: 'intl', tags: ['subscription'],
-    url: 'https://www.patreon.com/',
-    desc: 'クリエイター・研究者・教育者向けの月額サブスク型ファンディング。継続的支援を集めるのに最適。',
-    fee: '5-12%', model: 'Subscription (継続)', samples: 'YouTuber・科学コミュニケーター',
-  },
-  {
-    name: 'Ko-fi', region: 'intl', tags: ['subscription', 'general'],
-    url: 'https://ko-fi.com/',
-    desc: '「コーヒー一杯分の寄付」を集める軽量プラットフォーム。手数料 0% プランあり (Premium で物販可)。',
-    fee: '0% (Premium $6/mo)', model: 'Donation / Subscription', samples: '個人クリエイター・研究者',
-  },
-  {
-    name: 'BackerKit', region: 'intl', tags: ['product'],
-    url: 'https://www.backerkit.com/',
-    desc: 'Kickstarter / Indiegogo 後の支援者管理・追加販売プラットフォーム。プレッジマネージャーとして連携。',
-    fee: '4-7% (機能による)', model: '後続キャンペーン・追加販売', samples: '既存キャンペーンの追加注文',
-  },
-  {
-    name: 'Crowdfunder UK', region: 'intl', tags: ['general'],
-    url: 'https://www.crowdfunder.co.uk/',
-    desc: 'イギリス最大のクラファン。コミュニティプロジェクト、ビジネス、社会的企業など多様。',
-    fee: '5%', model: 'All-or-Nothing / All-in', samples: '英国内のコミュニティ・社会的企業',
-  },
-];
+let db = null, firebaseReady = false;
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+  firebaseReady = true;
+  document.getElementById('firebase-status').textContent = '🌐 共有モード (Firebase)';
+} catch (e) {
+  document.getElementById('firebase-status').textContent = '💾 ローカルモード (このブラウザのみ)';
+}
 
-function makeCard(s) {
-  const tagsHtml = s.tags.map(t => `<span class="tag" data-tag="${t}">${
-    {academic:'学術', product:'製品', general:'一般', subscription:'サブスク'}[t] || t
-  }</span>`).join('');
+// ---- Data store: Firebase or localStorage ----
+const STORE_KEY = 'lab-crowdfund';
+
+function loadProposals(cb) {
+  if (firebaseReady) {
+    db.ref('crowdfund/proposals').on('value', snap => {
+      const data = snap.val() || {};
+      cb(Object.entries(data).map(([id, p]) => ({...p, id})));
+    });
+  } else {
+    const data = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+    cb(data);
+  }
+}
+
+function saveProposal(prop) {
+  if (firebaseReady) {
+    if (!prop.id) prop.id = db.ref('crowdfund/proposals').push().key;
+    db.ref('crowdfund/proposals/' + prop.id).set(prop);
+  } else {
+    const data = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+    if (!prop.id) prop.id = 'l' + Date.now();
+    const i = data.findIndex(p => p.id === prop.id);
+    if (i >= 0) data[i] = prop; else data.push(prop);
+    localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    renderList(data);
+  }
+}
+
+function deleteProposal(id) {
+  if (firebaseReady) {
+    db.ref('crowdfund/proposals/' + id).remove();
+  } else {
+    const data = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+    localStorage.setItem(STORE_KEY, JSON.stringify(data.filter(p => p.id !== id)));
+    renderList(data.filter(p => p.id !== id));
+  }
+}
+
+// ---- Helpers ----
+function esc(s){if(s==null)return'';return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c])}
+function yen(n){return '¥' + (n||0).toLocaleString('ja-JP')}
+function sumPledges(p){return (p.pledges||[]).reduce((s, x) => s + (x.amount||0), 0)}
+function dayUntil(deadline){
+  if(!deadline) return null;
+  const d = new Date(deadline+'T23:59:59');
+  const diff = Math.ceil((d - new Date()) / 86400000);
+  return diff;
+}
+function statusOf(p){
+  const collected = sumPledges(p);
+  const days = dayUntil(p.deadline);
+  if (p.completed) return 'done';
+  if (collected >= p.target) return 'funded';
+  if (days !== null && days < 0) return 'expired';
+  return 'active';
+}
+
+// ---- List rendering ----
+function renderList(proposals) {
+  const groups = {active: [], funded: [], done: [], expired: []};
+  proposals.forEach(p => groups[statusOf(p)].push(p));
+
+  // Sort each group: active by deadline asc, others by created desc
+  groups.active.sort((a,b) => (a.deadline||'') > (b.deadline||'') ? 1 : -1);
+  groups.funded.sort((a,b) => (b.created_at||0) - (a.created_at||0));
+  groups.done.sort((a,b) => (b.created_at||0) - (a.created_at||0));
+  groups.expired.sort((a,b) => (b.created_at||0) - (a.created_at||0));
+
+  for (const key of ['active','funded','done','expired']) {
+    const grid = document.getElementById('grid-' + key);
+    const groupEl = document.getElementById(key + '-group');
+    if (groups[key].length === 0) {
+      groupEl.style.display = 'none';
+    } else {
+      groupEl.style.display = '';
+      grid.innerHTML = groups[key].map(cardHtml).join('');
+    }
+  }
+
+  const totalEmpty = proposals.length === 0;
+  document.getElementById('list-empty').hidden = !totalEmpty;
+}
+
+function cardHtml(p) {
+  const collected = sumPledges(p);
+  const pct = Math.min(100, p.target ? (collected/p.target*100) : 0);
+  const status = statusOf(p);
+  const badgeMap = {active:'badge-open', funded:'badge-funded', done:'badge-done', expired:'badge-expired'};
+  const badgeLabel = {active:'募集中', funded:'達成・送金中', done:'完了', expired:'期限切れ'};
+  const progClass = status === 'funded' ? 'gold' : status === 'done' ? 'done' : '';
+  const days = dayUntil(p.deadline);
+  const daysText = days !== null
+    ? (days > 0 ? `残り ${days} 日` : days === 0 ? '今日まで' : `${-days} 日前に終了`)
+    : '';
+  const imgStyle = p.image
+    ? `background-image:url(${esc(p.image)})`
+    : '';
+  const imgIcon = p.image ? '' : '📦';
   return `
-    <div class="card" data-region="${s.region}" data-tags="${s.tags.join(',')}">
-      <div class="card-head">
-        <h2>${s.name}</h2>
-        <span class="region region-${s.region}">${s.region === 'jp' ? '国内' : '海外'}</span>
+    <div class="card" onclick="showDetail('${p.id}')">
+      <div class="card-img" style="${imgStyle}">${imgIcon}</div>
+      <div>
+        <h3>${esc(p.title)} <span class="badge ${badgeMap[status]}" style="margin-left:6px">${badgeLabel[status]}</span></h3>
+        <div class="proposer">提案: ${esc(p.proposer)}</div>
       </div>
-      <div class="desc">${s.desc}</div>
-      <div class="tags">${tagsHtml}</div>
-      <div class="meta-row">
-        <span>手数料 <span class="val">${s.fee}</span></span>
-        <span>${s.model}</span>
+      <div class="progress-wrap"><div class="progress ${progClass}" style="width:${pct}%"></div></div>
+      <div class="card-stats">
+        <span><span class="val">${yen(collected)}</span> / ${yen(p.target)}</span>
+        <span>${(p.pledges||[]).length} 人 ${daysText ? '· ' + daysText : ''}</span>
       </div>
-      <div class="meta-row" style="border-top:none;padding-top:0">
-        <span>向き: ${s.samples}</span>
-      </div>
-      <a class="launch" href="${s.url}" target="_blank" rel="noopener">公式サイトへ &#8594;</a>
     </div>
   `;
 }
 
-function render() {
-  const reg = document.querySelector('input[name="reg"]:checked').value;
-  const tagFilters = Array.from(document.querySelectorAll('.tagf:checked')).map(t => t.value);
-
-  const filtered = SITES.filter(s => {
-    if (reg !== 'all' && s.region !== reg) return false;
-    if (!s.tags.some(t => tagFilters.includes(t))) return false;
-    return true;
-  });
-  document.getElementById('grid-jp').innerHTML = filtered.filter(s => s.region === 'jp').map(makeCard).join('') || '<div style="color:#666;padding:20px">該当なし</div>';
-  document.getElementById('grid-intl').innerHTML = filtered.filter(s => s.region === 'intl').map(makeCard).join('') || '<div style="color:#666;padding:20px">該当なし</div>';
+// ---- View switching ----
+function showList() {
+  document.getElementById('list-view').hidden = false;
+  document.getElementById('new-view').hidden = true;
+  document.getElementById('detail-view').hidden = true;
+  location.hash = '';
+}
+function showNew() {
+  document.getElementById('list-view').hidden = true;
+  document.getElementById('new-view').hidden = false;
+  document.getElementById('detail-view').hidden = true;
+  ['np-title','np-target','np-image','np-desc','np-proposer','np-paypay','np-contact'].forEach(id => document.getElementById(id).value = '');
+  const tomorrow = new Date(Date.now() + 14*86400000);
+  document.getElementById('np-deadline').value = tomorrow.toISOString().slice(0,10);
 }
 
-document.querySelectorAll('input[name="reg"], .tagf').forEach(i => i.addEventListener('change', render));
-render();
+let lastProposals = [];
+function showDetail(id) {
+  const p = lastProposals.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('list-view').hidden = true;
+  document.getElementById('new-view').hidden = true;
+  const dv = document.getElementById('detail-view');
+  dv.hidden = false;
+  dv.innerHTML = detailHtml(p);
+  location.hash = '#' + id;
+}
+
+function detailHtml(p) {
+  const collected = sumPledges(p);
+  const pct = Math.min(100, p.target ? (collected/p.target*100) : 0);
+  const status = statusOf(p);
+  const badgeLabel = {active:'募集中', funded:'達成・送金中', done:'完了', expired:'期限切れ'};
+  const badgeMap = {active:'badge-open', funded:'badge-funded', done:'badge-done', expired:'badge-expired'};
+  const progClass = status === 'funded' ? 'gold' : status === 'done' ? 'done' : '';
+  const days = dayUntil(p.deadline);
+  const daysText = days !== null
+    ? (days > 0 ? `期限まで ${days} 日 (${p.deadline})` : days === 0 ? `今日が期限 (${p.deadline})` : `期限切れ (${p.deadline}, ${-days} 日経過)`)
+    : '';
+  const imgStyle = p.image ? `style="background-image:url(${esc(p.image)})"` : '';
+
+  // Funded banner: show contact info
+  let fundedBanner = '';
+  if (status === 'funded' || status === 'done') {
+    const contacts = [];
+    if (p.paypay) contacts.push({
+      label: '💸 PayPay で送金', val: `<a href="${esc(p.paypay)}" target="_blank" rel="noopener">${esc(p.paypay)}</a>`,
+      hint: '提案者の個人 PayPay 請求書 URL。タップで送金画面へ。'
+    });
+    if (p.contact) contacts.push({
+      label: '📱 連絡先', val: `<span style="color:#9ad0ff;font-weight:600">${esc(p.contact)}</span>`,
+      hint: 'LINE / メール / Slack 等で連絡 → 直接渡しか別途相談'
+    });
+    if (contacts.length === 0) contacts.push({
+      label: '🤝 直接相談', val: `<span style="color:#aabad6">提案者 (${esc(p.proposer)}) に直接連絡してください。</span>`,
+      hint: 'PayPay/連絡先が登録されてません。'
+    });
+
+    fundedBanner = `
+      <div class="funded-banner">
+        <h3>${status === 'done' ? '✓ 完了済み' : '🎯 目標達成！送金してください'}</h3>
+        ${status === 'funded' ? `<div>支援額が <code>${yen(p.target)}</code> に到達しました。各支援者は下記のいずれかで <b>${esc(p.proposer)}</b> さんに送金してください。送金したら自分のピン横の「送金済み」を押してチェックしてください。</div>` : `<div>全員の送金が完了しました。${esc(p.proposer)} さんが <b>${esc(p.title)}</b> を購入します。</div>`}
+        <div class="contact-grid">
+          ${contacts.map(c => `<div class="contact-card"><div style="font-size:.78rem;color:#888;margin-bottom:4px">${c.label}</div>${c.val}<div style="font-size:.7rem;color:#7a8398;margin-top:6px">${c.hint}</div></div>`).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  const pledgersHtml = (p.pledges||[]).map((pl, i) => `
+    <div class="pledger ${pl.paid ? 'paid' : ''}">
+      <div>
+        <span class="name">${esc(pl.name)}</span>
+        ${pl.comment ? `<span class="comment">"${esc(pl.comment)}"</span>` : ''}
+      </div>
+      <div>
+        <span class="amount">${yen(pl.amount)}</span>
+        <span class="status-chip ${pl.paid ? 'paid' : 'unpaid'}">${pl.paid ? '送金済み ✓' : '未送金'}</span>
+        ${status !== 'active' ? `<button class="ghost" style="margin-left:4px;padding:2px 8px;font-size:.7rem" onclick="togglePaid('${p.id}', ${i})">${pl.paid ? '取消' : '送金済みにする'}</button>` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  const isProposer = (localStorage.getItem('cf-me') || '') === p.proposer;
+  const canComplete = status === 'funded' && (p.pledges||[]).every(pl => pl.paid);
+
+  return `
+    <div class="detail">
+      <span class="back" onclick="showList()">&#8592; 一覧に戻る</span>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">
+        <h2>${esc(p.title)} <span class="badge ${badgeMap[status]}">${badgeLabel[status]}</span></h2>
+        <div>
+          ${canComplete ? `<button class="primary" onclick="markCompleted('${p.id}')">完了とする</button>` : ''}
+          <button class="danger" onclick="confirmDelete('${p.id}')">削除</button>
+        </div>
+      </div>
+      <div class="proposer-row">
+        <span>提案: <b style="color:#fff">${esc(p.proposer)}</b></span>
+        ${daysText ? `<span>${daysText}</span>` : ''}
+        ${p.created_at ? `<span style="color:#666">投稿: ${new Date(p.created_at).toLocaleDateString('ja-JP')}</span>` : ''}
+      </div>
+
+      ${p.image ? `<div class="img" ${imgStyle}></div>` : ''}
+      <div class="desc">${esc(p.desc)}</div>
+
+      ${fundedBanner}
+
+      <div class="progress-big-wrap"><div class="progress progress-big ${progClass}" style="width:${pct}%"></div></div>
+      <div class="progress-label">
+        <span class="left">${yen(collected)} / ${yen(p.target)} (${pct.toFixed(1)}%)</span>
+        <span class="right">${(p.pledges||[]).length} 人が支援 · 残り <b style="color:#fff">${yen(Math.max(0, p.target - collected))}</b></span>
+      </div>
+
+      <h3 style="color:#fff;font-size:1rem;margin:18px 0 8px">支援した人</h3>
+      <div class="pledger-list">
+        ${pledgersHtml || '<div class="empty" style="padding:16px">まだ支援者がいません</div>'}
+      </div>
+
+      ${status === 'active' ? `
+        <div class="panel">
+          <h3>+ 支援する</h3>
+          <div class="form-row">
+            <label>あなたの名前 *</label>
+            <input type="text" id="pl-name" maxlength="30" value="${esc(localStorage.getItem('cf-me')||'')}">
+          </div>
+          <div class="form-row">
+            <label>金額 (円) *</label>
+            <input type="number" id="pl-amount" placeholder="3000" min="100" step="100">
+            <div class="helper">残り ${yen(Math.max(0, p.target - collected))} 以下で。多めに入れても OK（おまけ分は提案者に）。</div>
+          </div>
+          <div class="form-row">
+            <label>メッセージ (任意)</label>
+            <input type="text" id="pl-comment" maxlength="100" placeholder="楽しみ！" />
+          </div>
+          <div class="form-actions">
+            <button class="primary" onclick="addPledge('${p.id}')">支援する</button>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+// ---- Actions ----
+function submitProposal() {
+  const title = document.getElementById('np-title').value.trim();
+  const target = parseInt(document.getElementById('np-target').value);
+  const image = document.getElementById('np-image').value.trim();
+  const desc = document.getElementById('np-desc').value.trim();
+  const proposer = document.getElementById('np-proposer').value.trim();
+  const paypay = document.getElementById('np-paypay').value.trim();
+  const contact = document.getElementById('np-contact').value.trim();
+  const deadline = document.getElementById('np-deadline').value;
+  if (!title || !target || !desc || !proposer || !deadline) {
+    alert('物品名 / 目標金額 / 説明 / 提案者名 / 期限 は必須です。');
+    return;
+  }
+  if (target < 100) { alert('目標は ¥100 以上で。'); return; }
+  localStorage.setItem('cf-me', proposer);
+  const prop = {
+    title, target, image, desc, proposer, paypay, contact, deadline,
+    pledges: [], completed: false,
+    created_at: Date.now(),
+  };
+  saveProposal(prop);
+  showList();
+}
+
+function addPledge(id) {
+  const p = lastProposals.find(x => x.id === id);
+  if (!p) return;
+  const name = document.getElementById('pl-name').value.trim();
+  const amount = parseInt(document.getElementById('pl-amount').value);
+  const comment = document.getElementById('pl-comment').value.trim();
+  if (!name || !amount) { alert('名前と金額は必須。'); return; }
+  if (amount < 100) { alert('¥100 以上で。'); return; }
+  localStorage.setItem('cf-me', name);
+  p.pledges = p.pledges || [];
+  p.pledges.push({name, amount, comment, paid: false, ts: Date.now()});
+  saveProposal(p);
+}
+
+function togglePaid(id, idx) {
+  const p = lastProposals.find(x => x.id === id);
+  if (!p) return;
+  p.pledges[idx].paid = !p.pledges[idx].paid;
+  saveProposal(p);
+}
+
+function markCompleted(id) {
+  const p = lastProposals.find(x => x.id === id);
+  if (!p) return;
+  if (!confirm(`「${p.title}」を完了済みにします。よろしいですか？`)) return;
+  p.completed = true;
+  p.completed_at = Date.now();
+  saveProposal(p);
+}
+
+function confirmDelete(id) {
+  const p = lastProposals.find(x => x.id === id);
+  if (!p) return;
+  if (!confirm(`「${p.title}」を削除します。元に戻せません。よろしいですか？`)) return;
+  deleteProposal(id);
+  showList();
+}
+
+document.getElementById('btn-new').addEventListener('click', showNew);
+
+// ---- Boot ----
+loadProposals(props => {
+  lastProposals = props;
+  renderList(props);
+  // If URL has hash, open that proposal
+  if (location.hash.startsWith('#') && location.hash.length > 1) {
+    const targetId = location.hash.slice(1);
+    if (props.find(p => p.id === targetId)) showDetail(targetId);
+  }
+});
 </script>
 
 </body>
