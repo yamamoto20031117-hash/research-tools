@@ -175,23 +175,31 @@
   // Largest principal axis  → world Z (visible across viewport)
   // Medium principal axis   → world X (laterally)
   // Smallest principal axis → world Y (layer normal, fits in the vdW gap)
+  //
+  // H atoms are KEPT: dropping them leaves 7 aromatic edge C atoms with
+  // only 1 heavy-atom neighbor (their other bond is to H), so the
+  // structure looks fragmented. Render H as small pale spheres + thin
+  // bonds — clutter is minimal at the bg scale, and the molecule reads
+  // as a continuous polycyclic system.
   function buildHelicene() {
     const group = new THREE.Group();
-    const ptsRaw = HELICENE.filter(p => p[0] !== 'H');
+    const ptsRaw = HELICENE;   // full 66-atom set
 
-    // 1) Centroid
+    // 1) Centroid (over heavy atoms only — H mass is tiny anyway)
+    const heavy = ptsRaw.filter(p => p[0] !== 'H');
     let cx = 0, cy = 0, cz = 0;
-    ptsRaw.forEach(p => { cx += p[1]; cy += p[2]; cz += p[3]; });
-    cx /= ptsRaw.length; cy /= ptsRaw.length; cz /= ptsRaw.length;
+    heavy.forEach(p => { cx += p[1]; cy += p[2]; cz += p[3]; });
+    cx /= heavy.length; cy /= heavy.length; cz /= heavy.length;
 
-    // 2) Covariance matrix (population)
+    // 2) Covariance matrix — over heavy atoms only so PCA reflects the
+    //    aromatic framework, not the H corona
     let cxx = 0, cxy = 0, cxz = 0, cyy = 0, cyz = 0, czz = 0;
-    ptsRaw.forEach(p => {
+    heavy.forEach(p => {
       const dx = p[1] - cx, dy = p[2] - cy, dz = p[3] - cz;
       cxx += dx*dx; cyy += dy*dy; czz += dz*dz;
       cxy += dx*dy; cxz += dx*dz; cyz += dy*dz;
     });
-    const N = ptsRaw.length;
+    const N = heavy.length;
     const eigs = jacobiEig3(cxx/N, cxy/N, cxz/N, cyy/N, cyz/N, czz/N);
 
     // 3) Build rotation matrix whose ROWS are the principal axes such that
@@ -222,16 +230,17 @@
     pts.forEach(p => { if (p[2] < yMin) yMin = p[2]; if (p[2] > yMax) yMax = p[2]; });
     group.userData.yExtent = yMax - yMin;   // smallest extent now = thickness in y
 
-    // 4) Render atoms
-    const colors = { C: 0xa8b0bd, N: 0x4060ee, O: 0xee3030 };
-    const radii  = { C: 0.32,     N: 0.34,     O: 0.30 };
+    // 4) Render atoms — H atoms small + faint, heavy atoms full color
+    const colors = { C: 0xa8b0bd, N: 0x4060ee, O: 0xee3030, H: 0xe0e6f5 };
+    const radii  = { C: 0.32,     N: 0.34,     O: 0.30,     H: 0.18 };
+    const opacities = { C: 0.94, N: 0.94, O: 0.94, H: 0.55 };
     const mats = {}, geos = {};
     for (const k in colors) {
       mats[k] = new THREE.MeshPhongMaterial({
-        color: colors[k], emissive: new THREE.Color(colors[k]).multiplyScalar(0.15),
-        shininess: 70, transparent: true, opacity: 0.94,
+        color: colors[k], emissive: new THREE.Color(colors[k]).multiplyScalar(0.12),
+        shininess: 60, transparent: true, opacity: opacities[k],
       });
-      geos[k] = new THREE.SphereGeometry(radii[k], 14, 14);
+      geos[k] = new THREE.SphereGeometry(radii[k], k === 'H' ? 10 : 14, k === 'H' ? 10 : 14);
     }
     pts.forEach(([e, x, y, z]) => {
       const m = new THREE.Mesh(geos[e], mats[e]);
@@ -239,20 +248,36 @@
       group.add(m);
     });
 
-    // 5) Covalent bonds (<1.65 Å distance)
-    const cylGeo = new THREE.CylinderGeometry(0.06, 0.06, 1, 6, 1, true);
+    // 5) Covalent bonds — different thresholds for X-H vs heavy-heavy
+    //    so we keep the corona consistent and don't false-positive H-H pairs.
+    function bondLimit(e1, e2) {
+      // C-H, N-H, O-H ≈ 1.0-1.1 Å. Heavy-heavy ≤ 1.65 Å.
+      if (e1 === 'H' || e2 === 'H') {
+        if (e1 === 'H' && e2 === 'H') return 0;     // no H-H
+        return 1.25;
+      }
+      return 1.65;
+    }
+    const cylGeoHeavy = new THREE.CylinderGeometry(0.06, 0.06, 1, 6, 1, true);
+    const cylGeoH     = new THREE.CylinderGeometry(0.035, 0.035, 1, 5, 1, true);
     const bondMat = new THREE.MeshPhongMaterial({
       color: 0xb6c2d4, transparent: true, opacity: 0.62, depthWrite: false,
+    });
+    const bondMatH = new THREE.MeshPhongMaterial({
+      color: 0xc8d0e0, transparent: true, opacity: 0.40, depthWrite: false,
     });
     const up = new THREE.Vector3(0, 1, 0);
     for (let i = 0; i < pts.length; i++) {
       for (let j = i + 1; j < pts.length; j++) {
-        const [, x1, y1, z1] = pts[i];
-        const [, x2, y2, z2] = pts[j];
+        const [e1, x1, y1, z1] = pts[i];
+        const [e2, x2, y2, z2] = pts[j];
+        const lim = bondLimit(e1, e2);
+        if (lim === 0) continue;
         const dx = x1 - x2, dy = y1 - y2, dz = z1 - z2;
         const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        if (d < 1.65) {
-          const cyl = new THREE.Mesh(cylGeo, bondMat);
+        if (d < lim) {
+          const isH = e1 === 'H' || e2 === 'H';
+          const cyl = new THREE.Mesh(isH ? cylGeoH : cylGeoHeavy, isH ? bondMatH : bondMat);
           cyl.position.set((x1+x2)/2, (y1+y2)/2, (z1+z2)/2);
           cyl.quaternion.setFromUnitVectors(up, new THREE.Vector3(x2-x1, y2-y1, z2-z1).normalize());
           cyl.scale.y = d;
