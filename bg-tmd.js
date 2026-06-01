@@ -1,16 +1,17 @@
 /**
- * Animated 3D background — floating *real* TMD crystal fragments.
+ * Animated 3D background — "museum exhibit" style.
  *
- * Borrows the lattice / atom-color tables and the fracToXZ helper from
- * tmd-viewer/index.html so the geometry is identical to what that tool
- * generates: trigonal-prismatic 2H or octahedral 1T sheets with the
- * exact in-plane spacing (a) and M-X bond length (bond) from the
- * material database. Each fragment is a small 3×3 supercell of a
- * randomly picked TMD (VSe₂, MoS₂, WSe₂, NbSe₂, MoSe₂, MoTe₂, WS₂)
- * drifting and self-rotating in deep navy space.
+ * One large stacked TMD slab sits at the origin. The camera slowly
+ * orbits it on a tilted circular path and breathes in/out with a sine
+ * dolly. Mouse adds a gentle tilt. Atoms themselves are static so the
+ * lattice reads clearly behind the UI — no chaotic drift, no random
+ * flying fragments. Picks a TMD material every page load so the
+ * crystal cycles between VSe₂, MoS₂, WSe₂ etc.
  *
- * Drop-in: include after three.min.js and add
- *   <canvas id="bg-canvas"></canvas>
+ * Lattice geometry mirrors tmd-viewer/index.html exactly (DB rows,
+ * fracToXZ, 1T vs 2H rules, d_xm = √(bond² − (a/√3)²)).
+ *
+ * Drop-in: add <canvas id="bg-canvas"></canvas> and load after three.min.js.
  */
 (function () {
   'use strict';
@@ -19,9 +20,7 @@
   if (window.matchMedia('(max-width: 600px)').matches) { canvas.style.display = 'none'; return; }
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { canvas.style.display = 'none'; return; }
 
-  // === Material database — subset of tmd-viewer DB ===
-  // a in Å (in-plane), c in Å (c1T for 1T, c2H for 2H), bond = M-X in Å.
-  // mCol / xCol straight from tmd-viewer MCOL_DEFAULT / XCOL_DEFAULT.
+  // === TMD material table (subset of tmd-viewer DB) ===
   const TMD = [
     { name:'VSe₂',  m:'V',  x:'Se', phase:'1T', a:3.354, c:6.10,  bond:2.50, mCol:0x2e8bc0, xCol:0xd48a00 },
     { name:'TiSe₂', m:'Ti', x:'Se', phase:'1T', a:3.540, c:6.01,  bond:2.55, mCol:0x7799aa, xCol:0xd48a00 },
@@ -34,76 +33,82 @@
   ];
 
   const S3 = Math.sqrt(3);
-  // fracToXZ — identical to tmd-viewer
+  // Identical to tmd-viewer
   function fracToXZ(f1, f2, a) { return [f1*a + f2*(-a/2), f2*(a*S3/2)]; }
 
-  // === Build a real TMD crystal fragment ===
-  function buildFragment(spec) {
+  // === Build a multi-layer TMD crystal at origin ===
+  function buildSlab(spec, Na, Nb, layers) {
     const a = spec.a;
     const r_inp = a / S3;
     const d_xm = Math.sqrt(Math.max(spec.bond*spec.bond - r_inp*r_inp, 0.1));
+    const layerStep = spec.c;   // c_layer between sheets
     const group = new THREE.Group();
 
-    // Materials — tmd-viewer style Phong with emissive boost so they read in low-light bg
     const matM = new THREE.MeshPhongMaterial({
-      color: spec.mCol, emissive: new THREE.Color(spec.mCol).multiplyScalar(0.15),
+      color: spec.mCol, emissive: new THREE.Color(spec.mCol).multiplyScalar(0.12),
       shininess: 80, specular: 0x446688, transparent: true, opacity: 0.92,
     });
     const matX = new THREE.MeshPhongMaterial({
-      color: spec.xCol, emissive: new THREE.Color(spec.xCol).multiplyScalar(0.12),
-      shininess: 60, specular: 0x888844, transparent: true, opacity: 0.85,
+      color: spec.xCol, emissive: new THREE.Color(spec.xCol).multiplyScalar(0.10),
+      shininess: 60, specular: 0x888844, transparent: true, opacity: 0.86,
     });
     const matBond = new THREE.MeshPhongMaterial({
-      color: 0x8abbdd, transparent: true, opacity: 0.42, depthWrite: false,
+      color: 0x8abbdd, transparent: true, opacity: 0.4, depthWrite: false,
     });
 
-    const geoM = new THREE.SphereGeometry(0.45, 16, 16);
-    const geoX = new THREE.SphereGeometry(0.36, 14, 14);
+    const geoM = new THREE.SphereGeometry(0.5, 18, 18);
+    const geoX = new THREE.SphereGeometry(0.40, 14, 14);
+    const cylGeo = new THREE.CylinderGeometry(0.085, 0.085, 1, 6, 1, true);
+    const up = new THREE.Vector3(0, 1, 0);
 
-    const Na = 3, Nb = 3;
-    const mAtoms = [], xAtoms = [];
-    const yC = d_xm;  // single-layer fragment
+    const mAll = [], xAll = [];
 
-    for (let i = -1; i <= Na; i++) {
-      for (let j = -1; j <= Nb; j++) {
-        if (spec.phase === '1T') {
-          // Octahedral: M at (0,0), X top at (1/3,2/3), X bot at (2/3,1/3) — staggered
-          const [mx, mz] = fracToXZ(i, j, a);            mAtoms.push([mx, yC, mz]);
-          const [tx, tz] = fracToXZ(i+1/3, j+2/3, a);    xAtoms.push([tx, yC + d_xm, tz]);
-          const [bx, bz] = fracToXZ(i+2/3, j+1/3, a);    xAtoms.push([bx, yC - d_xm, bz]);
-        } else {
-          // Trigonal prismatic 2H: M at (1/3,2/3), X top & bot eclipsed at (2/3,1/3)
-          const [mx, mz] = fracToXZ(i+1/3, j+2/3, a);    mAtoms.push([mx, yC, mz]);
-          const [xx, xz] = fracToXZ(i+2/3, j+1/3, a);
-          xAtoms.push([xx, yC + d_xm, xz]);
-          xAtoms.push([xx, yC - d_xm, xz]);
+    for (let l = 0; l < layers; l++) {
+      const yC = (l - (layers - 1) / 2) * layerStep;
+      for (let i = -Na; i <= Na; i++) {
+        for (let j = -Nb; j <= Nb; j++) {
+          if (spec.phase === '1T') {
+            const [mx, mz] = fracToXZ(i, j, a);            mAll.push([mx, yC, mz, l]);
+            const [tx, tz] = fracToXZ(i+1/3, j+2/3, a);    xAll.push([tx, yC + d_xm, tz, l]);
+            const [bx, bz] = fracToXZ(i+2/3, j+1/3, a);    xAll.push([bx, yC - d_xm, bz, l]);
+          } else {
+            const [mx, mz] = fracToXZ(i+1/3, j+2/3, a);    mAll.push([mx, yC, mz, l]);
+            const [xx, xz] = fracToXZ(i+2/3, j+1/3, a);
+            xAll.push([xx, yC + d_xm, xz, l]);
+            xAll.push([xx, yC - d_xm, xz, l]);
+          }
         }
       }
     }
 
-    mAtoms.forEach(p => { const s = new THREE.Mesh(geoM, matM); s.position.set(p[0], p[1], p[2]); group.add(s); });
-    xAtoms.forEach(p => { const s = new THREE.Mesh(geoX, matX); s.position.set(p[0], p[1], p[2]); group.add(s); });
+    // Render atoms
+    mAll.forEach(p => { const s = new THREE.Mesh(geoM, matM); s.position.set(p[0], p[1], p[2]); group.add(s); });
+    xAll.forEach(p => { const s = new THREE.Mesh(geoX, matX); s.position.set(p[0], p[1], p[2]); group.add(s); });
 
-    // M-X bonds — cylinders, only the close ones
+    // M-X bonds within each layer only (don't draw inter-layer bonds)
     const bondTol = 1.15;
-    const cylGeo = new THREE.CylinderGeometry(0.08, 0.08, 1, 6, 1, true);
-    const up = new THREE.Vector3(0, 1, 0);
-    mAtoms.forEach(m => {
-      xAtoms.forEach(x => {
-        const dx = m[0]-x[0], dy = m[1]-x[1], dz = m[2]-x[2];
-        const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        if (len < spec.bond * bondTol) {
-          const cyl = new THREE.Mesh(cylGeo, matBond);
-          cyl.position.set((m[0]+x[0])/2, (m[1]+x[1])/2, (m[2]+x[2])/2);
-          const dir = new THREE.Vector3(x[0]-m[0], x[1]-m[1], x[2]-m[2]).normalize();
-          cyl.quaternion.setFromUnitVectors(up, dir);
-          cyl.scale.y = len;
-          group.add(cyl);
-        }
+    const mByLayer = {}, xByLayer = {};
+    mAll.forEach(p => { (mByLayer[p[3]] = mByLayer[p[3]] || []).push(p); });
+    xAll.forEach(p => { (xByLayer[p[3]] = xByLayer[p[3]] || []).push(p); });
+    for (let l = 0; l < layers; l++) {
+      const Ms = mByLayer[l] || [], Xs = xByLayer[l] || [];
+      Ms.forEach(m => {
+        Xs.forEach(x => {
+          const dx = m[0]-x[0], dy = m[1]-x[1], dz = m[2]-x[2];
+          const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+          if (len < spec.bond * bondTol) {
+            const cyl = new THREE.Mesh(cylGeo, matBond);
+            cyl.position.set((m[0]+x[0])/2, (m[1]+x[1])/2, (m[2]+x[2])/2);
+            const dir = new THREE.Vector3(x[0]-m[0], x[1]-m[1], x[2]-m[2]).normalize();
+            cyl.quaternion.setFromUnitVectors(up, dir);
+            cyl.scale.y = len;
+            group.add(cyl);
+          }
+        });
       });
-    });
+    }
 
-    // Re-center the group at its bounding-box centroid
+    // Re-center
     const box = new THREE.Box3().setFromObject(group);
     const center = box.getCenter(new THREE.Vector3());
     group.children.forEach(c => c.position.sub(center));
@@ -112,72 +117,54 @@
 
   // === Scene ===
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x0a0e17, 70, 220);
+  scene.fog = new THREE.Fog(0x0a0e17, 30, 130);
 
-  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
-  camera.position.set(0, 0, 90);
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
 
   const renderer = new THREE.WebGLRenderer({
     canvas, alpha: true, antialias: true, powerPreference: 'low-power',
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 
-  scene.add(new THREE.AmbientLight(0x6a7a99, 0.55));
-  const dirL = new THREE.DirectionalLight(0xffffff, 0.7);
-  dirL.position.set(30, 50, 80);
-  scene.add(dirL);
-  const dirL2 = new THREE.DirectionalLight(0x88aaff, 0.3);
-  dirL2.position.set(-40, -30, -60);
-  scene.add(dirL2);
+  // Lighting — rim light for material edges
+  scene.add(new THREE.AmbientLight(0x556677, 0.55));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
+  keyLight.position.set(40, 60, 50);
+  scene.add(keyLight);
+  const rimLight = new THREE.DirectionalLight(0x88aaff, 0.45);
+  rimLight.position.set(-50, -20, -40);
+  scene.add(rimLight);
 
-  // === Spawn fragments — one per random TMD ===
-  const FRAGMENT_COUNT = 4;
-  const fragments = [];
-  for (let i = 0; i < FRAGMENT_COUNT; i++) {
-    const spec = TMD[Math.floor(Math.random() * TMD.length)];
-    const f = buildFragment(spec);
-    f.position.set(
-      (Math.random() - 0.5) * 180,
-      (Math.random() - 0.5) * 110,
-      (Math.random() - 0.5) * 100 - 30
-    );
-    f.rotation.set(
-      Math.random() * Math.PI * 2,
-      Math.random() * Math.PI * 2,
-      Math.random() * Math.PI * 2,
-    );
-    f.scale.setScalar(0.7 + Math.random() * 0.6);
-    f.userData = {
-      rotSpeed: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.0015,
-        (Math.random() - 0.5) * 0.0020,
-        (Math.random() - 0.5) * 0.0010,
-      ),
-      driftSpeed: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.035,
-        (Math.random() - 0.5) * 0.035,
-        0.015 + Math.random() * 0.035,
-      ),
-    };
-    scene.add(f);
-    fragments.push(f);
-  }
+  // === Pick a TMD and build the slab ===
+  const spec = TMD[Math.floor(Math.random() * TMD.length)];
+  // 5×5×4 layers — enough to fill the frame at the camera distance
+  const slab = buildSlab(spec, 4, 4, 4);
+  scene.add(slab);
 
-  // === Ambient star field for depth ===
-  const STAR_COUNT = 200;
+  // Slight initial tilt so layers face the camera nicely
+  slab.rotation.x = 0.45;
+  slab.rotation.z = 0.15;
+
+  // === Ambient particles around the slab for atmosphere ===
+  const STAR_COUNT = 300;
   const starGeo = new THREE.BufferGeometry();
   const starPos = new Float32Array(STAR_COUNT * 3);
   for (let i = 0; i < STAR_COUNT; i++) {
-    starPos[i*3]     = (Math.random() - 0.5) * 320;
-    starPos[i*3 + 1] = (Math.random() - 0.5) * 200;
-    starPos[i*3 + 2] = (Math.random() - 0.5) * 240 - 40;
+    // Sphere shell around origin, radius 50-120
+    const r = 50 + Math.random() * 70;
+    const t = Math.random() * Math.PI * 2;
+    const p = Math.acos(2 * Math.random() - 1);
+    starPos[i*3]     = r * Math.sin(p) * Math.cos(t);
+    starPos[i*3 + 1] = r * Math.cos(p);
+    starPos[i*3 + 2] = r * Math.sin(p) * Math.sin(t);
   }
   starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
-    color: 0x9ad0ff, size: 0.4, transparent: true, opacity: 0.55, sizeAttenuation: true,
-  })));
+  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+    color: 0x9ad0ff, size: 0.45, transparent: true, opacity: 0.55, sizeAttenuation: true,
+  }));
+  scene.add(stars);
 
-  // === Mouse parallax ===
+  // === Mouse parallax (slight tilt only) ===
   let mouseX = 0, mouseY = 0, targetX = 0, targetY = 0;
   window.addEventListener('mousemove', e => {
     mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
@@ -193,38 +180,35 @@
   window.addEventListener('resize', onResize);
   onResize();
 
-  // === Animate ===
-  let prev = performance.now();
+  // === Animate: camera orbit, slab static ===
+  // Tilted orbit at ~38 units radius, completes one circle in 90 s.
+  // Slight sinusoidal dolly: ±5 units in/out every 25 s. Camera always
+  // looks at the slab center.
+  const ORBIT_RADIUS = 36;
+  const ORBIT_PERIOD_S = 90;
+  const DOLLY_AMPL = 5;
+  const DOLLY_PERIOD_S = 25;
+
   function animate(now) {
     requestAnimationFrame(animate);
-    const dt = (now - prev) / 1000;
-    prev = now;
 
-    targetX += (mouseX - targetX) * 0.045;
-    targetY += (mouseY - targetY) * 0.045;
+    targetX += (mouseX - targetX) * 0.05;
+    targetY += (mouseY - targetY) * 0.05;
 
-    camera.position.x = targetX * 8;
-    camera.position.y = -targetY * 5;
-    camera.position.z = 90 + Math.sin(now * 0.00018) * 10;
+    const t = now * 0.001;
+    const orbitT = (t / ORBIT_PERIOD_S) * Math.PI * 2;
+    const dolly = Math.sin((t / DOLLY_PERIOD_S) * Math.PI * 2) * DOLLY_AMPL;
+    const r = ORBIT_RADIUS + dolly;
+
+    // Tilted circular orbit — moves around the y-axis with a 25° tilt,
+    // then mouse adds a gentle ±3-unit nudge on x and ±2 on y.
+    camera.position.x = r * Math.cos(orbitT) + targetX * 3;
+    camera.position.y = 12 + r * 0.18 * Math.sin(orbitT * 0.6) + targetY * 2;
+    camera.position.z = r * Math.sin(orbitT);
     camera.lookAt(0, 0, 0);
 
-    for (const f of fragments) {
-      f.rotation.x += f.userData.rotSpeed.x;
-      f.rotation.y += f.userData.rotSpeed.y;
-      f.rotation.z += f.userData.rotSpeed.z;
-      f.position.x += f.userData.driftSpeed.x * dt * 60;
-      f.position.y += f.userData.driftSpeed.y * dt * 60;
-      f.position.z += f.userData.driftSpeed.z * dt * 60;
-      // Respawn when drifting out of bounds
-      if (f.position.length() > 160) {
-        f.position.set(
-          (Math.random() - 0.5) * 180,
-          (Math.random() - 0.5) * 110,
-          -90 - Math.random() * 20,
-        );
-        f.scale.setScalar(0.7 + Math.random() * 0.6);
-      }
-    }
+    // Stars rotate very slowly to give a tiny life signal
+    stars.rotation.y += 0.0003;
 
     renderer.render(scene, camera);
   }
