@@ -16,7 +16,10 @@
   body{background:transparent;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo','Hiragino Sans',sans-serif;
     min-height:100vh;display:flex;flex-direction:column;align-items:center;position:relative;z-index:1}
   /* Animated 3D background canvas */
-  #bg-canvas{position:fixed;inset:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;display:block}
+  #bg-canvas{position:fixed;inset:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;display:block;cursor:default}
+  body.bg-only #bg-canvas{z-index:1;pointer-events:auto;cursor:grab}
+  body.bg-only #bg-canvas:active{cursor:grabbing}
+  body.bg-only .site-switch-bar{position:fixed;top:0;left:0;right:0;z-index:50}
   /* site switcher (top of page, links to lab-play side) */
   .site-switch-bar{width:100%;padding:10px 20px;background:rgba(10,14,23,0.85);border-bottom:1px solid rgba(88,166,255,0.08);display:flex;justify-content:flex-end;gap:10px;align-items:center;transition:opacity .35s ease}
   .site-switch{display:flex;background:rgba(20,25,40,0.85);border:1px solid rgba(88,166,255,0.15);border-radius:8px;padding:3px;gap:2px}
@@ -163,6 +166,7 @@
 <!-- Animated 3D background (TMD lattice fragments) -->
 <canvas id="bg-canvas"></canvas>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script src="/bg-tmd.js" defer></script>
 
 <div class="conn-status" id="conn-status">

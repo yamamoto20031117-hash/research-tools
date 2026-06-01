@@ -454,6 +454,29 @@
   window.addEventListener('resize', onResize);
   onResize();
 
+  // === Manual orbit controls — enabled only in bg-only mode ===
+  let controls = null;
+  if (typeof THREE.OrbitControls !== 'undefined') {
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enabled = false;
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 8;
+    controls.maxDistance = 200;
+    controls.target.set(0, 0, 0);
+  }
+
+  let inBgOnly = false;
+  function syncControls() {
+    const want = document.body.classList.contains('bg-only');
+    if (want === inBgOnly) return;
+    inBgOnly = want;
+    if (controls) controls.enabled = want;
+  }
+  const observer = new MutationObserver(syncControls);
+  observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  syncControls();
+
   // === Animate: tilted camera orbit, scene static ===
   const ORBIT_RADIUS = 38;
   const ORBIT_PERIOD_S = 90;
@@ -462,19 +485,21 @@
 
   function animate(now) {
     requestAnimationFrame(animate);
-    const t = now * 0.001;
-    const orbitT = (t / ORBIT_PERIOD_S) * Math.PI * 2;
-    const dolly = Math.sin((t / DOLLY_PERIOD_S) * Math.PI * 2) * DOLLY_AMPL;
-    const r = ORBIT_RADIUS + dolly;
 
-    // True side view: camera stays at y=0 plane (same height as layers)
-    // and orbits horizontally around the y-axis. This makes the VSe2
-    // sheets appear as horizontal stripes with the helicene visible
-    // in the vdW gap between them.
-    camera.position.x = r * Math.cos(orbitT);
-    camera.position.y = 0;
-    camera.position.z = r * Math.sin(orbitT);
-    camera.lookAt(0, 0, 0);
+    if (inBgOnly && controls) {
+      // Hand the camera over to OrbitControls — the user is driving.
+      controls.update();
+    } else {
+      // Default behavior: auto-orbit the side view.
+      const t = now * 0.001;
+      const orbitT = (t / ORBIT_PERIOD_S) * Math.PI * 2;
+      const dolly = Math.sin((t / DOLLY_PERIOD_S) * Math.PI * 2) * DOLLY_AMPL;
+      const r = ORBIT_RADIUS + dolly;
+      camera.position.x = r * Math.cos(orbitT);
+      camera.position.y = 0;
+      camera.position.z = r * Math.sin(orbitT);
+      camera.lookAt(0, 0, 0);
+    }
 
     stars.rotation.y += 0.0003;
     renderer.render(scene, camera);
