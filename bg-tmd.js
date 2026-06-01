@@ -500,10 +500,12 @@
   onResize();
 
   // === Manual orbit controls — enabled only in bg-only mode ===
-  // Set autoRotate so the scene keeps slowly spinning when the user
-  // isn't actively dragging. autoRotateSpeed=0.7 reproduces the same
-  // ~90 s/orbit cadence the auto-orbit uses in normal mode.
+  // We *don't* use OrbitControls.autoRotate because its damping interacts
+  // weirdly with toggling enabled. Instead we rotate the camera ourselves
+  // around the target whenever the user isn't actively dragging — a
+  // single 'start'/'end' pair from OrbitControls is enough to gate it.
   let controls = null;
+  let userInteracting = false;
   if (typeof THREE.OrbitControls !== 'undefined') {
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enabled = false;
@@ -512,8 +514,8 @@
     controls.minDistance = 8;
     controls.maxDistance = 200;
     controls.target.set(0, 0, 0);
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.7;
+    controls.addEventListener('start', () => { userInteracting = true; });
+    controls.addEventListener('end',   () => { userInteracting = false; });
   }
 
   let inBgOnly = false;
@@ -533,11 +535,27 @@
   const DOLLY_AMPL = 5;
   const DOLLY_PERIOD_S = 25;
 
+  // Rotation rate for bg-only idle auto-rotate (matches normal-mode period)
+  const BG_AUTO_OMEGA = (2 * Math.PI) / ORBIT_PERIOD_S;  // rad/sec
+  let lastNow = performance.now();
+
   function animate(now) {
     requestAnimationFrame(animate);
+    const dtSec = Math.min(0.05, (now - lastNow) / 1000);   // clamp to 50ms
+    lastNow = now;
 
     if (inBgOnly && controls) {
-      // Hand the camera over to OrbitControls — the user is driving.
+      // While the user isn't dragging, rotate the camera around the y-axis
+      // ourselves so the scene keeps spinning at the same pace as normal mode.
+      if (!userInteracting) {
+        const tx = controls.target.x, tz = controls.target.z;
+        const dx = camera.position.x - tx;
+        const dz = camera.position.z - tz;
+        const r = Math.sqrt(dx*dx + dz*dz);
+        const theta = Math.atan2(dz, dx) + BG_AUTO_OMEGA * dtSec;
+        camera.position.x = tx + r * Math.cos(theta);
+        camera.position.z = tz + r * Math.sin(theta);
+      }
       controls.update();
     } else {
       // Default behavior: auto-orbit the side view.
