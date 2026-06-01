@@ -184,8 +184,10 @@
   /* Pixel analysis of lock-chain.png (1536×1024):
        chain band  y ≈ 38–50%  →  left / right split at x≈37% / 57%
        lock body   x = 37.5–56.2%, y = 40–73% */
-  .tool-section[data-locked="true"] .chain-img.left  { clip-path: inset(0 63% 0 0); }
-  .tool-section[data-locked="true"] .chain-img.right { clip-path: inset(0 0 0 57%); }
+  /* Chains extend under the lock region so there is no gap;
+     the .lock div (rendered last = on top) covers the overlap. */
+  .tool-section[data-locked="true"] .chain-img.left  { clip-path: inset(0 44% 0 0); }
+  .tool-section[data-locked="true"] .chain-img.right { clip-path: inset(0 0 0 38%); }
   .tool-section[data-locked="true"] .chain-img.lock  {
     clip-path: inset(40% 44% 27% 38%);
     filter: drop-shadow(0 6px 10px rgba(0,0,0,0.65))
