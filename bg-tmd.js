@@ -416,12 +416,15 @@
   helicene.position.set(0, 0, 0);   // centered between the two VSe₂ layers
   scene.add(helicene);
 
-  // Mild tilt — user reported the old 0.45 was too steep.
+  // No tilt — we want a true side view of the layered structure
+  // so the VSe2 sheets look like horizontal stripes with the helicene
+  // sitting in the vdW gap between them, the canonical 'intercalation
+  // cross-section' diagram.
   const sceneRoot = new THREE.Group();
   sceneRoot.add(slab);
   sceneRoot.add(helicene);
-  sceneRoot.rotation.x = 0.18;
-  sceneRoot.rotation.z = 0.04;
+  sceneRoot.rotation.x = 0;
+  sceneRoot.rotation.z = 0;
   scene.add(sceneRoot);
 
   // === Ambient stars for depth ===
@@ -464,8 +467,12 @@
     const dolly = Math.sin((t / DOLLY_PERIOD_S) * Math.PI * 2) * DOLLY_AMPL;
     const r = ORBIT_RADIUS + dolly;
 
+    // True side view: camera stays at y=0 plane (same height as layers)
+    // and orbits horizontally around the y-axis. This makes the VSe2
+    // sheets appear as horizontal stripes with the helicene visible
+    // in the vdW gap between them.
     camera.position.x = r * Math.cos(orbitT);
-    camera.position.y = 12 + r * 0.18 * Math.sin(orbitT * 0.6);
+    camera.position.y = 0;
     camera.position.z = r * Math.sin(orbitT);
     camera.lookAt(0, 0, 0);
 
