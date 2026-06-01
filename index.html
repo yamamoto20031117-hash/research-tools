@@ -1188,7 +1188,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 const LOCK_PASSWORD = 'suda2026';
 // Bump this when you want to force everyone back to the locked state
 // (e.g. after rotating the password, or fixing the lock visuals).
-const LOCK_STORAGE_KEY = 'rt-unlocked-v2';
+const LOCK_STORAGE_KEY = 'rt-unlocked-v3';
 
 function isUnlocked(){
   return localStorage.getItem(LOCK_STORAGE_KEY) === 'true';
