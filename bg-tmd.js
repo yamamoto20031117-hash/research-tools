@@ -164,13 +164,6 @@
   }));
   scene.add(stars);
 
-  // === Mouse parallax (slight tilt only) ===
-  let mouseX = 0, mouseY = 0, targetX = 0, targetY = 0;
-  window.addEventListener('mousemove', e => {
-    mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
-    mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
-  });
-
   function onResize() {
     const w = window.innerWidth, h = window.innerHeight;
     camera.aspect = w / h;
@@ -180,10 +173,10 @@
   window.addEventListener('resize', onResize);
   onResize();
 
-  // === Animate: camera orbit, slab static ===
-  // Tilted orbit at ~38 units radius, completes one circle in 90 s.
-  // Slight sinusoidal dolly: ±5 units in/out every 25 s. Camera always
-  // looks at the slab center.
+  // === Animate: camera orbit, slab static, no mouse input ===
+  // Tilted circular orbit at 36 unit radius, completes one revolution
+  // in 90 s. Sinusoidal dolly: ±5 units in/out every 25 s. The camera
+  // always looks at the slab center.
   const ORBIT_RADIUS = 36;
   const ORBIT_PERIOD_S = 90;
   const DOLLY_AMPL = 5;
@@ -192,18 +185,13 @@
   function animate(now) {
     requestAnimationFrame(animate);
 
-    targetX += (mouseX - targetX) * 0.05;
-    targetY += (mouseY - targetY) * 0.05;
-
     const t = now * 0.001;
     const orbitT = (t / ORBIT_PERIOD_S) * Math.PI * 2;
     const dolly = Math.sin((t / DOLLY_PERIOD_S) * Math.PI * 2) * DOLLY_AMPL;
     const r = ORBIT_RADIUS + dolly;
 
-    // Tilted circular orbit — moves around the y-axis with a 25° tilt,
-    // then mouse adds a gentle ±3-unit nudge on x and ±2 on y.
-    camera.position.x = r * Math.cos(orbitT) + targetX * 3;
-    camera.position.y = 12 + r * 0.18 * Math.sin(orbitT * 0.6) + targetY * 2;
+    camera.position.x = r * Math.cos(orbitT);
+    camera.position.y = 12 + r * 0.18 * Math.sin(orbitT * 0.6);
     camera.position.z = r * Math.sin(orbitT);
     camera.lookAt(0, 0, 0);
 
