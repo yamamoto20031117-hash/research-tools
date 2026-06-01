@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>クラファンディング — 研究・モノづくり向け一覧</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#080b12;color:#ccc;font-family:'Helvetica Neue',Arial,'Meiryo',sans-serif;min-height:100vh}
+  #top{position:sticky;top:0;background:rgba(8,11,18,0.92);backdrop-filter:blur(10px);padding:12px 18px;border-bottom:1px solid #1a2030;z-index:10;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  #top a{color:#58a6ff;text-decoration:none;font-size:.9rem}
+  #top h1{font-size:1.05rem;color:#fff;margin-right:8px}
+  #top .meta{font-size:.76rem;color:#888}
+  #top select{background:#181d27;color:#ddd;border:1px solid #2a3040;border-radius:5px;padding:4px 8px;font-size:.82rem}
+  main{padding:20px 22px 60px;max-width:1280px;margin:0 auto}
+  .intro{background:#10141c;border:1px solid #1f2638;border-radius:8px;padding:14px 18px;margin-bottom:18px;font-size:.84rem;line-height:1.6;color:#aabad6}
+  .intro b{color:#fff}
+  .intro a{color:#58a6ff}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+  .card{background:#10141c;border:1px solid #1f2638;border-radius:10px;padding:16px 18px;transition:border-color .2s;display:flex;flex-direction:column;gap:8px}
+  .card:hover{border-color:#3a4a60}
+  .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .card h2{font-size:1.05rem;color:#fff;font-weight:600}
+  .card .region{font-size:.7rem;padding:2px 8px;border-radius:3px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .region-jp{background:rgba(255,120,120,.12);color:#ff9a9a;border:1px solid #c14444}
+  .region-intl{background:rgba(88,166,255,.13);color:#9ad0ff;border:1px solid #58a6ff}
+  .desc{font-size:.84rem;color:#aabad6;line-height:1.55}
+  .tags{display:flex;gap:6px;flex-wrap:wrap}
+  .tag{font-size:.7rem;background:#1a2030;color:#9ad0ff;padding:2px 8px;border-radius:3px}
+  .meta-row{display:flex;justify-content:space-between;font-size:.74rem;color:#888;padding-top:6px;border-top:1px dotted #1a2030;margin-top:auto}
+  .meta-row .val{color:#ddd;font-weight:600;font-variant-numeric:tabular-nums}
+  .launch{display:inline-block;margin-top:4px;color:#58a6ff;text-decoration:none;font-size:.84rem;font-weight:600}
+  .launch:hover{text-decoration:underline}
+
+  .group-title{font-size:.78rem;color:#888;text-transform:uppercase;letter-spacing:.6px;margin:20px 0 8px;padding-bottom:6px;border-bottom:1px solid #1a2030}
+  .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;font-size:.8rem}
+  .filter-bar label{color:#888;display:flex;gap:6px;align-items:center;cursor:pointer}
+  .filter-bar input{accent-color:#58a6ff}
+
+  @media (max-width:600px){
+    main{padding:10px}
+    .grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<div id="top">
+  <a href="/" title="Research Tools トップ">&#8592;</a>
+  <h1>クラファンディング</h1>
+  <span class="meta">研究・モノづくり向け プラットフォーム一覧</span>
+</div>
+
+<main>
+  <div class="intro">
+    研究機材の購入、ラボ立ち上げ、デバイス開発、学術活動などの資金調達に使える
+    <b>クラウドファンディング・プラットフォーム</b> をまとめた早見表です。
+    プロジェクトのタイプ（学術 / 製品 / 一般）と地域（国内 / 海外）で使い分けるのが定石。
+    各リンクは公式サイトに飛びます。
+  </div>
+
+  <div class="filter-bar">
+    <span style="color:#aabad6">フィルタ:</span>
+    <label><input type="radio" name="reg" value="all" checked> 全部</label>
+    <label><input type="radio" name="reg" value="jp"> 国内のみ</label>
+    <label><input type="radio" name="reg" value="intl"> 海外のみ</label>
+    <span style="margin-left:20px;color:#aabad6">タイプ:</span>
+    <label><input type="checkbox" class="tagf" value="academic" checked> 学術</label>
+    <label><input type="checkbox" class="tagf" value="product" checked> 製品</label>
+    <label><input type="checkbox" class="tagf" value="general" checked> 一般・社会</label>
+    <label><input type="checkbox" class="tagf" value="subscription" checked> サブスク</label>
+  </div>
+
+  <div class="group-title">🇯🇵 国内</div>
+  <div class="grid" id="grid-jp"></div>
+
+  <div class="group-title">🌐 海外</div>
+  <div class="grid" id="grid-intl"></div>
+</main>
+
+<script>
+const SITES = [
+  // ===== 国内 =====
+  {
+    name: 'academist', region: 'jp', tags: ['academic'],
+    url: 'https://academist-cf.com/',
+    desc: '日本初の学術系クラファン。研究テーマで支援を集める「チャレンジ型」、月額の「ファンクラブ型」あり。研究者・大学院生に最適。',
+    fee: '20%', model: 'All-in / All-or-Nothing 両対応', samples: '大学・公的機関の研究者',
+  },
+  {
+    name: 'READYFOR', region: 'jp', tags: ['general', 'academic'],
+    url: 'https://readyfor.jp/',
+    desc: '社会課題・福祉・教育・研究で実績豊富。日本最古参のクラファン。「実行型」と「All-or-Nothing」が選べる。',
+    fee: '12% + 決済 5%', model: 'All-or-Nothing / 実行型', samples: 'NPO・大学・社会的事業',
+  },
+  {
+    name: 'CAMPFIRE', region: 'jp', tags: ['product', 'general'],
+    url: 'https://camp-fire.jp/',
+    desc: '国内最大級のクラファン。製品開発、ガジェット、漫画、音楽、社会活動など幅広い。プロジェクト数 No.1。',
+    fee: '17% + 決済 5%', model: 'All-or-Nothing / All-in', samples: 'モノづくり全般',
+  },
+  {
+    name: 'Makuake', region: 'jp', tags: ['product'],
+    url: 'https://www.makuake.com/',
+    desc: 'サイバーエージェント系。プロダクトのローンチや新製品先行販売に強い。家電・ガジェット系で実績多数。',
+    fee: '20% (決済込み)', model: 'All-in (実行確約型)', samples: 'スタートアップの新製品',
+  },
+  {
+    name: 'GREEN FUNDING', region: 'jp', tags: ['product', 'general'],
+    url: 'https://greenfunding.jp/',
+    desc: '蔦屋書店系。ガジェット・本・映像・音楽などクリエイティブ系に強い。CCCのプロモーション支援を活用できる。',
+    fee: '20% (決済込み)', model: 'All-in / All-or-Nothing', samples: 'クリエイティブ・本・ガジェット',
+  },
+  {
+    name: 'kibidango (きびだんご)', region: 'jp', tags: ['product'],
+    url: 'https://kibidango.com/',
+    desc: '達成率 80% の高い実行率を誇る、製品ローンチに特化したサイト。事前審査が手厚く、サポートが厚いと評判。',
+    fee: '10% + 決済 5%', model: 'All-or-Nothing', samples: 'ガジェット・テクノロジー製品',
+  },
+  {
+    name: 'JAPANGIVING', region: 'jp', tags: ['general'],
+    url: 'https://japangiving.jp/',
+    desc: '寄付型クラファン。NPO・社会活動・チャリティ向け。リターン無しで支援を集められる。',
+    fee: '15%', model: '寄付型 (All-in)', samples: 'NPO・チャリティ',
+  },
+  {
+    name: 'GoodMorning', region: 'jp', tags: ['general'],
+    url: 'https://camp-fire.jp/goodmorning',
+    desc: 'CAMPFIRE 系の社会活動特化版。災害支援、ジェンダー、環境などソーシャルテーマで集中的。',
+    fee: '9% + 決済 5%', model: 'All-or-Nothing / All-in', samples: '社会活動・寄付型',
+  },
+
+  // ===== 海外 =====
+  {
+    name: 'Kickstarter', region: 'intl', tags: ['product'],
+    url: 'https://www.kickstarter.com/',
+    desc: '世界最大級のクラファン。テクノロジー、デザイン、ゲーム、出版で圧倒的実績。英語必須。',
+    fee: '5% + 決済 3-5%', model: 'All-or-Nothing', samples: 'スマートデバイス・ゲーム・出版',
+  },
+  {
+    name: 'Indiegogo', region: 'intl', tags: ['product', 'general'],
+    url: 'https://www.indiegogo.com/',
+    desc: 'Kickstarter と並ぶ国際クラファン。柔軟な集金形式 (Fixed/Flexible)。研究・社会的事業も可。',
+    fee: '5% + 決済 3-5%', model: 'All-or-Nothing / All-in', samples: 'ハードウェア・社会的事業',
+  },
+  {
+    name: 'experiment.com', region: 'intl', tags: ['academic'],
+    url: 'https://experiment.com/',
+    desc: '科学研究に特化した海外クラファン。生命科学、地学、技術、人類学など。論文や DOI と連動するプロジェクトページ。',
+    fee: '8% + 決済 3%', model: 'All-or-Nothing', samples: '科学者・大学院生・ポスドク',
+  },
+  {
+    name: 'GoFundMe', region: 'intl', tags: ['general'],
+    url: 'https://www.gofundme.com/',
+    desc: '個人・チャリティに特化。医療費、災害復旧、社会運動など。プラットフォーム手数料無し（決済料のみ）。',
+    fee: '0% + 決済 2.9%', model: 'All-in', samples: '個人・社会・医療支援',
+  },
+  {
+    name: 'Patreon', region: 'intl', tags: ['subscription'],
+    url: 'https://www.patreon.com/',
+    desc: 'クリエイター・研究者・教育者向けの月額サブスク型ファンディング。継続的支援を集めるのに最適。',
+    fee: '5-12%', model: 'Subscription (継続)', samples: 'YouTuber・科学コミュニケーター',
+  },
+  {
+    name: 'Ko-fi', region: 'intl', tags: ['subscription', 'general'],
+    url: 'https://ko-fi.com/',
+    desc: '「コーヒー一杯分の寄付」を集める軽量プラットフォーム。手数料 0% プランあり (Premium で物販可)。',
+    fee: '0% (Premium $6/mo)', model: 'Donation / Subscription', samples: '個人クリエイター・研究者',
+  },
+  {
+    name: 'BackerKit', region: 'intl', tags: ['product'],
+    url: 'https://www.backerkit.com/',
+    desc: 'Kickstarter / Indiegogo 後の支援者管理・追加販売プラットフォーム。プレッジマネージャーとして連携。',
+    fee: '4-7% (機能による)', model: '後続キャンペーン・追加販売', samples: '既存キャンペーンの追加注文',
+  },
+  {
+    name: 'Crowdfunder UK', region: 'intl', tags: ['general'],
+    url: 'https://www.crowdfunder.co.uk/',
+    desc: 'イギリス最大のクラファン。コミュニティプロジェクト、ビジネス、社会的企業など多様。',
+    fee: '5%', model: 'All-or-Nothing / All-in', samples: '英国内のコミュニティ・社会的企業',
+  },
+];
+
+function makeCard(s) {
+  const tagsHtml = s.tags.map(t => `<span class="tag" data-tag="${t}">${
+    {academic:'学術', product:'製品', general:'一般', subscription:'サブスク'}[t] || t
+  }</span>`).join('');
+  return `
+    <div class="card" data-region="${s.region}" data-tags="${s.tags.join(',')}">
+      <div class="card-head">
+        <h2>${s.name}</h2>
+        <span class="region region-${s.region}">${s.region === 'jp' ? '国内' : '海外'}</span>
+      </div>
+      <div class="desc">${s.desc}</div>
+      <div class="tags">${tagsHtml}</div>
+      <div class="meta-row">
+        <span>手数料 <span class="val">${s.fee}</span></span>
+        <span>${s.model}</span>
+      </div>
+      <div class="meta-row" style="border-top:none;padding-top:0">
+        <span>向き: ${s.samples}</span>
+      </div>
+      <a class="launch" href="${s.url}" target="_blank" rel="noopener">公式サイトへ &#8594;</a>
+    </div>
+  `;
+}
+
+function render() {
+  const reg = document.querySelector('input[name="reg"]:checked').value;
+  const tagFilters = Array.from(document.querySelectorAll('.tagf:checked')).map(t => t.value);
+
+  const filtered = SITES.filter(s => {
+    if (reg !== 'all' && s.region !== reg) return false;
+    if (!s.tags.some(t => tagFilters.includes(t))) return false;
+    return true;
+  });
+  document.getElementById('grid-jp').innerHTML = filtered.filter(s => s.region === 'jp').map(makeCard).join('') || '<div style="color:#666;padding:20px">該当なし</div>';
+  document.getElementById('grid-intl').innerHTML = filtered.filter(s => s.region === 'intl').map(makeCard).join('') || '<div style="color:#666;padding:20px">該当なし</div>';
+}
+
+document.querySelectorAll('input[name="reg"], .tagf').forEach(i => i.addEventListener('change', render));
+render();
+</script>
+
+</body>
+</html>

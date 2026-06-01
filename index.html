@@ -595,6 +595,64 @@
   </div>
 </div>
 
+<!-- ===== クラファンディング ===== -->
+<div class="tool-section" data-tool="crowdfunding">
+  <div class="card">
+    <div class="card-top">
+      <div class="icon">&#128176;</div>
+      <div>
+        <h2>クラファンディング</h2>
+        <p>研究機材の購入、ラボ立ち上げ、デバイス開発、学術活動などの資金調達に使えるクラウドファンディング・プラットフォームを一覧化。国内 8 + 海外 8 サイト、手数料・運営形式・向く用途で絞り込み可能。academist / READYFOR / CAMPFIRE / Makuake / Kickstarter / Indiegogo / experiment.com など。</p>
+        <div class="tags">
+          <span class="tag">資金調達</span><span class="tag">学術クラファン</span>
+          <span class="tag">プロダクト</span><span class="tag">国内・海外</span>
+        </div>
+        <a class="launch" href="/crowdfunding/">ツールを開く &#8594;</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- スレッド板 -->
+  <div class="board" id="board-crowdfunding">
+    <div class="board-header" onclick="toggleBoard('crowdfunding')">
+      <h3>&#128172; スレッド板</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="count" id="count-crowdfunding">0 スレッド</span>
+        <span class="toggle-arrow closed" id="arrow-crowdfunding">&#9660;</span>
+      </div>
+    </div>
+    <div class="board-body collapsed" id="body-crowdfunding">
+      <div class="thread-list" id="threads-crowdfunding"></div>
+      <button class="new-thread-btn" id="ntbtn-crowdfunding" onclick="showNewThread('crowdfunding')">+ 新しいスレッドを立てる</button>
+      <div class="new-thread-form" id="newform-crowdfunding">
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="nt-name-crowdfunding" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <div class="pf-row"><input type="text" id="nt-title-crowdfunding" placeholder="スレッドタイトル" maxlength="80"></div>
+          <textarea id="nt-body-crowdfunding" placeholder="本文を入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button class="cancel-btn" onclick="hideNewThread('crowdfunding')">キャンセル</button>
+            <button onclick="createThread('crowdfunding')">スレッドを立てる</button>
+          </div>
+        </div>
+      </div>
+      <div class="thread-view" id="view-crowdfunding">
+        <span class="tv-back" onclick="backToList('crowdfunding')">&#8592; スレッド一覧に戻る</span>
+        <div class="tv-title" id="vtitle-crowdfunding"></div>
+        <div id="replies-crowdfunding"></div>
+        <div class="post-form">
+          <div class="pf-row"><input type="text" id="rp-name-crowdfunding" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
+          <textarea id="rp-body-crowdfunding" placeholder="レスを入力..." maxlength="2000"></textarea>
+          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
+            <button onclick="postReply('crowdfunding')">書き込む</button>
+          </div>
+          <div class="pf-hint">名前欄が空の場合「名無しさん」になります</div>
+        </div>
+      </div>
+      <div class="auto-refresh" id="autorefresh-crowdfunding"><div class="spinner"></div> リアルタイム更新中</div>
+    </div>
+  </div>
+</div>
+
 <!-- 将来のツール: tool-sectionをコピーして追加 -->
 
 </main>
@@ -923,6 +981,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadThreads('dmm-monitor-2');
   loadThreads('cfms-plotter');
   loadThreads('qe-calculator');
+  loadThreads('crowdfunding');
 });
 </script>
 </body>
