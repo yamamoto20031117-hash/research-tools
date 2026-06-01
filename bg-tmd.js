@@ -88,43 +88,143 @@
     return group;
   }
 
-  // === DBPO P-helicene Cartesian coords (Å) — from CCDC 1040766 ===
-  // [element, x, y, z]. H atoms included but skipped at render time.
-  const HELICENE = [
-    ['H', 4.166, -3.401, 1.403], ['H', 4.061, -5.258, 3.059],
-    ['H', 3.325,  8.116, 3.687], ['H', 1.890,  6.848, 2.226],
-    ['H', 1.344,  7.691, 0.064], ['H', 1.390,  9.514,-1.570],
-    ['H', 2.607, -3.384,-5.062], ['H', 3.598, -2.345, 7.858],
-    ['H',-6.467, -0.610, 8.924], ['H',-5.305,  0.903,-4.676],
-    ['H',-5.229,  0.595,-2.360], ['H',-3.943, -1.793,-1.714],
-    ['H',-1.734, -2.190,-2.764], ['H', 0.524, -1.593,-3.066],
-    ['H', 1.457,  0.190,-1.879], ['H', 0.171,  1.470,-0.364],
-    ['H',-2.041,  1.735, 0.870], ['H',-5.366,  1.481, 3.923],
-    ['H', 4.305,  1.332, 3.698], ['H', 2.143,  0.586, 4.381],
-    ['H', 0.843, -0.862, 2.949], ['H', 1.755, -1.701, 0.962],
-    ['C', 3.239, -3.420,-0.431], ['C', 3.584, -3.929, 0.790],
-    ['C', 3.139, -5.217, 1.188], ['C', 3.476, -5.766, 2.453],
-    ['C', 3.022,  8.457, 2.823], ['C', 2.213,  7.710, 1.948],
-    ['C', 1.883,  8.196, 0.713], ['C', 2.332,  9.475, 0.301],
-    ['C', 2.011, -5.446,-0.969], ['C', 2.454, -4.210,-1.317],
-    ['C', 3.048, -2.874,-3.154], ['C', 3.171, -2.827,-4.504],
-    ['C', 4.057, -1.886,-5.091], ['C', 4.129, -1.730,-6.501],
-    ['C',-6.499, -0.739,-5.110], ['C',-5.779,  0.152,-4.281],
-    ['C',-5.766, -0.010,-2.919], ['C',-6.515, -1.050,-2.305],
-    ['C',-6.544, -1.280,-0.894], ['C', 3.856, -2.081,-2.310],
-    ['C',-4.277, -0.434,-0.207], ['C',-3.513, -1.100,-1.133],
-    ['C',-2.150, -0.755,-1.343], ['C',-1.334, -1.450,-2.269],
-    ['C',-0.017, -1.095,-2.444], ['C', 0.533, -0.025,-1.742],
-    ['C',-0.228,  0.696,-0.860], ['C',-1.592,  0.346,-0.620],
-    ['C',-2.390,  0.995, 0.342], ['C',-3.662,  0.575, 0.583],
-    ['C',-5.450,  0.531, 2.121], ['C',-5.875,  0.832, 3.380],
-    ['C', 4.299,  0.275, 1.903], ['C', 3.733,  0.703, 3.132],
-    ['C', 2.489,  0.282, 3.518], ['C', 1.751, -0.595, 2.689],
-    ['C', 2.294, -1.088, 1.529], ['C', 3.583, -0.679, 1.105],
-    ['C', 4.182, -1.113,-0.122], ['C',-6.120, -0.429, 1.329],
-    ['N', 3.628, -2.148,-0.922], ['N',-5.655, -0.643, 0.014],
-    ['O', 2.121, -3.725,-2.576], ['O',-4.351,  1.195, 1.615],
-  ];
+  // === [5]Helicene — procedural, chemically-clean construction ===
+  // Five ortho-fused benzene rings stacked into a partial helix. Built by
+  // hex fusion: ring N+1 shares an edge with ring N (always the "same"
+  // local edge so the spiral keeps curling in the same sense), and each
+  // ring tilts by HELIX_TWIST around the shared edge so the rings rise
+  // out of plane into a true 3D helix.  Total: 22 C + 14 H (the canonical
+  // [5]helicene formula). H atoms are placed radially outward from each
+  // non-junction C.
+  //
+  // The CCDC-extracted DBPO XYZ couldn't be used directly: the CIF→XYZ
+  // script in qe-auto/examples/ doesn't unwrap molecules that cross the
+  // unit-cell boundary, so 7 aromatic carbons came out with only one
+  // covalent neighbor (the rest of the molecule was on the "other side"
+  // of the periodic boundary). The structure read as broken to a chemist.
+  function _buildHelicene5() {
+    const CC = 1.42;                 // aromatic C-C
+    const hexH = CC * Math.sqrt(3) / 2;  // hex center → edge midpoint
+    const CH = 1.08;                 // C-H bond
+    const HELIX_TWIST = 0.42;        // radians; sets steepness of spiral
+
+    const heavy = [];                // [el, x, y, z]
+    const junctions = new Set();     // string keys for atoms shared between rings (no H)
+
+    function key(p) { return p.x.toFixed(3) + ',' + p.y.toFixed(3) + ',' + p.z.toFixed(3); }
+    function pushHeavy(p, el='C', shared=false) {
+      heavy.push([el, p.x, p.y, p.z]);
+      if (shared) junctions.add(key(p));
+      return p;
+    }
+
+    // --- Ring 0: hex in the xz plane, centered at origin ---
+    const ring0 = [];
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      ring0.push(new THREE.Vector3(CC * Math.cos(a), 0, CC * Math.sin(a)));
+    }
+    ring0.forEach(p => pushHeavy(p));
+
+    // Helper — Rodrigues rotation of v around unit axis k by angle θ
+    function rotateAround(v, k, theta) {
+      const c = Math.cos(theta), s = Math.sin(theta);
+      const kxv = k.clone().cross(v);
+      const kdv = k.dot(v);
+      return v.clone().multiplyScalar(c)
+        .add(kxv.multiplyScalar(s))
+        .add(k.clone().multiplyScalar(kdv * (1 - c)));
+    }
+
+    let currentRing = ring0;
+    // Fuse the next ring on the edge between atoms 1 and 2 of the current ring,
+    // then for the ring after that, fuse on atoms 1 & 2 of THAT ring — but in
+    // the new ring's indexing, the edge "1-2" lands one vertex further around,
+    // so the spiral keeps winding in the same rotational sense.
+    let edgeStartIdx = 1, edgeEndIdx = 2;
+
+    for (let r = 1; r < 5; r++) {
+      const e1 = currentRing[edgeStartIdx];
+      const e2 = currentRing[edgeEndIdx];
+
+      const mid = e1.clone().add(e2).multiplyScalar(0.5);
+      const edgeDir = e2.clone().sub(e1).normalize();
+
+      // Centroid of current ring → mid gives the "outward" direction (away from old ring center)
+      const centroid = new THREE.Vector3();
+      currentRing.forEach(p => centroid.add(p));
+      centroid.divideScalar(currentRing.length);
+      const outward = mid.clone().sub(centroid).normalize();
+
+      // Tilt outward around the edge axis — this is what makes it a helix instead of a flat naphthalene chain
+      const newPerp = rotateAround(outward, edgeDir, HELIX_TWIST);
+
+      // Center of the new ring
+      const newCenter = mid.clone().add(newPerp.clone().multiplyScalar(hexH));
+
+      // Local hex basis: edgeDir = local +x ; newPerp = local +y
+      // e1, e2 occupy vertices 4 and 5 (the "bottom" edge of the new ring)
+      // The 4 new atoms are vertices 0, 1, 2, 3 in canonical CCW order
+      const newRing = [];
+      newRing.push(e1);                 // shared from previous ring
+      newRing.push(e2);                 // shared from previous ring
+
+      // Mark e1, e2 as junctions (no H on them)
+      junctions.add(key(e1));
+      junctions.add(key(e2));
+
+      // vertex 0: (CC, 0)
+      newRing.push(newCenter.clone()
+        .add(edgeDir.clone().multiplyScalar(CC)));
+      // vertex 1: (CC/2, hexH)
+      newRing.push(newCenter.clone()
+        .add(edgeDir.clone().multiplyScalar(CC / 2))
+        .add(newPerp.clone().multiplyScalar(hexH)));
+      // vertex 2: (-CC/2, hexH)
+      newRing.push(newCenter.clone()
+        .add(edgeDir.clone().multiplyScalar(-CC / 2))
+        .add(newPerp.clone().multiplyScalar(hexH)));
+      // vertex 3: (-CC, 0)
+      newRing.push(newCenter.clone()
+        .add(edgeDir.clone().multiplyScalar(-CC)));
+
+      for (let i = 2; i < 6; i++) pushHeavy(newRing[i]);
+      currentRing = newRing;
+      // For the next ring: re-use the same local edge index, which after the
+      // ring's own reindexing becomes the "next" edge around the rim → helix.
+      edgeStartIdx = 1; edgeEndIdx = 2;
+    }
+
+    // Build H atoms — one per non-junction C, placed radially outward
+    // from that ring's local centroid
+    // We need to know each ring's centroid. Rebuild from heavy array by
+    // tagging atoms by ring index (kept implicit). Simpler: place H by
+    // looking at each C's two nearest C neighbors, and putting H along the
+    // bisector pointing outward.
+    const Hs = [];
+    const heavyVecs = heavy.map(([e, x, y, z]) => new THREE.Vector3(x, y, z));
+    for (let i = 0; i < heavy.length; i++) {
+      const pos = heavyVecs[i];
+      if (junctions.has(key(pos))) continue;
+      // Find 2 nearest heavy neighbors
+      const dists = [];
+      for (let j = 0; j < heavyVecs.length; j++) {
+        if (j === i) continue;
+        const d = pos.distanceTo(heavyVecs[j]);
+        if (d < CC * 1.15) dists.push({ j, d });
+      }
+      // H is placed along the average of (pos - neighbor) for each neighbor
+      const direction = new THREE.Vector3();
+      dists.forEach(({ j }) => direction.add(pos.clone().sub(heavyVecs[j])));
+      if (direction.lengthSq() < 1e-6) continue;  // can't place
+      direction.normalize();
+      const hPos = pos.clone().add(direction.multiplyScalar(CH));
+      Hs.push(['H', hPos.x, hPos.y, hPos.z]);
+    }
+
+    return [...heavy, ...Hs];
+  }
+  const HELICENE = _buildHelicene5();
 
   // === Jacobi eigen-decomposition for 3x3 symmetric matrix ===
   // Returns [{val,vec}, ...] sorted by eigenvalue descending. Eigenvalues
