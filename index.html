@@ -1120,6 +1120,7 @@ function openThread(t,id){
   document.getElementById('ntbtn-'+t).style.display='none';
   document.getElementById('newform-'+t).style.display='none';
   document.getElementById('view-'+t).style.display='block';
+  const rb=document.getElementById('rp-body-'+t); if(rb) rb.value='';   // スレッド切替で返信欄が残らないように
   renderThread(t,th,false);
 }
 
