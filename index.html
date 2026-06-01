@@ -151,7 +151,7 @@
     background-size:cover;
     filter:drop-shadow(0 6px 10px rgba(0,0,0,0.65));
     will-change:transform,opacity;
-    mix-blend-mode:lighten;  /* white bg vanishes on the dark card */
+    /* image already has alpha=0 background, so no blend mode needed */
   }
   .tool-section[data-locked="true"] .chain-img.left  { clip-path: inset(0 56% 0 0); }
   .tool-section[data-locked="true"] .chain-img.right { clip-path: inset(0 0 0 56%); }
