@@ -154,9 +154,14 @@
     will-change:transform,opacity;
     /* image already has alpha=0 background, so no blend mode needed */
   }
-  .tool-section[data-locked="true"] .chain-img.left  { clip-path: inset(0 56% 0 0); }
-  .tool-section[data-locked="true"] .chain-img.right { clip-path: inset(0 0 0 56%); }
-  .tool-section[data-locked="true"] .chain-img.lock  { clip-path: inset(28% 44% 18% 44%); }
+  /* Measured against lock-chain.png (1536x1024):
+       - chain band  y ≈ 38–50% of image
+       - lock cluster x = 37.5–56.2%, y ≈ 40–73%
+     so we cut left chain up to 37%, right chain starting 57%, and the
+     lock occupies the slice between. */
+  .tool-section[data-locked="true"] .chain-img.left  { clip-path: inset(0 63% 0 0); }
+  .tool-section[data-locked="true"] .chain-img.right { clip-path: inset(0 0 0 57%); }
+  .tool-section[data-locked="true"] .chain-img.lock  { clip-path: inset(35% 43% 25% 37%); }
   /* Idle subtle sway */
   .tool-section[data-locked="true"] .chain-img.left  { animation: chainSwayL 6s ease-in-out infinite; }
   .tool-section[data-locked="true"] .chain-img.right { animation: chainSwayR 6s ease-in-out infinite; }
@@ -1146,7 +1151,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 // パスワードはここで定義。研究室メンバーに共有する文字列を入れてください。
 // 変更したら全員に再共有 → 各ブラウザで再度入力が必要。
 const LOCK_PASSWORD = 'suda2026';
-const LOCK_STORAGE_KEY = 'rt-unlocked-v1';
+// Bump this when you want to force everyone back to the locked state
+// (e.g. after rotating the password, or fixing the lock visuals).
+const LOCK_STORAGE_KEY = 'rt-unlocked-v2';
 
 function isUnlocked(){
   return localStorage.getItem(LOCK_STORAGE_KEY) === 'true';
