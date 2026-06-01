@@ -19,8 +19,9 @@
   'use strict';
   const canvas = document.getElementById('bg-canvas');
   if (!canvas || typeof THREE === 'undefined') return;
-  if (window.matchMedia('(max-width: 600px)').matches) { canvas.style.display = 'none'; return; }
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { canvas.style.display = 'none'; return; }
+  // モバイルは pixel ratio を下げてパフォーマンス確保
+  const isMobile = window.matchMedia('(max-width: 600px)').matches;
 
   // === Host material: 1T-VSe₂ (from tmd-viewer DB) ===
   const VSE2 = { m:'V', x:'Se', phase:'1T', a:3.354, c:6.10, bond:2.50, mCol:0x2e8bc0, xCol:0xd48a00 };
@@ -441,7 +442,7 @@
   const renderer = new THREE.WebGLRenderer({
     canvas, alpha: true, antialias: true, powerPreference: 'low-power',
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5));
 
   scene.add(new THREE.AmbientLight(0x556677, 0.55));
   const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);

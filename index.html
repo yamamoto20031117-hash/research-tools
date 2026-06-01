@@ -157,27 +157,33 @@
     z-index:3;
   }
   .tool-section[data-locked="true"] .card .launch{cursor:not-allowed}
+  /* chain-wrap: maintain the image's native 3:2 aspect ratio so
+     clip-path percentages always land on the same pixel region,
+     regardless of how tall/short the card is on PC vs mobile. */
   .tool-section[data-locked="true"] .chain-wrap{
-    position:absolute;inset:0;pointer-events:none;z-index:4;overflow:hidden;
-    border-radius:12px;
+    position:absolute;
+    left:50%; top:50%;
+    transform:translate(-50%,-50%);
+    width:100%;
+    aspect-ratio:1536/1024;
+    pointer-events:none;z-index:4;overflow:visible;
+    transition: opacity .35s ease;
   }
-  /* Three clip-pathed copies of the same lock-chain image:
-     left half, right half, central padlock. The break animation
-     flies them apart in 3 different directions. */
+  .tool-section[data-locked="true"].unlocking .chain-wrap{
+    opacity: 0;
+  }
+  /* Three clip-pathed copies of the same lock-chain image (1536×1024 RGBA).
+     background-size:100% 100% forces an exact 1:1 pixel mapping so
+     inset() percentages are stable at every viewport width. */
   .tool-section[data-locked="true"] .chain-img{
     position:absolute;inset:0;
-    background:url('/lock-chain.png') no-repeat center center;
-    background-size:cover;
+    background:url('/lock-chain.png') no-repeat top left;
+    background-size:100% 100%;
     filter:drop-shadow(0 6px 10px rgba(0,0,0,0.65));
-    will-change:transform,opacity;
-    /* image already has alpha=0 background, so no blend mode needed */
   }
-  /* Measured against lock-chain.png (1536x1024):
-       - chain band  y ≈ 38–50% of image
-       - lock cluster x = 37.5–56.2%, y ≈ 40–73%
-     so we cut left chain up to 37%, right chain starting 57%, and the
-     lock occupies the slice between. No idle sway, no break animation —
-     the chains are static; on unlock the whole layer just fades out. */
+  /* Pixel analysis of lock-chain.png (1536×1024):
+       chain band  y ≈ 38–50%  →  left / right split at x≈37% / 57%
+       lock body   x = 37.5–56.2%, y = 40–73% */
   .tool-section[data-locked="true"] .chain-img.left  { clip-path: inset(0 63% 0 0); }
   .tool-section[data-locked="true"] .chain-img.right { clip-path: inset(0 0 0 57%); }
   .tool-section[data-locked="true"] .chain-img.lock  {
@@ -185,13 +191,6 @@
     filter: drop-shadow(0 6px 10px rgba(0,0,0,0.65))
             brightness(1.45) saturate(1.55) contrast(1.05)
             drop-shadow(0 0 18px rgba(252,211,77,0.55));
-  }
-  /* Soft fade-out when the lock is dismissed */
-  .tool-section[data-locked="true"] .chain-wrap{
-    transition: opacity .35s ease;
-  }
-  .tool-section[data-locked="true"].unlocking .chain-wrap{
-    opacity: 0;
   }
 
   /* unlocked → chain消える */
