@@ -14,6 +14,14 @@
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo','Hiragino Sans',sans-serif;
     min-height:100vh;display:flex;flex-direction:column;align-items:center}
+  /* site switcher (top of page, links to lab-play side) */
+  .site-switch-bar{width:100%;padding:10px 20px;background:rgba(10,14,23,0.85);border-bottom:1px solid rgba(88,166,255,0.08);display:flex;justify-content:flex-end}
+  .site-switch{display:flex;background:rgba(20,25,40,0.85);border:1px solid rgba(88,166,255,0.15);border-radius:8px;padding:3px;gap:2px}
+  .site-switch a{padding:5px 14px;font-size:.78rem;border-radius:5px;color:#aabad6;font-weight:600;text-decoration:none;transition:background .15s}
+  .site-switch a.active{background:rgba(88,166,255,0.18);color:#9ad0ff}
+  .site-switch a:hover:not(.active){background:rgba(88,166,255,0.08);color:#fff}
+  @media (max-width:600px){.site-switch-bar{padding:8px 12px}.site-switch a{padding:4px 10px;font-size:.74rem}}
+
   header{width:100%;padding:48px 24px 32px;text-align:center;
     background:linear-gradient(180deg,rgba(88,166,255,0.08) 0%,transparent 100%)}
   header h1{font-size:2rem;color:#fff;letter-spacing:0.04em;margin-bottom:8px}
@@ -135,6 +143,13 @@
 
 <div class="conn-status" id="conn-status">
   <span class="dot"></span><span id="conn-text"></span>
+</div>
+
+<div class="site-switch-bar">
+  <div class="site-switch">
+    <a href="/" class="active">🔬 研究ツール</a>
+    <a href="https://lab-play.vercel.app/">🎮 遊びツール</a>
+  </div>
 </div>
 
 <header>
@@ -595,67 +610,6 @@
   </div>
 </div>
 
-<!-- ===== クラファンディング ===== -->
-<div class="tool-section" data-tool="crowdfunding">
-  <div class="card">
-    <div class="card-top">
-      <div class="icon">&#128176;</div>
-      <div>
-        <h2>研究室クラファン</h2>
-        <p>研究室内で「みんなで使う物」を共同購入するためのクラファン。誰かが提案を投稿 → 全員が金額表明 → 目標達成で送金（PayPay 個人請求書 URL or 直接渡し）。<b>手数料ゼロ</b>。Firebase で全員共有、提案一覧・進捗バー・支援者リスト・送金チェック付き。</p>
-        <div class="tags">
-          <span class="tag">研究室内</span><span class="tag">共同購入</span>
-          <span class="tag">手数料ゼロ</span><span class="tag">PayPay</span>
-        </div>
-        <a class="launch" href="/crowdfunding/">ツールを開く &#8594;</a>
-        <span style="margin-left:14px;font-size:.78rem;color:#888">|
-          <a href="/crowdfunding-demo/" style="color:#ffcc55">🎮 お試し版で動きを見る</a>
-        </span>
-      </div>
-    </div>
-  </div>
-
-  <!-- スレッド板 -->
-  <div class="board" id="board-crowdfunding">
-    <div class="board-header" onclick="toggleBoard('crowdfunding')">
-      <h3>&#128172; スレッド板</h3>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span class="count" id="count-crowdfunding">0 スレッド</span>
-        <span class="toggle-arrow closed" id="arrow-crowdfunding">&#9660;</span>
-      </div>
-    </div>
-    <div class="board-body collapsed" id="body-crowdfunding">
-      <div class="thread-list" id="threads-crowdfunding"></div>
-      <button class="new-thread-btn" id="ntbtn-crowdfunding" onclick="showNewThread('crowdfunding')">+ 新しいスレッドを立てる</button>
-      <div class="new-thread-form" id="newform-crowdfunding">
-        <div class="post-form">
-          <div class="pf-row"><input type="text" id="nt-name-crowdfunding" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
-          <div class="pf-row"><input type="text" id="nt-title-crowdfunding" placeholder="スレッドタイトル" maxlength="80"></div>
-          <textarea id="nt-body-crowdfunding" placeholder="本文を入力..." maxlength="2000"></textarea>
-          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
-            <button class="cancel-btn" onclick="hideNewThread('crowdfunding')">キャンセル</button>
-            <button onclick="createThread('crowdfunding')">スレッドを立てる</button>
-          </div>
-        </div>
-      </div>
-      <div class="thread-view" id="view-crowdfunding">
-        <span class="tv-back" onclick="backToList('crowdfunding')">&#8592; スレッド一覧に戻る</span>
-        <div class="tv-title" id="vtitle-crowdfunding"></div>
-        <div id="replies-crowdfunding"></div>
-        <div class="post-form">
-          <div class="pf-row"><input type="text" id="rp-name-crowdfunding" placeholder="名前（空欄で名無しさん）" maxlength="30"></div>
-          <textarea id="rp-body-crowdfunding" placeholder="レスを入力..." maxlength="2000"></textarea>
-          <div class="pf-row" style="justify-content:flex-end;margin-top:8px">
-            <button onclick="postReply('crowdfunding')">書き込む</button>
-          </div>
-          <div class="pf-hint">名前欄が空の場合「名無しさん」になります</div>
-        </div>
-      </div>
-      <div class="auto-refresh" id="autorefresh-crowdfunding"><div class="spinner"></div> リアルタイム更新中</div>
-    </div>
-  </div>
-</div>
-
 <!-- 将来のツール: tool-sectionをコピーして追加 -->
 
 </main>
@@ -984,7 +938,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadThreads('dmm-monitor-2');
   loadThreads('cfms-plotter');
   loadThreads('qe-calculator');
-  loadThreads('crowdfunding');
 });
 </script>
 </body>
