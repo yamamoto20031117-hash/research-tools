@@ -126,18 +126,106 @@
     ['O', 2.121, -3.725,-2.576], ['O',-4.351,  1.195, 1.615],
   ];
 
-  // === Build helicene mesh group (H atoms hidden) ===
+  // === Jacobi eigen-decomposition for 3x3 symmetric matrix ===
+  // Returns [{val,vec}, ...] sorted by eigenvalue descending. Eigenvalues
+  // are variances; eigenvectors are the principal axes of the point cloud.
+  function jacobiEig3(cxx, cxy, cxz, cyy, cyz, czz) {
+    const m = [[cxx, cxy, cxz], [cxy, cyy, cyz], [cxz, cyz, czz]];
+    const V = [[1,0,0], [0,1,0], [0,0,1]];
+    for (let sweep = 0; sweep < 40; sweep++) {
+      let maxOff = 0, p_ = 0, q_ = 1;
+      for (let p = 0; p < 2; p++) {
+        for (let q = p + 1; q < 3; q++) {
+          if (Math.abs(m[p][q]) > maxOff) { maxOff = Math.abs(m[p][q]); p_ = p; q_ = q; }
+        }
+      }
+      if (maxOff < 1e-12) break;
+      const p = p_, q = q_;
+      const theta = (m[q][q] - m[p][p]) / (2 * m[p][q]);
+      const t = (theta >= 0 ? 1 : -1) / (Math.abs(theta) + Math.sqrt(theta*theta + 1));
+      const c = 1 / Math.sqrt(t*t + 1);
+      const s = t * c;
+      const Mpp = m[p][p], Mqq = m[q][q], Mpq = m[p][q];
+      m[p][p] = Mpp - t * Mpq;
+      m[q][q] = Mqq + t * Mpq;
+      m[p][q] = 0; m[q][p] = 0;
+      for (let r = 0; r < 3; r++) {
+        if (r !== p && r !== q) {
+          const Mrp = m[r][p], Mrq = m[r][q];
+          m[r][p] = c * Mrp - s * Mrq; m[p][r] = m[r][p];
+          m[r][q] = s * Mrp + c * Mrq; m[q][r] = m[r][q];
+        }
+      }
+      for (let r = 0; r < 3; r++) {
+        const Vrp = V[r][p], Vrq = V[r][q];
+        V[r][p] = c * Vrp - s * Vrq;
+        V[r][q] = s * Vrp + c * Vrq;
+      }
+    }
+    const eigs = [
+      { val: m[0][0], vec: [V[0][0], V[1][0], V[2][0]] },
+      { val: m[1][1], vec: [V[0][1], V[1][1], V[2][1]] },
+      { val: m[2][2], vec: [V[0][2], V[1][2], V[2][2]] },
+    ];
+    eigs.sort((a, b) => b.val - a.val);
+    return eigs;
+  }
+
+  // === Build helicene mesh group, PCA-aligned to layer normal ===
+  // Largest principal axis  → world Z (visible across viewport)
+  // Medium principal axis   → world X (laterally)
+  // Smallest principal axis → world Y (layer normal, fits in the vdW gap)
   function buildHelicene() {
     const group = new THREE.Group();
-    const pts = HELICENE.filter(p => p[0] !== 'H');
-    // Center at centroid
-    let cx = 0, cy = 0, cz = 0;
-    pts.forEach(p => { cx += p[1]; cy += p[2]; cz += p[3]; });
-    cx /= pts.length; cy /= pts.length; cz /= pts.length;
+    const ptsRaw = HELICENE.filter(p => p[0] !== 'H');
 
+    // 1) Centroid
+    let cx = 0, cy = 0, cz = 0;
+    ptsRaw.forEach(p => { cx += p[1]; cy += p[2]; cz += p[3]; });
+    cx /= ptsRaw.length; cy /= ptsRaw.length; cz /= ptsRaw.length;
+
+    // 2) Covariance matrix (population)
+    let cxx = 0, cxy = 0, cxz = 0, cyy = 0, cyz = 0, czz = 0;
+    ptsRaw.forEach(p => {
+      const dx = p[1] - cx, dy = p[2] - cy, dz = p[3] - cz;
+      cxx += dx*dx; cyy += dy*dy; czz += dz*dz;
+      cxy += dx*dy; cxz += dx*dz; cyz += dy*dz;
+    });
+    const N = ptsRaw.length;
+    const eigs = jacobiEig3(cxx/N, cxy/N, cxz/N, cyy/N, cyz/N, czz/N);
+
+    // 3) Build rotation matrix whose ROWS are the principal axes such that
+    //    eigs[1] (medium) → x, eigs[2] (smallest) → y, eigs[0] (largest) → z
+    const xRow = new THREE.Vector3(...eigs[1].vec);  // medium
+    const yRow = new THREE.Vector3(...eigs[2].vec);  // smallest → layer normal
+    let   zRow = new THREE.Vector3(...eigs[0].vec);  // largest
+    // Ensure right-handed orientation (det = +1) to avoid mirror flip
+    if (xRow.clone().cross(yRow).dot(zRow) < 0) zRow.negate();
+
+    // Helper to project a centered point onto the new basis
+    function rotate(x, y, z) {
+      return [
+        xRow.x*x + xRow.y*y + xRow.z*z,
+        yRow.x*x + yRow.y*y + yRow.z*z,
+        zRow.x*x + zRow.y*y + zRow.z*z,
+      ];
+    }
+
+    // Rotate every atom
+    const pts = ptsRaw.map(([e, x, y, z]) => {
+      const [nx, ny, nz] = rotate(x - cx, y - cy, z - cz);
+      return [e, nx, ny, nz];
+    });
+
+    // Compute final extents — handy for tuning the layer gap externally
+    let yMin = Infinity, yMax = -Infinity;
+    pts.forEach(p => { if (p[2] < yMin) yMin = p[2]; if (p[2] > yMax) yMax = p[2]; });
+    group.userData.yExtent = yMax - yMin;   // smallest extent now = thickness in y
+
+    // 4) Render atoms
     const colors = { C: 0xa8b0bd, N: 0x4060ee, O: 0xee3030 };
     const radii  = { C: 0.32,     N: 0.34,     O: 0.30 };
-    const mats   = {}, geos = {};
+    const mats = {}, geos = {};
     for (const k in colors) {
       mats[k] = new THREE.MeshPhongMaterial({
         color: colors[k], emissive: new THREE.Color(colors[k]).multiplyScalar(0.15),
@@ -145,14 +233,13 @@
       });
       geos[k] = new THREE.SphereGeometry(radii[k], 14, 14);
     }
-
     pts.forEach(([e, x, y, z]) => {
       const m = new THREE.Mesh(geos[e], mats[e]);
-      m.position.set(x - cx, y - cy, z - cz);
+      m.position.set(x, y, z);
       group.add(m);
     });
 
-    // Covalent bonds: any pair with d < 1.65 Å
+    // 5) Covalent bonds (<1.65 Å distance)
     const cylGeo = new THREE.CylinderGeometry(0.06, 0.06, 1, 6, 1, true);
     const bondMat = new THREE.MeshPhongMaterial({
       color: 0xb6c2d4, transparent: true, opacity: 0.62, depthWrite: false,
@@ -160,13 +247,13 @@
     const up = new THREE.Vector3(0, 1, 0);
     for (let i = 0; i < pts.length; i++) {
       for (let j = i + 1; j < pts.length; j++) {
-        const [e1, x1, y1, z1] = pts[i];
-        const [e2, x2, y2, z2] = pts[j];
+        const [, x1, y1, z1] = pts[i];
+        const [, x2, y2, z2] = pts[j];
         const dx = x1 - x2, dy = y1 - y2, dz = z1 - z2;
         const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
         if (d < 1.65) {
           const cyl = new THREE.Mesh(cylGeo, bondMat);
-          cyl.position.set((x1+x2)/2 - cx, (y1+y2)/2 - cy, (z1+z2)/2 - cz);
+          cyl.position.set((x1+x2)/2, (y1+y2)/2, (z1+z2)/2);
           cyl.quaternion.setFromUnitVectors(up, new THREE.Vector3(x2-x1, y2-y1, z2-z1).normalize());
           cyl.scale.y = d;
           group.add(cyl);
@@ -194,14 +281,14 @@
   rimLight.position.set(-50, -20, -40);
   scene.add(rimLight);
 
-  // === Compose the scene: VSe₂ slab + helicene in the gap ===
-  // 2 layers separated by 16 Å (vs natural 6.10 Å) — enough vdW space for DBPO.
-  const INTERCALATED_GAP = 16;
-  const slab = buildSlab(VSE2, 4, 4, 2, INTERCALATED_GAP);
-  scene.add(slab);
-
+  // === Compose: VSe₂ slab + PCA-aligned helicene in the vdW gap ===
+  // Build the helicene first so we know its thickness (smallest-axis extent
+  // after PCA alignment), then size the layer gap to fit it with margin.
   const helicene = buildHelicene();
-  helicene.position.set(0, 0, 0);   // sits in the middle of the slab gap
+  const gap = Math.max(13, Math.min(22, (helicene.userData.yExtent || 8) + 5));
+  const slab = buildSlab(VSE2, 4, 4, 2, gap);
+  scene.add(slab);
+  helicene.position.set(0, 0, 0);   // centered between the two VSe₂ layers
   scene.add(helicene);
 
   // Mild tilt — user reported the old 0.45 was too steep.
