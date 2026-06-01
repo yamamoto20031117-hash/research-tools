@@ -1065,8 +1065,6 @@ function detectPeaks(){
     }
 
     // ---- バックグラウンド推定 (rolling minimum → 平滑化) ----
-    // XRD の低角散乱・蛍光バックグラウンドを除去し、ピーク高さをローカルに評価する。
-    // グローバル最大値との比率で判定していた旧実装の最大の欠点をここで解消。
     const bgWin = Math.max(10, Math.floor(nn / 50));
     const rolMin = y.map((_,i)=>{
       let m=Infinity;
@@ -1075,23 +1073,24 @@ function detectPeaks(){
     });
     const baseline = smooth(rolMin, bgWin);
 
-    // ---- ノイズ推定 (残差の RMS) ----
-    // バックグラウンドから離れた低強度領域の標準偏差をノイズフロアとして使う。
+    // ---- ノイズ推定: 隣接点差分の中央絶対偏差 (MAD) ----
+    // バックグラウンド・ピーク形状に依存しないロバストな推定。
+    // rolling minimum のバイアスや残差フィルタのアーティファクトを避ける。
     const maxY = Math.max(...y);
-    const residuals = y.map((v,i) => Math.max(0, v - baseline[i]));
-    const quietResiduals = residuals.filter(v => v < maxY * 0.05);
-    const noiseStd = quietResiduals.length > 5
-      ? Math.sqrt(quietResiduals.reduce((s,v)=>s+v*v,0)/quietResiduals.length)
-      : maxY * 0.005;
-    // ピーク判定に使うしきい値: ノイズの4倍 or グローバル最大の0.5% の大きい方
-    const minAbove = Math.max(noiseStd * 4, maxY * 0.005);
+    const absDiffs = [];
+    for(let i=1;i<nn;i++) absDiffs.push(Math.abs(y[i]-y[i-1]));
+    absDiffs.sort((a,b)=>a-b);
+    // MAD of first differences → σ: median / (√2 × 0.6745) ≈ median / 0.9545
+    const noiseStd = Math.max(absDiffs[Math.floor(absDiffs.length*0.5)] / 0.9545, 1);
+    // ピーク判定しきい値: 5σ or グローバル最大の0.5% の大きい方
+    const minAbove = Math.max(noiseStd * 5, maxY * 0.005);
 
-    // 2パス: 鋭いピーク用 + 広いピーク用
+    // 単一パス（narrow smoothing のみ）。
+    // broad pass はノイズの相関から等間隔アーティファクトを生成するため廃止。
+    // XRD ピーク幅 (FWHM≥0.1°) は narrow pass で確実に検出可能。
     const winNarrow = Math.max(2, Math.floor(nn / 2000));
-    const winBroad  = Math.max(3, Math.floor(nn / 200));
     const passes = [
-      {sy: smooth(y, winNarrow), win: winNarrow, promRange: 30},
-      {sy: smooth(y, winBroad),  win: winBroad,  promRange: 50},
+      {sy: smooth(y, winNarrow), win: winNarrow, promRange: 40},
     ];
 
     for(const pass of passes){
