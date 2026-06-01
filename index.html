@@ -18,12 +18,28 @@
   /* Animated 3D background canvas */
   #bg-canvas{position:fixed;inset:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;display:block}
   /* site switcher (top of page, links to lab-play side) */
-  .site-switch-bar{width:100%;padding:10px 20px;background:rgba(10,14,23,0.85);border-bottom:1px solid rgba(88,166,255,0.08);display:flex;justify-content:flex-end}
+  .site-switch-bar{width:100%;padding:10px 20px;background:rgba(10,14,23,0.85);border-bottom:1px solid rgba(88,166,255,0.08);display:flex;justify-content:flex-end;gap:10px;align-items:center;transition:opacity .35s ease}
   .site-switch{display:flex;background:rgba(20,25,40,0.85);border:1px solid rgba(88,166,255,0.15);border-radius:8px;padding:3px;gap:2px}
   .site-switch a{padding:5px 14px;font-size:.78rem;border-radius:5px;color:#aabad6;font-weight:600;text-decoration:none;transition:background .15s}
   .site-switch a.active{background:rgba(88,166,255,0.18);color:#9ad0ff}
   .site-switch a:hover:not(.active){background:rgba(88,166,255,0.08);color:#fff}
   @media (max-width:600px){.site-switch-bar{padding:8px 12px}.site-switch a{padding:4px 10px;font-size:.74rem}}
+
+  /* "View background" toggle button */
+  #bg-toggle{background:rgba(20,25,40,0.85);border:1px solid rgba(88,166,255,0.15);border-radius:8px;padding:5px 12px;font-size:.78rem;color:#aabad6;font-weight:600;cursor:pointer;transition:background .15s,color .15s;font-family:inherit}
+  #bg-toggle:hover{background:rgba(88,166,255,0.08);color:#fff;border-color:rgba(88,166,255,0.4)}
+  body.bg-only header,
+  body.bg-only main,
+  body.bg-only footer,
+  body.bg-only .conn-status{opacity:0;pointer-events:none;transition:opacity .4s ease}
+  body.bg-only .site-switch-bar{background:rgba(10,14,23,0.0);border-bottom-color:transparent}
+  body.bg-only .site-switch{opacity:0;pointer-events:none;transition:opacity .35s ease}
+  body.bg-only #bg-toggle{background:rgba(88,166,255,0.22);color:#9ad0ff;border-color:#58a6ff}
+  body:not(.bg-only) header,
+  body:not(.bg-only) main,
+  body:not(.bg-only) footer,
+  body:not(.bg-only) .conn-status,
+  body:not(.bg-only) .site-switch{transition:opacity .4s ease}
 
   header{width:100%;padding:48px 24px 32px;text-align:center;
     background:linear-gradient(180deg,rgba(88,166,255,0.08) 0%,transparent 100%)}
@@ -154,11 +170,28 @@
 </div>
 
 <div class="site-switch-bar">
+  <button id="bg-toggle" type="button" aria-pressed="false" title="UI を隠して 3D 背景だけ表示">🔭 背景を見る</button>
   <div class="site-switch">
     <a href="/" class="active">🔬 研究ツール</a>
     <a href="https://lab-play.vercel.app/">🎮 遊びツール</a>
   </div>
 </div>
+<script>
+(function(){
+  const btn = document.getElementById('bg-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const on = document.body.classList.toggle('bg-only');
+    btn.textContent = on ? '✕ UI に戻る' : '🔭 背景を見る';
+    btn.setAttribute('aria-pressed', String(on));
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.body.classList.contains('bg-only')) {
+      btn.click();
+    }
+  });
+})();
+</script>
 
 <header>
   <h1>Research Tools</h1>
