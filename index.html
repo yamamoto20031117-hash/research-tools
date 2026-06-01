@@ -12,8 +12,11 @@
 <title>Research Tools — 研究ツール集</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo','Hiragino Sans',sans-serif;
-    min-height:100vh;display:flex;flex-direction:column;align-items:center}
+  html{background:#0a0e17}
+  body{background:transparent;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo','Hiragino Sans',sans-serif;
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;position:relative;z-index:1}
+  /* Animated 3D background canvas */
+  #bg-canvas{position:fixed;inset:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;display:block}
   /* site switcher (top of page, links to lab-play side) */
   .site-switch-bar{width:100%;padding:10px 20px;background:rgba(10,14,23,0.85);border-bottom:1px solid rgba(88,166,255,0.08);display:flex;justify-content:flex-end}
   .site-switch{display:flex;background:rgba(20,25,40,0.85);border:1px solid rgba(88,166,255,0.15);border-radius:8px;padding:3px;gap:2px}
@@ -140,6 +143,11 @@
 </style>
 </head>
 <body>
+
+<!-- Animated 3D background (TMD lattice fragments) -->
+<canvas id="bg-canvas"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="/bg-tmd.js" defer></script>
 
 <div class="conn-status" id="conn-status">
   <span class="dot"></span><span id="conn-text"></span>
