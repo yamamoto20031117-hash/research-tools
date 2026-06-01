@@ -528,6 +528,46 @@
   // keep `stars` name for the existing animate() loop (rotate the near layer)
   const stars = starLayers[0].points;
 
+  // === Constellation lines ===
+  // For each near-layer star, connect it to its nearest neighbors within
+  // a small radius so the night sky reads as a constellation map rather
+  // than an isolated point cloud. Each star is capped at MAX_CONNS to
+  // keep the graph sparse and pretty.
+  function buildConstellations(points, maxDist, maxConns) {
+    const pa = points.geometry.getAttribute('position');
+    const N = pa.count;
+    const v = [];
+    for (let i = 0; i < N; i++) v.push(new THREE.Vector3(pa.getX(i), pa.getY(i), pa.getZ(i)));
+    const used = new Int32Array(N);
+    const verts = [];
+    for (let i = 0; i < N; i++) {
+      if (used[i] >= maxConns) continue;
+      const cand = [];
+      for (let j = 0; j < N; j++) {
+        if (i === j) continue;
+        if (used[j] >= maxConns) continue;
+        const d = v[i].distanceTo(v[j]);
+        if (d < maxDist) cand.push({ j, d });
+      }
+      cand.sort((a, b) => a.d - b.d);
+      for (const c of cand) {
+        if (used[i] >= maxConns) break;
+        if (used[c.j] >= maxConns) continue;
+        verts.push(v[i].x, v[i].y, v[i].z, v[c.j].x, v[c.j].y, v[c.j].z);
+        used[i]++; used[c.j]++;
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    const mat = new THREE.LineBasicMaterial({
+      color: 0x9ad0ff, transparent: true, opacity: 0.20,
+      depthWrite: false,
+    });
+    return new THREE.LineSegments(geo, mat);
+  }
+  const constellations = buildConstellations(starLayers[0].points, 28, 3);
+  scene.add(constellations);
+
   // === Nebula clouds — translucent colored spheres far from the camera ===
   // They sit beyond the star layers and tint the void with soft color.
   function makeNebula(radius, x, y, z, color) {
@@ -566,7 +606,7 @@
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.minDistance = 8;
-    controls.maxDistance = 200;
+    controls.maxDistance = 80;   // keep TMD always within view
     controls.target.set(0, 0, 0);
     controls.addEventListener('start', () => { userInteracting = true; });
     controls.addEventListener('end',   () => { userInteracting = false; });
@@ -634,6 +674,11 @@
     starLayers[0].material.opacity = 0.80 + 0.18 * Math.sin(tStar * 0.9);
     starLayers[1].material.opacity = 0.65 + 0.20 * Math.sin(tStar * 0.7 + 1.4);
     starLayers[2].material.opacity = 0.55 + 0.22 * Math.sin(tStar * 0.5 + 2.8);
+
+    // Constellations follow the near star layer so the pattern stays
+    // pinned to its stars, and pulse with them so the network breathes.
+    constellations.rotation.y = starLayers[0].points.rotation.y;
+    constellations.material.opacity = 0.17 + 0.10 * Math.sin(tStar * 0.9);
 
     renderer.render(scene, camera);
   }
