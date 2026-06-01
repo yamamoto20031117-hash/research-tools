@@ -1055,9 +1055,7 @@ function detectPeaks(){
   fileList.forEach((f, fi)=>{
     const x=f.x, y=f.y, nn=y.length;
     const peaks=[];
-    const maxY=Math.max(...y);
 
-    // スムージング関数
     function smooth(data, w){
       return data.map((_,i)=>{
         let s=0,c=0;
@@ -1066,57 +1064,75 @@ function detectPeaks(){
       });
     }
 
-    // 2パス方式: 鋭いピーク用（軽いスムージング）+ 広いピーク用（強いスムージング）
-    const winNarrow=Math.max(2, Math.floor(nn/2000));  // 鋭いピーク用: ±2〜4点
-    const winBroad=Math.max(3, Math.floor(nn/200));     // 広いピーク用: ±40点程度
+    // ---- バックグラウンド推定 (rolling minimum → 平滑化) ----
+    // XRD の低角散乱・蛍光バックグラウンドを除去し、ピーク高さをローカルに評価する。
+    // グローバル最大値との比率で判定していた旧実装の最大の欠点をここで解消。
+    const bgWin = Math.max(10, Math.floor(nn / 50));
+    const rolMin = y.map((_,i)=>{
+      let m=Infinity;
+      for(let j=Math.max(0,i-bgWin);j<=Math.min(nn-1,i+bgWin);j++) if(y[j]<m) m=y[j];
+      return m;
+    });
+    const baseline = smooth(rolMin, bgWin);
 
-    const passes=[
-      {sy:smooth(y, winNarrow), win:winNarrow, promRange:30},
-      {sy:smooth(y, winBroad),  win:winBroad,  promRange:50}
+    // ---- ノイズ推定 (残差の RMS) ----
+    // バックグラウンドから離れた低強度領域の標準偏差をノイズフロアとして使う。
+    const maxY = Math.max(...y);
+    const residuals = y.map((v,i) => Math.max(0, v - baseline[i]));
+    const quietResiduals = residuals.filter(v => v < maxY * 0.05);
+    const noiseStd = quietResiduals.length > 5
+      ? Math.sqrt(quietResiduals.reduce((s,v)=>s+v*v,0)/quietResiduals.length)
+      : maxY * 0.005;
+    // ピーク判定に使うしきい値: ノイズの4倍 or グローバル最大の0.5% の大きい方
+    const minAbove = Math.max(noiseStd * 4, maxY * 0.005);
+
+    // 2パス: 鋭いピーク用 + 広いピーク用
+    const winNarrow = Math.max(2, Math.floor(nn / 2000));
+    const winBroad  = Math.max(3, Math.floor(nn / 200));
+    const passes = [
+      {sy: smooth(y, winNarrow), win: winNarrow, promRange: 30},
+      {sy: smooth(y, winBroad),  win: winBroad,  promRange: 50},
     ];
 
     for(const pass of passes){
-      const {sy, win, promRange}=pass;
-      const maxSy=Math.max(...sy);
-      const threshold=maxSy*0.08;
+      const {sy, win, promRange} = pass;
+      const maxSy = Math.max(...sy);
 
-      for(let i=5;i<nn-5;i++){
-        if(sy[i]>sy[i-1]&&sy[i]>sy[i+1]&&sy[i]>sy[i-2]&&sy[i]>sy[i+2]&&sy[i]>threshold){
-          let leftMin=sy[i], rightMin=sy[i];
-          for(let j=i-1;j>=Math.max(0,i-promRange);j--){if(sy[j]<leftMin)leftMin=sy[j];if(sy[j]>sy[i])break;}
-          for(let j=i+1;j<=Math.min(nn-1,i+promRange);j++){if(sy[j]<rightMin)rightMin=sy[j];if(sy[j]>sy[i])break;}
-          const prominence=sy[i]-Math.max(leftMin,rightMin);
-          if(prominence<maxSy*0.03) continue;
+      for(let i=5; i<nn-5; i++){
+        // 局所最大条件
+        if(!(sy[i]>sy[i-1]&&sy[i]>sy[i+1]&&sy[i]>sy[i-2]&&sy[i]>sy[i+2])) continue;
 
-          // 検出位置周辺のraw dataから実際の最大値を探す
-          const searchW=Math.max(win, 5);
-          let bestJ=i, bestY=y[i];
-          for(let j=Math.max(0,i-searchW);j<=Math.min(nn-1,i+searchW);j++){
-            if(y[j]>bestY){bestY=y[j];bestJ=j;}
-          }
+        // バックグラウンドからの突出量チェック（グローバル比ではなくノイズ比）
+        const aboveBg = sy[i] - baseline[i];
+        if(aboveBg < minAbove) continue;
 
-          // raw dataでもピークとして目視できるレベルか最終チェック
-          if(bestY<maxY*0.04) continue;
+        // prominence チェック（旧: maxSy*0.03 → ノイズ比に変更）
+        let leftMin=sy[i], rightMin=sy[i];
+        for(let j=i-1;j>=Math.max(0,i-promRange);j--){if(sy[j]<leftMin)leftMin=sy[j];if(sy[j]>sy[i])break;}
+        for(let j=i+1;j<=Math.min(nn-1,i+promRange);j++){if(sy[j]<rightMin)rightMin=sy[j];if(sy[j]>sy[i])break;}
+        const prominence = sy[i] - Math.max(leftMin, rightMin);
+        if(prominence < Math.max(noiseStd * 2, maxSy * 0.003)) continue;
 
-          // 既存ピークと重複チェック（近い場所にあれば強い方を残す）
-          const dupIdx=peaks.findIndex(p=>Math.abs(x[bestJ]-p.x)<1.0);
-          if(dupIdx>=0){
-            if(bestY>peaks[dupIdx].y) peaks[dupIdx]={x:x[bestJ],y:bestY,label:'',fwhm:null,_baseY:0};
-          } else {
-            peaks.push({x:x[bestJ],y:bestY,label:'',fwhm:null,_baseY:0});
-          }
+        // raw data で実際の最大位置を探す
+        const searchW = Math.max(win, 5);
+        let bestJ=i, bestY=y[i];
+        for(let j=Math.max(0,i-searchW);j<=Math.min(nn-1,i+searchW);j++){
+          if(y[j]>bestY){bestY=y[j];bestJ=j;}
+        }
+
+        // 重複チェック
+        const dupIdx = peaks.findIndex(p=>Math.abs(x[bestJ]-p.x)<1.0);
+        if(dupIdx>=0){
+          if(bestY>peaks[dupIdx].y) peaks[dupIdx]={x:x[bestJ],y:bestY,label:'',fwhm:null,_baseY:0};
+        } else {
+          peaks.push({x:x[bestJ],y:bestY,label:'',fwhm:null,_baseY:0});
         }
       }
     }
 
-    // 2θ順にソート
     peaks.sort((a,b)=>a.x-b.x);
-    f.peaks=peaks;
-
-    // FWHM計算
-    for(let pi=0;pi<f.peaks.length;pi++){
-      f.peaks[pi].fwhm=calcFWHM(f, pi);
-    }
+    f.peaks = peaks;
+    for(let pi=0;pi<f.peaks.length;pi++) f.peaks[pi].fwhm=calcFWHM(f, pi);
   });
 
   refreshPeakTables();
