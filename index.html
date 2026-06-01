@@ -22,11 +22,28 @@
   body.bg-only #bg-canvas:active{cursor:grabbing}
   body.bg-only .site-switch-bar{position:fixed;top:0;left:0;right:0;z-index:50}
   /* site switcher (top of page, links to lab-play side) */
-  .site-switch-bar{width:100%;padding:10px 20px;background:rgba(10,14,23,0.85);border-bottom:1px solid rgba(88,166,255,0.08);display:flex;justify-content:flex-end;gap:10px;align-items:center;transition:opacity .35s ease}
+  .site-switch-bar{width:100%;padding:10px 20px;background:rgba(10,14,23,0.85);border-bottom:1px solid rgba(88,166,255,0.08);display:flex;justify-content:flex-end;gap:10px;align-items:center;flex-wrap:wrap;transition:opacity .35s ease}
   .site-switch{display:flex;background:rgba(20,25,40,0.85);border:1px solid rgba(88,166,255,0.15);border-radius:8px;padding:3px;gap:2px}
   .site-switch a{padding:5px 14px;font-size:.78rem;border-radius:5px;color:#aabad6;font-weight:600;text-decoration:none;transition:background .15s}
   .site-switch a.active{background:rgba(88,166,255,0.18);color:#9ad0ff}
   .site-switch a:hover:not(.active){background:rgba(88,166,255,0.08);color:#fff}
+
+  /* 名前チップ & 登録モーダル */
+  .name-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.25);color:#9ad0ff;border-radius:999px;padding:5px 12px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit}
+  .name-chip:hover{border-color:#58a6ff;background:rgba(88,166,255,.2)}
+  .name-chip .pencil{opacity:.65;font-size:.72rem}
+  .name-modal-overlay{position:fixed;inset:0;background:rgba(4,7,12,.78);z-index:10000;display:flex;align-items:flex-start;justify-content:center;padding:7vh 16px 24px;backdrop-filter:blur(3px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .name-modal{background:#10141c;border:1px solid #2a3040;border-radius:14px;padding:22px;width:min(420px,100%);box-shadow:0 12px 40px rgba(0,0,0,.6)}
+  .name-modal h3{color:#fff;font-size:1.1rem;margin:0 0 8px}
+  .name-modal p{color:#aabad6;font-size:.82rem;line-height:1.6;margin:0 0 14px}
+  .name-modal input{width:100%;background:#181d27;color:#ddd;border:1px solid #2a3040;border-radius:8px;padding:11px 12px;font-size:16px;font-family:inherit}
+  .name-modal input:focus{outline:none;border-color:#58a6ff}
+  .name-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+  .name-modal-actions button{padding:8px 18px;border-radius:8px;font-size:.84rem;font-weight:700;cursor:pointer;font-family:inherit}
+  .name-modal-actions .ghost{background:transparent;border:1px solid #2a3040;color:#aabad6}
+  .name-modal-actions .ghost:hover{border-color:#58a6ff;color:#9ad0ff}
+  .name-modal-actions .primary{background:rgba(88,166,255,.18);color:#9ad0ff;border:1px solid #58a6ff}
+  .name-modal-actions .primary:hover{background:rgba(88,166,255,.3)}
   @media (max-width:600px){.site-switch-bar{padding:8px 12px}.site-switch a{padding:4px 10px;font-size:.74rem}}
 
   /* "View background" toggle button */
@@ -309,10 +326,24 @@
 </div>
 
 <div class="site-switch-bar">
+  <button id="name-chip" class="name-chip" style="margin-right:auto" onclick="openNameModal()" title="名前を設定・変更">👤 <span id="name-chip-label">名前を登録</span> <span class="pencil">✎</span></button>
   <button id="bg-toggle" type="button" aria-pressed="false" title="UI を隠して 3D 背景だけ表示">🔭 背景を見る</button>
   <div class="site-switch">
     <a href="/" class="active">🔬 研究ツール</a>
-    <a href="https://lab-play.vercel.app/">🎮 遊びツール</a>
+    <a href="https://lab-play.vercel.app/" data-bridge>🎮 遊びツール</a>
+  </div>
+</div>
+
+<!-- 名前登録モーダル -->
+<div id="name-modal" class="name-modal-overlay" hidden>
+  <div class="name-modal">
+    <h3>👤 お名前を登録</h3>
+    <p>掲示板で表示される名前です。遊びツール（クラファン等）とも連動します。未入力なら掲示板では「名無しさん」になります。あとから変更できます。</p>
+    <input id="name-input" type="text" maxlength="30" placeholder="例: 山本" onkeydown="if(event.key==='Enter')submitNameModal()">
+    <div class="name-modal-actions">
+      <button class="ghost" onclick="closeNameModal()">あとで</button>
+      <button class="primary" onclick="submitNameModal()">登録</button>
+    </div>
   </div>
 </div>
 <script>
@@ -862,6 +893,46 @@ try{
 const connEl=document.getElementById('conn-status');
 if(connEl) connEl.style.display='none';
 
+/* ===== 共有プロフィール（名前 登録・端末記憶・遊びツール連動）===== */
+/* getUid() は既存のものを流用（再定義しない） */
+(function adoptBridge(){
+  try{
+    const u=new URLSearchParams(location.search).get('u');
+    if(u && /^[A-Za-z0-9_]+$/.test(u)){
+      localStorage.setItem('rt_uid',u);
+      document.cookie='rt_uid='+u+';max-age=31536000;path=/;SameSite=Lax';
+      const url=new URL(location.href); url.searchParams.delete('u');
+      history.replaceState(null,'',url.pathname+(url.search||'')+url.hash);
+    }
+  }catch(e){}
+})();
+const RT_GUEST='ゲストさん';
+let myName=''; try{ myName=localStorage.getItem('rt_uname')||''; }catch(e){}
+function rtDisplayName(){ return myName || RT_GUEST; }
+function updateNameChip(){ const c=document.getElementById('name-chip-label'); if(c) c.textContent = myName || '名前を登録'; }
+function bridgeLinks(){ const uid=getUid(); document.querySelectorAll('a[data-bridge]').forEach(function(a){ try{ const url=new URL(a.href); url.searchParams.set('u',uid); a.href=url.toString(); }catch(e){} }); }
+function applyProfileToNameInputs(){
+  if(!myName) return;
+  document.querySelectorAll('input[id^="nt-name-"]').forEach(function(el){ if(!el.value) el.value=myName; });
+  document.querySelectorAll('input[id^="rp-name-"]').forEach(function(el){ if(!el.readOnly && !el.value) el.value=myName; });
+}
+function loadProfile(){
+  updateNameChip();
+  if(!firebaseReady||!db) return;
+  try{ db.ref('profiles/'+getUid()+'/name').on('value', function(snap){ const n=snap.val(); if(typeof n==='string'&&n.trim()){ myName=n.trim(); try{localStorage.setItem('rt_uname',myName);}catch(e){} updateNameChip(); applyProfileToNameInputs(); } }, function(){}); }catch(e){}
+}
+function saveName(name){
+  name=(name||'').trim().slice(0,30);
+  myName=name;
+  try{ localStorage.setItem('rt_uname',name); }catch(e){}
+  updateNameChip();
+  applyProfileToNameInputs();
+  if(firebaseReady&&db){ try{ db.ref('profiles/'+getUid()).set({name:name, updated:Date.now()}); }catch(e){} }
+}
+function openNameModal(){ const m=document.getElementById('name-modal'); if(!m) return; const i=document.getElementById('name-input'); if(i) i.value=myName||''; m.hidden=false; if(i) setTimeout(function(){i.focus();},30); }
+function closeNameModal(){ const m=document.getElementById('name-modal'); if(m) m.hidden=true; }
+function submitNameModal(){ const i=document.getElementById('name-input'); const v=(i?i.value:'').trim(); if(!v){ alert('お名前を入力してください。あとで設定する場合は「あとで」を押してください。'); if(i) i.focus(); return; } saveName(v); closeNameModal(); }
+
 // =====================================================
 //  ローカルストレージ fallback + ポーリング
 // =====================================================
@@ -994,6 +1065,7 @@ function renderThread(t,th,isUpdate){
       nameInput.readOnly=false;
       nameInput.style.opacity='1';
       nameInput.title='';
+      if(!nameInput.value && typeof myName!=='undefined' && myName) nameInput.value=myName;
     }
   }
 }
@@ -1146,6 +1218,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadThreads('dmm-monitor-2');
   loadThreads('cfms-plotter');
   loadThreads('qe-calculator');
+
+  // ===== 共有プロフィール =====
+  bridgeLinks();
+  loadProfile();
+  applyProfileToNameInputs();
 
   // ===== Lock setup =====
   installLockOverlays();
