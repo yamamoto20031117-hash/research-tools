@@ -157,44 +157,22 @@
     z-index:3;
   }
   .tool-section[data-locked="true"] .card .launch{cursor:not-allowed}
-  /* chain-wrap: maintain the image's native 3:2 aspect ratio so
-     clip-path percentages always land on the same pixel region,
-     regardless of how tall/short the card is on PC vs mobile. */
+  /* 1枚のPNGをそのまま表示。clip-path分割はアニメ用だったので不要。 */
   .tool-section[data-locked="true"] .chain-wrap{
     position:absolute;
     left:50%; top:50%;
     transform:translate(-50%,-50%);
     width:100%;
     aspect-ratio:1536/1024;
-    pointer-events:none;z-index:4;overflow:visible;
+    pointer-events:none;z-index:4;
     transition: opacity .35s ease;
   }
-  .tool-section[data-locked="true"].unlocking .chain-wrap{
-    opacity: 0;
-  }
-  /* Three clip-pathed copies of the same lock-chain image (1536×1024 RGBA).
-     background-size:100% 100% forces an exact 1:1 pixel mapping so
-     inset() percentages are stable at every viewport width. */
+  .tool-section[data-locked="true"].unlocking .chain-wrap{ opacity:0; }
   .tool-section[data-locked="true"] .chain-img{
     position:absolute;inset:0;
-    background:url('/lock-chain.png') no-repeat top left;
-    background-size:100% 100%;
-    filter:drop-shadow(0 6px 10px rgba(0,0,0,0.65));
-  }
-  /* Pixel analysis of lock-chain.png (1536×1024):
-       chain band  y ≈ 38–50%  →  left / right split at x≈37% / 57%
-       lock body   x = 37.5–56.2%, y = 40–73% */
-  /* Chains extend under the lock region so there is no gap;
-     the .lock div (rendered last = on top) covers the overlap. */
-  .tool-section[data-locked="true"] .chain-img.left  { clip-path: inset(0 44% 0 0); }
-  .tool-section[data-locked="true"] .chain-img.right { clip-path: inset(0 0 0 38%); }
-  .tool-section[data-locked="true"] .chain-img.lock  {
-    clip-path: inset(40% 44% 27% 38%);
-    /* dark fill so the keyhole (alpha=0 in PNG) shows card bg, not chains below */
-    background-color: rgb(20, 25, 40);
-    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.65))
-            brightness(1.45) saturate(1.55) contrast(1.05)
-            drop-shadow(0 0 18px rgba(252,211,77,0.55));
+    background:url('/lock-chain.png') no-repeat center center;
+    background-size:contain;
+    filter: drop-shadow(0 0 14px rgba(252,211,77,0.5));
   }
 
   /* unlocked → chain消える */
@@ -1204,11 +1182,7 @@ function applyUnlockedState(){
 
 // Chain markup: 3 copies of the same lock-chain.png clip-pathed into
 // left half / right half / central padlock.
-const CHAIN_HTML = `
-<div class="chain-img left"></div>
-<div class="chain-img right"></div>
-<div class="chain-img lock"></div>
-`;
+const CHAIN_HTML = `<div class="chain-img"></div>`;
 
 function installLockOverlays(){
   document.querySelectorAll('.tool-section[data-locked="true"]').forEach(section => {
