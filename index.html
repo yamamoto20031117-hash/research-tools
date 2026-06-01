@@ -125,6 +125,94 @@
   .setup-notice{padding:16px;text-align:center;color:#666;font-size:.78rem;border-bottom:1px solid rgba(255,255,255,0.04)}
   .setup-notice a{color:#58a6ff}
 
+  /* ===== Locked tools (鎖でバッテン + 錠前) ===== */
+  .tool-section[data-locked="true"]{position:relative}
+  .tool-section[data-locked="true"] .card{
+    position:relative;
+    filter:grayscale(70%) brightness(0.55) contrast(0.9);
+    transition:filter .25s ease;
+  }
+  .tool-section[data-locked="true"] .card::before{
+    content:'';position:absolute;inset:0;border-radius:12px;pointer-events:none;
+    background:radial-gradient(ellipse at center,rgba(0,0,0,0.0) 30%,rgba(0,0,0,0.55) 100%);
+    z-index:3;
+  }
+  .tool-section[data-locked="true"] .card .launch{cursor:not-allowed}
+  .tool-section[data-locked="true"] .chain-wrap{
+    position:absolute;inset:0;pointer-events:none;z-index:4;
+    display:flex;align-items:center;justify-content:center;
+    perspective:600px;
+  }
+  .tool-section[data-locked="true"] .chain-strand{
+    position:absolute;width:130%;height:36px;left:-15%;top:50%;
+    transform-style:preserve-3d;
+    filter:drop-shadow(0 6px 10px rgba(0,0,0,0.7));
+  }
+  .tool-section[data-locked="true"] .chain-strand.s1{
+    transform:translateY(-50%) rotate(22deg) rotateY(-8deg);
+    animation:chainSway1 5.5s ease-in-out infinite;
+  }
+  .tool-section[data-locked="true"] .chain-strand.s2{
+    transform:translateY(-50%) rotate(-22deg) rotateY(8deg);
+    animation:chainSway2 6.5s ease-in-out infinite;
+  }
+  @keyframes chainSway1{
+    0%,100%{transform:translateY(-50%) rotate(22deg) rotateY(-8deg)}
+    50%   {transform:translateY(calc(-50% + 4px)) rotate(20deg) rotateY(-4deg)}
+  }
+  @keyframes chainSway2{
+    0%,100%{transform:translateY(-50%) rotate(-22deg) rotateY(8deg)}
+    50%   {transform:translateY(calc(-50% + 5px)) rotate(-20deg) rotateY(4deg)}
+  }
+  .tool-section[data-locked="true"] .padlock{
+    position:relative;width:96px;height:108px;z-index:5;
+    filter:drop-shadow(0 10px 14px rgba(0,0,0,0.7)) drop-shadow(0 0 8px rgba(252,211,77,0.35));
+    animation:padlockSway 4s ease-in-out infinite;
+    transform-style:preserve-3d;
+  }
+  @keyframes padlockSway{
+    0%,100%{transform:translateY(0) rotate(-5deg) rotateY(-6deg)}
+    50%   {transform:translateY(-6px) rotate(5deg) rotateY(6deg)}
+  }
+  .tool-section[data-locked="true"]:hover .padlock{animation-duration:1.5s}
+  .tool-section[data-locked="true"]:hover .chain-strand.s1,
+  .tool-section[data-locked="true"]:hover .chain-strand.s2{animation-duration:1.2s}
+
+  /* unlocked → chain消える */
+  body.rt-unlocked .tool-section[data-locked="true"] .card{filter:none}
+  body.rt-unlocked .tool-section[data-locked="true"] .card::before,
+  body.rt-unlocked .tool-section[data-locked="true"] .chain-wrap{display:none}
+  body.rt-unlocked .tool-section[data-locked="true"] .card .launch{cursor:pointer}
+
+  /* ===== Password modal ===== */
+  #lock-modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+  #lock-modal.visible{display:flex}
+  #lock-modal .backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.72);backdrop-filter:blur(6px)}
+  #lock-modal .panel{position:relative;background:#10141c;border:1px solid rgba(252,211,77,0.4);
+    border-radius:14px;padding:26px 30px;max-width:380px;width:100%;
+    box-shadow:0 20px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(252,211,77,0.15) inset}
+  #lock-modal h3{color:#fcd34d;font-size:1.1rem;margin-bottom:6px;text-align:center;letter-spacing:.04em}
+  #lock-modal p{color:#aabad6;font-size:.82rem;text-align:center;margin-bottom:18px;line-height:1.5}
+  #lock-modal .ico{display:block;margin:0 auto 12px;width:54px;height:54px}
+  #lock-input{width:100%;background:#0c0f15;border:1px solid #2a3040;color:#fff;
+    padding:10px 14px;border-radius:7px;font-size:1rem;font-family:inherit;letter-spacing:.1em;
+    transition:border-color .15s}
+  #lock-input:focus{outline:none;border-color:#fcd34d;box-shadow:0 0 0 3px rgba(252,211,77,0.15)}
+  #lock-input.shake{animation:shake .4s ease-in-out}
+  @keyframes shake{
+    0%,100%{transform:translateX(0)}
+    25%{transform:translateX(-6px)}
+    75%{transform:translateX(6px)}
+  }
+  #lock-error{color:#ff7a7a;font-size:.78rem;text-align:center;min-height:1.2em;margin-top:8px}
+  #lock-modal .actions{display:flex;gap:10px;margin-top:14px;justify-content:flex-end}
+  #lock-modal button{padding:7px 16px;border-radius:6px;font-size:.85rem;font-weight:600;
+    border:none;cursor:pointer;font-family:inherit;transition:background .15s}
+  #lock-modal .btn-go{background:linear-gradient(135deg,#fcd34d,#f59e0b);color:#3a1a05}
+  #lock-modal .btn-go:hover{filter:brightness(1.08)}
+  #lock-modal .btn-cancel{background:transparent;color:#aabad6;border:1px solid #2a3040}
+  #lock-modal .btn-cancel:hover{border-color:#fcd34d;color:#fff}
+
   /* 接続ステータス */
   .conn-status{position:fixed;top:8px;right:12px;font-size:.7rem;padding:3px 10px;border-radius:10px;z-index:100;
     display:flex;align-items:center;gap:5px;pointer-events:none}
@@ -316,7 +404,7 @@
 </div>
 
 <!-- ===== DMM リアルタイムモニター ===== -->
-<div class="tool-section" data-tool="dmm-monitor">
+<div class="tool-section" data-tool="dmm-monitor" data-locked="true">
   <div class="card">
     <div class="card-top">
       <div class="icon">&#9889;</div>
@@ -373,7 +461,7 @@
 
 
 <!-- ===== DMM リアルタイムモニター 2 ===== -->
-<div class="tool-section" data-tool="dmm-monitor-2">
+<div class="tool-section" data-tool="dmm-monitor-2" data-locked="true">
   <div class="card">
     <div class="card-top">
       <div class="icon">&#9889;</div>
@@ -429,7 +517,7 @@
 </div>
 
 <!-- ===== SQUID 磁化データプロッター ===== -->
-<div class="tool-section" data-tool="squid-plotter">
+<div class="tool-section" data-tool="squid-plotter" data-locked="true">
   <div class="card">
     <div class="card-top">
       <div class="icon">&#129532;</div>
@@ -484,7 +572,7 @@
 
 
 <!-- ===== CFMS 低温物性モニター ===== -->
-<div class="tool-section" data-tool="cfms-plotter">
+<div class="tool-section" data-tool="cfms-plotter" data-locked="true">
   <div class="card">
     <div class="card-top">
       <div class="icon">&#10052;</div>
@@ -541,7 +629,7 @@
 </div>
 
 <!-- ===== QE 計算ランチャー ===== -->
-<div class="tool-section" data-tool="qe-calculator">
+<div class="tool-section" data-tool="qe-calculator" data-locked="true">
   <div class="card">
     <div class="card-top">
       <div class="icon">&#9883;</div>
@@ -599,7 +687,7 @@
   </div>
 </div>
 
-<div class="tool-section" data-tool="Temudraw">
+<div class="tool-section" data-tool="Temudraw" data-locked="true">
   <div class="card">
     <div class="card-top">
       <div class="icon">🧪</div>
@@ -658,6 +746,34 @@
 <!-- 将来のツール: tool-sectionをコピーして追加 -->
 
 </main>
+
+<!-- Password modal for locked tools -->
+<div id="lock-modal">
+  <div class="backdrop"></div>
+  <div class="panel">
+    <svg class="ico" viewBox="0 0 100 120">
+      <defs>
+        <linearGradient id="lockGrad-modal" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fde68a"/>
+          <stop offset="50%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#7c2d12"/>
+        </linearGradient>
+      </defs>
+      <path d="M 28 56 L 28 42 A 22 22 0 0 1 72 42 L 72 56" fill="none" stroke="#a8a8b8" stroke-width="8" stroke-linecap="round"/>
+      <rect x="14" y="50" width="72" height="60" rx="8" fill="url(#lockGrad-modal)" stroke="#3a1a05" stroke-width="1.5"/>
+      <circle cx="50" cy="76" r="6" fill="#3a1a05"/>
+      <rect x="46" y="76" width="8" height="16" rx="2" fill="#3a1a05"/>
+    </svg>
+    <h3>🔒 ロック中</h3>
+    <p>このツールは研究室メンバー限定です。<br>パスワードを入力してください。</p>
+    <input id="lock-input" type="password" autocomplete="off" placeholder="パスワード">
+    <div id="lock-error"></div>
+    <div class="actions">
+      <button class="btn-cancel" type="button" onclick="window._closeLock()">キャンセル</button>
+      <button class="btn-go" type="button" onclick="window._submitLock()">解除</button>
+    </div>
+  </div>
+</div>
 
 <footer>
   <p>Built with Claude &amp; Three.js — <a href="https://github.com/yamamoto20031117-hash" target="_blank">GitHub</a></p>
@@ -983,6 +1099,148 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadThreads('dmm-monitor-2');
   loadThreads('cfms-plotter');
   loadThreads('qe-calculator');
+
+  // ===== Lock setup =====
+  installLockOverlays();
+  applyUnlockedState();
+});
+
+// =====================================================
+//  Lock / password gate
+// =====================================================
+// パスワードはここで定義。研究室メンバーに共有する文字列を入れてください。
+// 変更したら全員に再共有 → 各ブラウザで再度入力が必要。
+const LOCK_PASSWORD = 'suda2026';
+const LOCK_STORAGE_KEY = 'rt-unlocked-v1';
+
+function isUnlocked(){
+  return localStorage.getItem(LOCK_STORAGE_KEY) === 'true';
+}
+function applyUnlockedState(){
+  if(isUnlocked()) document.body.classList.add('rt-unlocked');
+}
+
+// Chain SVG — 8 chain links per strand, alternating orientation
+const CHAIN_SVG = `
+<svg class="chain-strand s1" viewBox="0 0 800 40" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="chainGradA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e6ecf6"/>
+      <stop offset="50%" stop-color="#7a8090"/>
+      <stop offset="100%" stop-color="#2a303c"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#chainGradA)" stroke-width="3.5" fill="none">
+    <ellipse cx="40"  cy="20" rx="32" ry="13"/>
+    <ellipse cx="140" cy="20" rx="13" ry="16"/>
+    <ellipse cx="240" cy="20" rx="32" ry="13"/>
+    <ellipse cx="340" cy="20" rx="13" ry="16"/>
+    <ellipse cx="440" cy="20" rx="32" ry="13"/>
+    <ellipse cx="540" cy="20" rx="13" ry="16"/>
+    <ellipse cx="640" cy="20" rx="32" ry="13"/>
+    <ellipse cx="740" cy="20" rx="13" ry="16"/>
+  </g>
+</svg>
+<svg class="chain-strand s2" viewBox="0 0 800 40" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="chainGradB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e6ecf6"/>
+      <stop offset="50%" stop-color="#7a8090"/>
+      <stop offset="100%" stop-color="#2a303c"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#chainGradB)" stroke-width="3.5" fill="none">
+    <ellipse cx="40"  cy="20" rx="32" ry="13"/>
+    <ellipse cx="140" cy="20" rx="13" ry="16"/>
+    <ellipse cx="240" cy="20" rx="32" ry="13"/>
+    <ellipse cx="340" cy="20" rx="13" ry="16"/>
+    <ellipse cx="440" cy="20" rx="32" ry="13"/>
+    <ellipse cx="540" cy="20" rx="13" ry="16"/>
+    <ellipse cx="640" cy="20" rx="32" ry="13"/>
+    <ellipse cx="740" cy="20" rx="13" ry="16"/>
+  </g>
+</svg>
+<svg class="padlock" viewBox="0 0 100 120">
+  <defs>
+    <linearGradient id="lockGradMain" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#7c2d12"/>
+    </linearGradient>
+    <linearGradient id="shackleGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#dde3ee"/>
+      <stop offset="100%" stop-color="#5a6075"/>
+    </linearGradient>
+  </defs>
+  <path d="M 28 56 L 28 38 A 22 22 0 0 1 72 38 L 72 56" fill="none" stroke="url(#shackleGrad)" stroke-width="10" stroke-linecap="round"/>
+  <rect x="14" y="48" width="72" height="62" rx="9" fill="url(#lockGradMain)" stroke="#3a1a05" stroke-width="2"/>
+  <circle cx="50" cy="74" r="6" fill="#3a1a05"/>
+  <rect x="46" y="74" width="8" height="18" rx="2" fill="#3a1a05"/>
+</svg>
+`;
+
+function installLockOverlays(){
+  document.querySelectorAll('.tool-section[data-locked="true"]').forEach(section => {
+    const card = section.querySelector('.card');
+    if(!card) return;
+    if(card.querySelector('.chain-wrap')) return; // already installed
+    const wrap = document.createElement('div');
+    wrap.className = 'chain-wrap';
+    wrap.innerHTML = CHAIN_SVG;
+    card.appendChild(wrap);
+  });
+}
+
+// Intercept clicks on locked launch links
+document.addEventListener('click', e => {
+  if(isUnlocked()) return;
+  const section = e.target.closest('.tool-section[data-locked="true"]');
+  if(!section) return;
+  // Only intercept launch link clicks (not board, not card hover)
+  const launch = e.target.closest('.launch');
+  const card = e.target.closest('.card');
+  if(!launch && !card) return;
+  // Don't gate the thread board interactions
+  if(e.target.closest('.board')) return;
+  e.preventDefault();
+  const target = launch ? launch.getAttribute('href') : section.querySelector('.launch')?.getAttribute('href');
+  window._openLock(target || '');
+}, true);
+
+window._openLock = function(redirectUrl){
+  const modal = document.getElementById('lock-modal');
+  modal.dataset.redirect = redirectUrl || '';
+  modal.classList.add('visible');
+  const input = document.getElementById('lock-input');
+  input.value = '';
+  document.getElementById('lock-error').textContent = '';
+  setTimeout(() => input.focus(), 50);
+};
+window._closeLock = function(){
+  document.getElementById('lock-modal').classList.remove('visible');
+};
+window._submitLock = function(){
+  const input = document.getElementById('lock-input');
+  const errEl = document.getElementById('lock-error');
+  if(input.value === LOCK_PASSWORD){
+    localStorage.setItem(LOCK_STORAGE_KEY, 'true');
+    document.body.classList.add('rt-unlocked');
+    const url = document.getElementById('lock-modal').dataset.redirect;
+    window._closeLock();
+    if(url) location.href = url;
+  } else {
+    errEl.textContent = 'パスワードが違います';
+    input.classList.add('shake');
+    setTimeout(() => input.classList.remove('shake'), 400);
+  }
+};
+
+// Enter key submits, Escape cancels
+document.addEventListener('keydown', e => {
+  const modal = document.getElementById('lock-modal');
+  if(!modal.classList.contains('visible')) return;
+  if(e.key === 'Enter'){ e.preventDefault(); window._submitLock(); }
+  if(e.key === 'Escape'){ e.preventDefault(); window._closeLock(); }
 });
 </script>
 </body>
