@@ -839,9 +839,7 @@ if(connEl) connEl.style.display='none';
     }
   }catch(e){}
 })();
-const RT_GUEST='ゲストさん';
 let myName=''; try{ myName=localStorage.getItem('rt_uname')||''; }catch(e){}
-function rtDisplayName(){ return myName || RT_GUEST; }
 function updateNameChip(){ const c=document.getElementById('name-chip-label'); if(c) c.textContent = myName || '名前を登録'; }
 function bridgeLinks(){ const uid=getUid(); document.querySelectorAll('a[data-bridge]').forEach(function(a){ try{ const url=new URL(a.href); url.searchParams.set('u',uid); a.href=url.toString(); }catch(e){} }); }
 function applyProfileToNameInputs(){
