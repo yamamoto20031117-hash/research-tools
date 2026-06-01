@@ -621,15 +621,15 @@
     ];
   }
 
-  // === Build celestial sphere (stars + lines + figures) ====================
-  // Hemisphere shader hides everything on the camera's near side.
+  // === Build celestial sphere (stars + lines) ============================
+  // Hemisphere shader hides everything on the camera's near side. Figure
+  // sprites have been retired — the equirectangular sky map (loaded later)
+  // now plays that role as the "always present" backdrop.
   function buildConstellationSky(R) {
     const allPos = [], allCol = [], allSize = [], lineVerts = [];
-    const figureDefs = [];   // {fig, centroidWorld}
 
     CONSTELLATIONS.forEach(C => {
       const local = [];
-      let cx = 0, cy = 0, cz = 0;
       C.s.forEach(([ra, dec, mag]) => {
         const [x, y, z] = radecToXYZ(ra, dec, R);
         allPos.push(x, y, z);
@@ -640,15 +640,7 @@
         const sz = Math.max(1.2, 4.0 - mag * 0.7);
         allSize.push(sz);
         local.push([x, y, z]);
-        cx += x; cy += y; cz += z;
       });
-      const n = C.s.length;
-      cx /= n; cy /= n; cz /= n;
-      const len = Math.sqrt(cx*cx + cy*cy + cz*cz) || 1;
-      // Project centroid onto sphere, slightly inside so figure sits "behind" the stars
-      const k = R * 0.92 / len;
-      if (C.fig) figureDefs.push({ fig: C.fig, pos: [cx*k, cy*k, cz*k] });
-
       C.l.forEach(([i, j]) => {
         const [xi, yi, zi] = local[i];
         const [xj, yj, zj] = local[j];
@@ -724,39 +716,37 @@
     });
     const skyLines = new THREE.LineSegments(lGeo, lMat);
 
-    // ===== Constellation figures (emoji sprites) ============================
-    // Each emoji rendered into a CanvasTexture and placed as a Sprite at the
-    // constellation centroid. Opacity is updated per frame for hemisphere
-    // visibility (Sprites can't easily use ShaderMaterial in r147).
-    const figures = [];
-    figureDefs.forEach(({ fig, pos }) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 256; canvas.height = 256;
-      const ctx = canvas.getContext('2d');
-      ctx.font = '170px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(fig, 128, 138);
-      const tex = new THREE.CanvasTexture(canvas);
-      tex.minFilter = THREE.LinearFilter;
-      const mat = new THREE.SpriteMaterial({
-        map: tex, transparent: true, opacity: 0.15,
-        depthWrite: false, color: 0xffd9aa,
-      });
-      const sprite = new THREE.Sprite(mat);
-      sprite.position.set(pos[0], pos[1], pos[2]);
-      sprite.scale.set(14, 14, 1);
-      const dir = new THREE.Vector3(pos[0], pos[1], pos[2]).normalize();
-      figures.push({ sprite, dir, mat, base: 0.18 });
-    });
-
-    return { stars: skyStars, lines: skyLines, figures,
+    return { stars: skyStars, lines: skyLines,
              camDir: camDirU, starMat: sMat, lineMat: lMat };
   }
 
   const sky = buildConstellationSky(60);
   scene.add(sky.stars);
   scene.add(sky.lines);
-  sky.figures.forEach(f => scene.add(f.sprite));
+
+  // === A-layer: real all-sky equirectangular background ====================
+  // Drop a CC-BY equirectangular star map (e.g. Solar System Scope
+  // 8k_stars_milky_way.jpg) into research-tools/sky-equirect.jpg.
+  // If the file is missing the scene still works — we just skip this layer.
+  new THREE.TextureLoader().load(
+    '/sky-equirect.jpg',
+    tex => {
+      if ('encoding' in tex) tex.encoding = THREE.sRGBEncoding;
+      const skyGeo = new THREE.SphereGeometry(280, 64, 32);
+      const skyMat = new THREE.MeshBasicMaterial({
+        map: tex,
+        side: THREE.BackSide,           // visible from inside
+        transparent: true,
+        opacity: 0.55,                   // soft, so point stars stay readable
+        depthWrite: false,
+      });
+      const skySphere = new THREE.Mesh(skyGeo, skyMat);
+      skySphere.renderOrder = -10;       // paint first, everything else on top
+      scene.add(skySphere);
+    },
+    undefined,
+    () => { /* file absent — silent fallback to procedural sky only */ }
+  );
 
   // === Nebula clouds — translucent colored spheres far from the camera ===
   // They sit beyond the star layers and tint the void with soft color.
@@ -866,18 +856,10 @@
     starLayers[2].material.opacity = 0.55 + 0.22 * Math.sin(tStar * 0.5 + 2.8);
 
     // Celestial sphere: update camera direction so the shader hides
-    // the camera-side hemisphere; figures get the same treatment via
-    // per-frame opacity (Sprite materials don't run our shader).
+    // the camera-side hemisphere.
     sky.camDir.value.copy(camera.position).normalize();
     sky.starMat.uniforms.twinkle.value = 0.85 + 0.15 * Math.sin(tStar * 0.6);
     sky.lineMat.uniforms.baseOpacity.value = 0.38 + 0.12 * Math.sin(tStar * 0.7);
-    const cd = sky.camDir.value;
-    sky.figures.forEach(f => {
-      const d = f.dir.dot(cd);
-      // Same edge order as the shader so figures fade in step with stars
-      const vis = 1 - THREE.MathUtils.smoothstep(d, -0.1, 0.15);
-      f.mat.opacity = f.base * vis;
-    });
 
     renderer.render(scene, camera);
   }
