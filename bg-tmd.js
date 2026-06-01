@@ -533,79 +533,79 @@
   // Each entry: s = [[RA_hours, Dec_deg, magnitude], ...]
   //            l = [[i, j], ...] indices for line segments
   const CONSTELLATIONS = [
-    { name:'UMa', s:[
+    { name:'UMa', fig:'🐻',  s:[
       [11.062, 61.751, 1.79],[11.030, 56.382, 2.37],[11.897, 53.694, 2.44],
       [12.257, 57.033, 3.31],[12.900, 55.960, 1.77],[13.398, 54.925, 2.27],
       [13.792, 49.313, 1.86]],
       l:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[0,3]] },
-    { name:'UMi', s:[
+    { name:'UMi', fig:'🐻‍❄️', s:[
       [2.530, 89.264, 2.02],[14.845, 74.156, 2.08],[15.345, 71.834, 3.05],
       [16.292, 75.755, 4.95],[16.766, 82.037, 4.21],[17.537, 86.586, 4.36],
       [15.733, 77.794, 4.32]],
       l:[[0,5],[5,4],[4,6],[6,1],[1,2],[2,3],[3,6]] },
-    { name:'Cas', s:[
+    { name:'Cas', fig:'👸', s:[
       [0.675, 56.537, 2.24],[0.153, 59.150, 2.27],[0.945, 60.717, 2.47],
       [1.430, 60.235, 2.68],[1.907, 63.670, 3.38]],
       l:[[1,0],[0,2],[2,3],[3,4]] },
-    { name:'Ori', s:[
+    { name:'Ori', fig:'🏹', s:[
       [5.919,   7.407, 0.42],[5.242,  -8.202, 0.18],[5.418,   6.350, 1.64],
       [5.533,  -0.299, 2.21],[5.604,  -1.202, 1.69],[5.679,  -1.943, 1.74],
       [5.795,  -9.670, 2.06]],
       l:[[0,2],[2,1],[1,6],[6,0],[3,4],[4,5]] },
-    { name:'Tau', s:[
+    { name:'Tau', fig:'🐂', s:[
       [4.598, 16.509, 0.87],[5.438, 28.608, 1.65],[5.628, 21.143, 3.00]],
       l:[[0,1],[0,2]] },
-    { name:'Aur', s:[
+    { name:'Aur', fig:'🐐', s:[
       [5.278, 45.998, 0.08],[5.992, 44.948, 1.90],[4.950, 33.166, 2.69],
       [5.438, 28.608, 1.65],[5.998, 37.213, 2.62]],
       l:[[0,1],[1,4],[4,3],[3,2],[2,0]] },
-    { name:'Gem', s:[
+    { name:'Gem', fig:'👯', s:[
       [7.577, 31.888, 1.58],[7.755, 28.026, 1.14],[6.628, 16.399, 1.92],
       [7.335, 21.982, 3.50]],
       l:[[0,1],[0,3],[3,2]] },
-    { name:'CMa', s:[
+    { name:'CMa', fig:'🐕', s:[
       [6.752,-16.716,-1.46],[6.378,-17.956, 1.98],[7.140,-26.393, 1.83],
       [6.977,-28.972, 1.50]],
       l:[[1,0],[0,3],[3,2]] },
-    { name:'Leo', s:[
+    { name:'Leo', fig:'🦁', s:[
       [10.140, 11.967, 1.36],[10.333, 19.833, 2.61],[11.818, 14.572, 2.14],
       [11.235, 20.524, 2.56],[11.237, 15.430, 3.33],[10.279, 23.417, 3.44]],
       l:[[0,1],[1,5],[1,3],[3,2],[0,4],[4,2]] },
-    { name:'Vir', s:[
+    { name:'Vir', fig:'👰', s:[
       [13.420,-11.161, 0.97]], l:[] },
-    { name:'Boo', s:[
+    { name:'Boo', fig:'🧑‍🌾', s:[
       [14.261, 19.182,-0.05],[14.749, 27.075, 2.35],[14.534, 38.308, 3.04],
       [14.530, 30.371, 3.57],[15.032, 40.391, 3.50]],
       l:[[0,1],[1,4],[4,2],[2,3],[3,0]] },
-    { name:'Cru', s:[
+    { name:'Cru', fig:'✚', s:[
       [12.443,-63.099, 0.76],[12.795,-59.689, 1.25],[12.519,-57.113, 1.59],
       [12.252,-58.749, 2.78]],
       l:[[0,2],[1,3]] },
-    { name:'Cen', s:[
+    { name:'Cen', fig:'🐎', s:[
       [14.660,-60.835,-0.01],[14.063,-60.373, 0.61]],
       l:[[0,1]] },
-    { name:'Sco', s:[
+    { name:'Sco', fig:'🦂', s:[
       [16.490,-26.432, 1.06],[16.090,-19.806, 2.62],[16.005,-22.622, 2.32],
       [17.622,-42.998, 1.86],[17.560,-37.104, 1.62],[15.987,-26.114, 2.89],
       [16.353,-25.593, 2.91]],
       l:[[1,2],[2,5],[5,6],[6,0],[0,3],[3,4]] },
-    { name:'Sgr', s:[
+    { name:'Sgr', fig:'🏹', s:[
       [18.402,-34.385, 1.79],[18.921,-26.296, 2.05],[19.043,-29.880, 2.60],
       [18.351,-29.828, 2.72],[18.466,-25.421, 2.81],[18.075,-27.000, 3.17],
       [19.115,-27.670, 3.32]],
       l:[[5,4],[4,3],[3,0],[0,2],[2,1],[1,4]] },
-    { name:'Lyr', s:[
+    { name:'Lyr', fig:'🎵', s:[
       [18.616, 38.784, 0.03],[18.747, 37.605, 4.34],[18.835, 33.363, 3.52],
       [18.982, 32.690, 3.24]],
       l:[[0,1],[1,2],[2,3],[3,0]] },
-    { name:'Aql', s:[
+    { name:'Aql', fig:'🦅', s:[
       [19.846,  8.868, 0.77],[19.771, 10.613, 2.72],[19.922,  6.407, 3.71]],
       l:[[1,0],[0,2]] },
-    { name:'Cyg', s:[
+    { name:'Cyg', fig:'🦢', s:[
       [20.690, 45.280, 1.25],[20.370, 40.257, 2.20],[19.513, 27.965, 3.18],
       [20.770, 33.967, 2.46],[19.750, 45.131, 2.87]],
       l:[[0,1],[1,2],[4,1],[1,3]] },
-    { name:'Peg', s:[
+    { name:'Peg', fig:'🐎', s:[
       [23.080, 15.205, 2.49],[23.063, 28.083, 2.42],[0.221, 15.184, 2.83],
       [0.140, 29.090, 2.07]],
       l:[[0,1],[1,3],[3,2],[2,0]] },
@@ -621,25 +621,34 @@
     ];
   }
 
-  // === Build celestial sphere (stars + lines) with hemisphere visibility ===
-  // Shader hides everything on the camera's hemisphere — only the far half
-  // of the sky is rendered, like looking through the TMD into space.
+  // === Build celestial sphere (stars + lines + figures) ====================
+  // Hemisphere shader hides everything on the camera's near side.
   function buildConstellationSky(R) {
     const allPos = [], allCol = [], allSize = [], lineVerts = [];
+    const figureDefs = [];   // {fig, centroidWorld}
 
     CONSTELLATIONS.forEach(C => {
       const local = [];
+      let cx = 0, cy = 0, cz = 0;
       C.s.forEach(([ra, dec, mag]) => {
         const [x, y, z] = radecToXYZ(ra, dec, R);
         allPos.push(x, y, z);
-        // Color: warm tint for bright stars
-        const t = Math.min(1, Math.max(0, mag) * 0.15);
-        allCol.push(1.0 - t*0.05, 0.97 - t*0.05, 0.90 - t*0.10);
-        // Size: brighter (lower mag) = bigger
-        const sz = Math.max(0.6, 2.4 - mag * 0.5);
+        // Stars are nearly white — warmer for bright ones
+        const t = Math.min(1, Math.max(0, mag) * 0.1);
+        allCol.push(1.0, 1.0 - t*0.04, 0.93 - t*0.08);
+        // Size: brighter (lower mag) = much bigger
+        const sz = Math.max(1.2, 4.0 - mag * 0.7);
         allSize.push(sz);
         local.push([x, y, z]);
+        cx += x; cy += y; cz += z;
       });
+      const n = C.s.length;
+      cx /= n; cy /= n; cz /= n;
+      const len = Math.sqrt(cx*cx + cy*cy + cz*cz) || 1;
+      // Project centroid onto sphere, slightly inside so figure sits "behind" the stars
+      const k = R * 0.92 / len;
+      if (C.fig) figureDefs.push({ fig: C.fig, pos: [cx*k, cy*k, cz*k] });
+
       C.l.forEach(([i, j]) => {
         const [xi, yi, zi] = local[i];
         const [xj, yj, zj] = local[j];
@@ -647,10 +656,10 @@
       });
     });
 
-    // shared uniform — updated each frame from camera position
+    // Shared uniform: camera direction (unit vector toward camera from origin)
     const camDirU = { value: new THREE.Vector3(1, 0, 0) };
 
-    // ===== Stars (Points with shader) =====
+    // ===== Stars: ShaderMaterial Points with bright halo ====================
     const sGeo = new THREE.BufferGeometry();
     sGeo.setAttribute('position', new THREE.Float32BufferAttribute(allPos, 3));
     sGeo.setAttribute('color',    new THREE.Float32BufferAttribute(allCol, 3));
@@ -666,11 +675,11 @@
         void main() {
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           gl_Position = projectionMatrix * mv;
-          gl_PointSize = starSize * (220.0 / -mv.z);
-          // dot < 0  → opposite hemisphere from camera → visible
-          // dot > 0  → same hemisphere → hidden
+          // larger multiplier → brighter, more visible stars
+          gl_PointSize = starSize * (420.0 / -mv.z);
           float d = dot(normalize(position), cameraDir);
-          vAlpha = smoothstep(0.15, -0.1, d);
+          // Smooth fade across the horizon, GLSL-standard edge order
+          vAlpha = 1.0 - smoothstep(-0.1, 0.15, d);
           vColor = color;
         }`,
       fragmentShader: `
@@ -682,44 +691,72 @@
           vec2 uv = gl_PointCoord - 0.5;
           float r = length(uv);
           if (r > 0.5) discard;
-          float a = (1.0 - r * 2.0) * vAlpha * twinkle;
+          // Bright core + soft halo: 1.0 at center, falls off as r^1.5
+          float a = pow(1.0 - r * 2.0, 1.5) * vAlpha * twinkle;
           gl_FragColor = vec4(vColor, a);
         }`,
       transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending,   // makes overlapping stars glow brighter
     });
     const skyStars = new THREE.Points(sGeo, sMat);
 
-    // ===== Constellation lines =====
+    // ===== Constellation lines ============================================
     const lGeo = new THREE.BufferGeometry();
     lGeo.setAttribute('position', new THREE.Float32BufferAttribute(lineVerts, 3));
     const lMat = new THREE.ShaderMaterial({
-      uniforms: { cameraDir: camDirU, baseOpacity: { value: 0.35 } },
+      uniforms: { cameraDir: camDirU, baseOpacity: { value: 0.45 } },
       vertexShader: `
         uniform vec3 cameraDir;
         varying float vAlpha;
         void main() {
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           float d = dot(normalize(position), cameraDir);
-          vAlpha = smoothstep(0.15, -0.1, d);
+          vAlpha = 1.0 - smoothstep(-0.1, 0.15, d);
         }`,
       fragmentShader: `
         uniform float baseOpacity;
         varying float vAlpha;
         void main() {
           if (vAlpha < 0.02) discard;
-          gl_FragColor = vec4(0.6, 0.78, 1.0, vAlpha * baseOpacity);
+          gl_FragColor = vec4(0.7, 0.85, 1.0, vAlpha * baseOpacity);
         }`,
       transparent: true, depthWrite: false,
     });
     const skyLines = new THREE.LineSegments(lGeo, lMat);
 
-    return { stars: skyStars, lines: skyLines, camDir: camDirU,
-             starMat: sMat, lineMat: lMat };
+    // ===== Constellation figures (emoji sprites) ============================
+    // Each emoji rendered into a CanvasTexture and placed as a Sprite at the
+    // constellation centroid. Opacity is updated per frame for hemisphere
+    // visibility (Sprites can't easily use ShaderMaterial in r147).
+    const figures = [];
+    figureDefs.forEach(({ fig, pos }) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256; canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.font = '170px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(fig, 128, 138);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.minFilter = THREE.LinearFilter;
+      const mat = new THREE.SpriteMaterial({
+        map: tex, transparent: true, opacity: 0.15,
+        depthWrite: false, color: 0xffd9aa,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.position.set(pos[0], pos[1], pos[2]);
+      sprite.scale.set(14, 14, 1);
+      const dir = new THREE.Vector3(pos[0], pos[1], pos[2]).normalize();
+      figures.push({ sprite, dir, mat, base: 0.18 });
+    });
+
+    return { stars: skyStars, lines: skyLines, figures,
+             camDir: camDirU, starMat: sMat, lineMat: lMat };
   }
 
   const sky = buildConstellationSky(60);
   scene.add(sky.stars);
   scene.add(sky.lines);
+  sky.figures.forEach(f => scene.add(f.sprite));
 
   // === Nebula clouds — translucent colored spheres far from the camera ===
   // They sit beyond the star layers and tint the void with soft color.
@@ -828,12 +865,19 @@
     starLayers[1].material.opacity = 0.65 + 0.20 * Math.sin(tStar * 0.7 + 1.4);
     starLayers[2].material.opacity = 0.55 + 0.22 * Math.sin(tStar * 0.5 + 2.8);
 
-    // Celestial sphere: feed the current camera direction into the
-    // shader so only the half-sky on the opposite side of the camera
-    // is rendered. Twinkle the constellation lines softly too.
+    // Celestial sphere: update camera direction so the shader hides
+    // the camera-side hemisphere; figures get the same treatment via
+    // per-frame opacity (Sprite materials don't run our shader).
     sky.camDir.value.copy(camera.position).normalize();
     sky.starMat.uniforms.twinkle.value = 0.85 + 0.15 * Math.sin(tStar * 0.6);
-    sky.lineMat.uniforms.baseOpacity.value = 0.28 + 0.10 * Math.sin(tStar * 0.7);
+    sky.lineMat.uniforms.baseOpacity.value = 0.38 + 0.12 * Math.sin(tStar * 0.7);
+    const cd = sky.camDir.value;
+    sky.figures.forEach(f => {
+      const d = f.dir.dot(cd);
+      // Same edge order as the shader so figures fade in step with stars
+      const vis = 1 - THREE.MathUtils.smoothstep(d, -0.1, 0.15);
+      f.mat.opacity = f.base * vis;
+    });
 
     renderer.render(scene, camera);
   }
