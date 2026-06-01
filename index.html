@@ -161,7 +161,14 @@
      lock occupies the slice between. */
   .tool-section[data-locked="true"] .chain-img.left  { clip-path: inset(0 63% 0 0); }
   .tool-section[data-locked="true"] .chain-img.right { clip-path: inset(0 0 0 57%); }
-  .tool-section[data-locked="true"] .chain-img.lock  { clip-path: inset(35% 43% 25% 37%); }
+  .tool-section[data-locked="true"] .chain-img.lock  {
+    /* tight to just the padlock body — no chain segment leaks in above */
+    clip-path: inset(40% 44% 27% 38%);
+    /* boost the gold + add a warm halo so it pops against the dimmed card */
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.65))
+            brightness(1.45) saturate(1.55) contrast(1.05)
+            drop-shadow(0 0 18px rgba(252,211,77,0.55));
+  }
   /* Idle subtle sway */
   .tool-section[data-locked="true"] .chain-img.left  { animation: chainSwayL 6s ease-in-out infinite; }
   .tool-section[data-locked="true"] .chain-img.right { animation: chainSwayR 6s ease-in-out infinite; }

@@ -472,23 +472,77 @@
   sceneRoot.rotation.z = 0;
   scene.add(sceneRoot);
 
-  // === Ambient stars for depth ===
-  const STAR_COUNT = 280;
-  const starGeo = new THREE.BufferGeometry();
-  const starPos = new Float32Array(STAR_COUNT * 3);
-  for (let i = 0; i < STAR_COUNT; i++) {
-    const r = 55 + Math.random() * 65;
-    const t = Math.random() * Math.PI * 2;
-    const p = Math.acos(2 * Math.random() - 1);
-    starPos[i*3]     = r * Math.sin(p) * Math.cos(t);
-    starPos[i*3 + 1] = r * Math.cos(p);
-    starPos[i*3 + 2] = r * Math.sin(p) * Math.sin(t);
+  // === Planetarium-style starfield ===========================
+  // Three layered point clouds at different distances + sizes + colors
+  // give the dome of a planetarium around the central TMD. Each layer
+  // twinkles by independently sin-modulating its global opacity.
+  function makeStarLayer(count, rMin, rMax, sizeMin, sizeMax, palette) {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const r = rMin + Math.random() * (rMax - rMin);
+      const t = Math.random() * Math.PI * 2;
+      const p = Math.acos(2 * Math.random() - 1);
+      pos[i*3]     = r * Math.sin(p) * Math.cos(t);
+      pos[i*3 + 1] = r * Math.cos(p);
+      pos[i*3 + 2] = r * Math.sin(p) * Math.sin(t);
+      const c = palette[(Math.random() * palette.length) | 0];
+      col[i*3] = c[0]; col[i*3+1] = c[1]; col[i*3+2] = c[2];
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+    const mat = new THREE.PointsMaterial({
+      size: sizeMin + Math.random() * (sizeMax - sizeMin),
+      vertexColors: true, transparent: true, opacity: 0.85,
+      sizeAttenuation: true, depthWrite: false,
+    });
+    const pts = new THREE.Points(geo, mat);
+    return { points: pts, material: mat };
   }
-  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
-    color: 0x9ad0ff, size: 0.45, transparent: true, opacity: 0.55, sizeAttenuation: true,
-  }));
-  scene.add(stars);
+
+  // Color palettes (RGB 0-1)
+  const PALETTE_NEAR = [
+    [1.0, 1.0, 1.0],   // pure white
+    [0.92, 0.95, 1.0], // pale blue-white
+    [1.0, 0.92, 0.78], // warm yellow
+  ];
+  const PALETTE_MID = [
+    [0.78, 0.88, 1.0],
+    [0.9,  0.95, 1.0],
+    [1.0,  0.85, 0.6],
+    [0.8,  0.7,  1.0], // faint violet
+  ];
+  const PALETTE_FAR = [
+    [0.55, 0.7,  1.0], // distant blue
+    [0.7,  0.55, 1.0], // distant violet
+    [0.95, 0.88, 0.95],
+  ];
+
+  const starLayers = [
+    makeStarLayer(280, 50,  90,  0.45, 0.55, PALETTE_NEAR),
+    makeStarLayer(380, 90,  150, 0.30, 0.40, PALETTE_MID),
+    makeStarLayer(450, 150, 240, 0.20, 0.28, PALETTE_FAR),
+  ];
+  starLayers.forEach(l => scene.add(l.points));
+  // keep `stars` name for the existing animate() loop (rotate the near layer)
+  const stars = starLayers[0].points;
+
+  // === Nebula clouds — translucent colored spheres far from the camera ===
+  // They sit beyond the star layers and tint the void with soft color.
+  function makeNebula(radius, x, y, z, color) {
+    const geo = new THREE.SphereGeometry(radius, 24, 16);
+    const mat = new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.06,
+      side: THREE.BackSide, depthWrite: false,
+    });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    return m;
+  }
+  scene.add(makeNebula(120, -180,  60, -100, 0x5a3a8a));  // violet bloom upper-left
+  scene.add(makeNebula(140,  150, -40, -120, 0x1a4a8a));  // deep blue lower-right
+  scene.add(makeNebula(100,   30, 100,  200, 0x7a2a5a));  // magenta behind
 
   function onResize() {
     const w = window.innerWidth, h = window.innerHeight;
@@ -569,7 +623,18 @@
       camera.lookAt(0, 0, 0);
     }
 
-    stars.rotation.y += 0.0003;
+    // Star layers: each rotates at a slightly different rate (parallax)
+    // and twinkles its global opacity on a sine wave for that planetarium
+    // shimmer. Different phase offsets per layer so they don't all pulse
+    // in unison.
+    const tStar = now * 0.001;
+    starLayers[0].points.rotation.y += 0.00030;
+    starLayers[1].points.rotation.y -= 0.00018;
+    starLayers[2].points.rotation.y += 0.00010;
+    starLayers[0].material.opacity = 0.80 + 0.18 * Math.sin(tStar * 0.9);
+    starLayers[1].material.opacity = 0.65 + 0.20 * Math.sin(tStar * 0.7 + 1.4);
+    starLayers[2].material.opacity = 0.55 + 0.22 * Math.sin(tStar * 0.5 + 2.8);
+
     renderer.render(scene, camera);
   }
   animate(performance.now());
