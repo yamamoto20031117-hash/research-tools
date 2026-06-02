@@ -210,6 +210,34 @@
   #lock-modal .btn-cancel{background:transparent;color:#aabad6;border:1px solid #2a3040}
   #lock-modal .btn-cancel:hover{border-color:#fcd34d;color:#fff}
 
+  /* ===== 管理者パネル ===== */
+  #admin-btn{display:none;background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.35);border-radius:8px;padding:5px 12px;font-size:.78rem;color:#eab308;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
+  #admin-btn:hover{background:rgba(234,179,8,.28)}
+  .admin-ov{position:fixed;inset:0;background:rgba(4,7,12,.88);z-index:30000;display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px 24px;backdrop-filter:blur(5px);overflow-y:auto}
+  .admin-ov[hidden]{display:none}
+  .admin-panel{background:#0e1220;border:1px solid rgba(234,179,8,.2);border-radius:16px;width:min(780px,100%);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.75)}
+  .ap-head{padding:16px 18px 0;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;flex-wrap:wrap;padding-bottom:12px}
+  .ap-head h2{font-size:.95rem;color:#eab308;margin:0;flex:0 0 auto}
+  .ap-tabs{display:flex;gap:3px;background:rgba(20,25,40,1);border-radius:8px;padding:3px;flex:1}
+  .ap-tab{padding:4px 14px;font-size:.76rem;border-radius:5px;color:#888;font-weight:600;cursor:pointer;border:none;background:transparent;font-family:inherit;transition:background .15s;white-space:nowrap}
+  .ap-tab.active{background:rgba(234,179,8,.2);color:#eab308}
+  .ap-tab:hover:not(.active){background:rgba(255,255,255,.05);color:#ccc}
+  .ap-refresh{background:transparent;border:1px solid rgba(88,166,255,.2);color:#58a6ff;border-radius:6px;padding:4px 11px;font-size:.72rem;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .ap-refresh:hover{background:rgba(88,166,255,.1)}
+  .ap-close{background:transparent;border:none;color:#666;font-size:1.1rem;cursor:pointer;padding:2px 8px;line-height:1;flex-shrink:0}
+  .ap-close:hover{color:#fff}
+  .ap-body{flex:1;overflow-y:auto;padding:14px 18px;min-height:0;scrollbar-width:thin}
+  .ap-card{background:rgba(20,25,40,.7);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:11px 14px;margin-bottom:8px}
+  .ap-card-title{color:#ddd;font-size:.85rem;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .ap-card-meta{color:#666;font-size:.72rem;display:flex;gap:12px;flex-wrap:wrap}
+  .ap-card-meta span{color:#777}
+  .ap-badge{display:inline-block;padding:1px 7px;border-radius:8px;font-size:.64rem;font-weight:700}
+  .ap-badge.open{background:rgba(88,166,255,.2);color:#58a6ff;border:1px solid rgba(88,166,255,.3)}
+  .ap-badge.funded{background:rgba(234,179,8,.2);color:#eab308;border:1px solid rgba(234,179,8,.3)}
+  .ap-badge.closed{background:rgba(100,100,100,.2);color:#888;border:1px solid rgba(100,100,100,.3)}
+  .ap-empty{color:#555;font-size:.82rem;text-align:center;padding:32px 0}
+  .ap-section-label{font-size:.72rem;color:#555;letter-spacing:.07em;text-transform:uppercase;margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,.05)}
+
   /* 接続ステータス */
   .conn-status{position:fixed;top:8px;right:12px;font-size:.7rem;padding:3px 10px;border-radius:10px;z-index:100;
     display:flex;align-items:center;gap:5px;pointer-events:none}
@@ -260,6 +288,7 @@
 
 <div class="site-switch-bar">
   <button id="name-chip" class="name-chip" style="margin-right:auto" onclick="openNameModal()" title="名前を設定・変更">👤 <span id="name-chip-label">名前を登録</span> <span class="pencil">✎</span></button>
+  <button id="admin-btn" type="button" onclick="openAdminPanel()" title="管理者パネル">⚙️ 管理</button>
   <button id="bg-toggle" type="button" aria-pressed="false" title="UI を隠して 3D 背景だけ表示">🔭 背景を見る</button>
   <div class="site-switch">
     <a href="/" class="active">🔬 研究ツール</a>
@@ -785,6 +814,25 @@
   </div>
 </div>
 
+<!-- 管理者パネル -->
+<div id="admin-ov" class="admin-ov" hidden>
+  <div class="admin-panel">
+    <div class="ap-head">
+      <h2>⚙️ 管理者パネル</h2>
+      <div class="ap-tabs">
+        <button class="ap-tab active" data-tab="boards" onclick="apTab('boards')">🗨️ スレッド板</button>
+        <button class="ap-tab" data-tab="cf" onclick="apTab('cf')">💰 クラファン</button>
+      </div>
+      <button class="ap-refresh" onclick="apLoad()">↻ 更新</button>
+      <button class="ap-close" onclick="closeAdminPanel()">✕</button>
+    </div>
+    <div class="ap-body">
+      <div id="ap-boards"></div>
+      <div id="ap-cf" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
 <footer>
   <p>Built with Claude &amp; Three.js — <a href="https://github.com/yamamoto20031117-hash" target="_blank">GitHub</a></p>
 </footer>
@@ -1154,6 +1202,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   bridgeLinks();
   loadProfile();
   applyProfileToNameInputs();
+  // lab-play 側「管理」ボタンから ?admin=open で飛んできた場合に自動オープン
+  if(new URLSearchParams(location.search).get('admin')==='open'&&localStorage.getItem(ADMIN_KEY)==='1'){
+    history.replaceState(null,'',location.pathname);
+    setTimeout(openAdminPanel, 800);
+  }
 
   // ===== Lock setup =====
   installLockOverlays();
@@ -1251,6 +1304,139 @@ document.addEventListener('keydown', e => {
   if(e.key === 'Enter'){ e.preventDefault(); window._submitLock(); }
   if(e.key === 'Escape'){ e.preventDefault(); window._closeLock(); }
 });
+
+// ===== 管理者モード =====
+// 有効化: ページ上部の "Research Tools" タイトルを 7 回クリック → パスワード入力
+// パスワード: admin-rt-2026 （必要に応じて変更）
+const ADMIN_KEY = 'rt-admin-v1';
+const ADMIN_PW  = 'admin-rt-2026';
+
+(function initAdmin(){
+  if(localStorage.getItem(ADMIN_KEY)==='1') showAdminBtn();
+  let cnt=0, timer=null;
+  const h1=document.querySelector('header h1');
+  if(!h1) return;
+  h1.style.cursor='default';
+  h1.addEventListener('click',()=>{
+    cnt++; clearTimeout(timer);
+    timer=setTimeout(()=>cnt=0, 3000);
+    if(cnt>=7){
+      cnt=0;
+      if(localStorage.getItem(ADMIN_KEY)==='1'){
+        if(confirm('管理者モードを解除しますか？')){
+          localStorage.removeItem(ADMIN_KEY);
+          document.getElementById('admin-btn').style.display='none';
+        }
+      } else {
+        const pw=prompt('管理者パスワードを入力:');
+        if(pw===ADMIN_PW){ localStorage.setItem(ADMIN_KEY,'1'); showAdminBtn(); alert('✅ 管理者モードが有効になりました'); }
+        else if(pw!==null) alert('パスワードが違います');
+      }
+    }
+  });
+})();
+
+function showAdminBtn(){ document.getElementById('admin-btn').style.display=''; }
+
+let _apTab='boards';
+function openAdminPanel(){
+  document.getElementById('admin-ov').removeAttribute('hidden');
+  apLoad();
+}
+function closeAdminPanel(){
+  document.getElementById('admin-ov').setAttribute('hidden','');
+}
+function apTab(tab){
+  _apTab=tab;
+  document.querySelectorAll('.ap-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  document.getElementById('ap-boards').style.display=tab==='boards'?'':'none';
+  document.getElementById('ap-cf').style.display=tab==='cf'?'':'none';
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&!document.getElementById('admin-ov').hidden) closeAdminPanel();
+});
+
+function _apTime(ts){
+  if(!ts) return '—';
+  const diff=Date.now()-ts;
+  if(diff<60000)  return 'たった今';
+  if(diff<3600000)return Math.floor(diff/60000)+'分前';
+  if(diff<86400000)return Math.floor(diff/3600000)+'時間前';
+  if(diff<604800000)return Math.floor(diff/86400000)+'日前';
+  return new Date(ts).toLocaleDateString('ja');
+}
+function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function apLoad(){
+  if(!firebaseReady||!db){
+    document.getElementById('ap-boards').innerHTML='<div class="ap-empty">Firebase 未接続</div>';
+    document.getElementById('ap-cf').innerHTML='<div class="ap-empty">Firebase 未接続</div>';
+    return;
+  }
+  // --- スレッド板 ---
+  const bPane=document.getElementById('ap-boards');
+  bPane.innerHTML='<div class="ap-empty">読み込み中…</div>';
+  db.ref('boards').once('value',snap=>{
+    const data=snap.val();
+    if(!data){ bPane.innerHTML='<div class="ap-empty">投稿なし</div>'; return; }
+    const threads=[];
+    Object.entries(data).forEach(([bid,board])=>{
+      if(!board||!board.threads) return;
+      Object.entries(board.threads).forEach(([tid,th])=>{
+        if(!th) return;
+        const rc=th.replies?Object.keys(th.replies).length:0;
+        threads.push({bid,tid,title:th.title,name:th.name,body:th.body,created:th.created,last:th.lastActivity||th.created,rc});
+      });
+    });
+    threads.sort((a,b)=>b.last-a.last);
+    if(!threads.length){ bPane.innerHTML='<div class="ap-empty">投稿なし</div>'; return; }
+    bPane.innerHTML=
+      '<div class="ap-section-label">最近の投稿（最新順）</div>'+
+      threads.slice(0,40).map(t=>`
+        <div class="ap-card">
+          <div class="ap-card-title">${_esc(t.title)}</div>
+          <div class="ap-card-meta">
+            <span>👤 ${_esc(t.name||'名無し')}</span>
+            <span>💬 ${t.rc}件</span>
+            <span>🕐 ${_apTime(t.last)}</span>
+            <span style="color:#444;font-size:.68rem">${_esc(t.bid)}</span>
+          </div>
+        </div>`).join('');
+  });
+  // --- クラファン ---
+  const cfPane=document.getElementById('ap-cf');
+  cfPane.innerHTML='<div class="ap-empty">読み込み中…</div>';
+  db.ref('crowdfund/proposals').once('value',snap=>{
+    const data=snap.val();
+    if(!data){ cfPane.innerHTML='<div class="ap-empty">提案なし</div>'; return; }
+    const props=Object.values(data).filter(Boolean).sort((a,b)=>(b.created||0)-(a.created||0));
+    if(!props.length){ cfPane.innerHTML='<div class="ap-empty">提案なし</div>'; return; }
+    const open=props.filter(p=>p.status!=='closed'&&p.status!=='cancelled');
+    const closed=props.filter(p=>p.status==='closed'||p.status==='cancelled');
+    const renderProp=p=>{
+      const pledged=p.pledges?Object.values(p.pledges).reduce((s,pl)=>s+(pl.amount||0),0):0;
+      const pct=p.goal?Math.min(100,Math.round(pledged/p.goal*100)):0;
+      const pc=p.pledges?Object.keys(p.pledges).length:0;
+      const badge=pledged>=(p.goal||Infinity)?'funded':p.status==='closed'?'closed':'open';
+      const badgeLbl=badge==='funded'?'達成 🎉':badge==='closed'?'終了':'募集中';
+      return `<div class="ap-card">
+        <div class="ap-card-title">
+          ${_esc(p.title||'無題')}
+          <span class="ap-badge ${badge}">${badgeLbl}</span>
+        </div>
+        <div class="ap-card-meta">
+          <span>👤 ${_esc(p.name||'?')}</span>
+          <span>💴 ¥${pledged.toLocaleString()} / ¥${(p.goal||0).toLocaleString()} (${pct}%)</span>
+          <span>🙋 ${pc}人</span>
+          <span>🕐 ${_apTime(p.created)}</span>
+        </div>
+      </div>`;
+    };
+    cfPane.innerHTML=
+      (open.length?'<div class="ap-section-label">募集中</div>'+open.map(renderProp).join(''):'') +
+      (closed.length?'<div class="ap-section-label">終了</div>'+closed.map(renderProp).join(''):'');
+  });
+}
 </script>
 </body>
 </html>
