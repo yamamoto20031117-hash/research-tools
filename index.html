@@ -211,7 +211,7 @@
   #lock-modal .btn-cancel:hover{border-color:#fcd34d;color:#fff}
 
   /* ===== 管理者パネル ===== */
-  #admin-btn{background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.35);border-radius:8px;padding:5px 12px;font-size:.78rem;color:#eab308;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
+  #admin-btn{display:none;background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.35);border-radius:8px;padding:5px 12px;font-size:.78rem;color:#eab308;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
   #admin-btn:hover{background:rgba(234,179,8,.28)}
   .admin-ov{position:fixed;inset:0;background:rgba(4,7,12,.88);z-index:30000;display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px 24px;backdrop-filter:blur(5px);overflow-y:auto}
   .admin-ov[hidden]{display:none}
@@ -1308,31 +1308,45 @@ document.addEventListener('keydown', e => {
 // ===== 管理者モード =====
 // 有効化: ページ上部の "Research Tools" タイトルを 7 回クリック → パスワード入力
 // パスワード: admin-rt-2026 （必要に応じて変更）
-// ボタンは常時表示。初回クリック→パスワード要求。このMacで一度入れたら以降は直接開く。
+// 有効化: "Research Tools" タイトルを 7 回クリック（3秒以内）→ パスワード入力
 const ADMIN_KEY = 'rt-admin-v1';
 const ADMIN_PW  = 'admin-rt-2026';
 
-// ボタンは常時表示
-document.getElementById('admin-btn').style.display = '';
+// 既にこのブラウザで認証済みならボタンを表示
+if(localStorage.getItem(ADMIN_KEY)==='1') document.getElementById('admin-btn').style.display='';
+
+// 7回クリック起動
+(function(){
+  let cnt=0, timer=null;
+  const h1=document.querySelector('header h1');
+  if(!h1) return;
+  h1.addEventListener('click',()=>{
+    cnt++; clearTimeout(timer);
+    timer=setTimeout(()=>cnt=0, 3000);
+    if(cnt>=7){
+      cnt=0;
+      if(localStorage.getItem(ADMIN_KEY)==='1'){
+        if(confirm('管理者モードを解除しますか？')){
+          localStorage.removeItem(ADMIN_KEY);
+          document.getElementById('admin-btn').style.display='none';
+        }
+      } else {
+        const pw=prompt('管理者パスワードを入力:');
+        if(pw===ADMIN_PW){
+          localStorage.setItem(ADMIN_KEY,'1');
+          document.getElementById('admin-btn').style.display='';
+        } else if(pw!==null){
+          alert('パスワードが違います');
+        }
+      }
+    }
+  });
+})();
 
 let _apTab='boards';
 function openAdminPanel(){
-  // 既にこのMacで認証済みなら直接開く
-  if(localStorage.getItem(ADMIN_KEY)==='1'){
-    document.getElementById('admin-ov').removeAttribute('hidden');
-    apLoad();
-    return;
-  }
-  // 初回 or 別デバイス: パスワードを要求
-  const pw = prompt('管理者パスワードを入力:');
-  if(pw === null) return;
-  if(pw === ADMIN_PW){
-    localStorage.setItem(ADMIN_KEY,'1');
-    document.getElementById('admin-ov').removeAttribute('hidden');
-    apLoad();
-  } else {
-    alert('パスワードが違います');
-  }
+  document.getElementById('admin-ov').removeAttribute('hidden');
+  apLoad();
 }
 function closeAdminPanel(){
   document.getElementById('admin-ov').setAttribute('hidden','');
