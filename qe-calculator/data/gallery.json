@@ -1,4 +1,24 @@
 {
-  "generated_at": null,
-  "systems": []
+  "generated_at": "2026-06-10T10:00:00",
+  "systems": [
+    {
+      "id": "helicene_uv",
+      "title": "中性ヘリセン (DBPO double[5]helicene) — UV-vis 吸収(実測)",
+      "config": "溶液, 200–600 nm 測定",
+      "summary": {
+        "notes": "強い π–π* 帯 ~300–355 nm(極大 ~299.5/326/337/343/354.5 nm)、弱い HOMO→LUMO 帯 441.5 nm。中性体=黄色。λ<250 nm は検出器飽和。"
+      },
+      "figures": [
+        {
+          "key": "uv",
+          "title": "UV-vis 吸収スペクトル",
+          "png": "uv/helicene_uv.png",
+          "svg": "uv/helicene_uv.svg",
+          "pdf": "uv/helicene_uv.pdf",
+          "caption": "中性ヘリセンの吸収。インセット=441.5 nm の弱い HOMO→LUMO 帯(可視域)のズーム。発表用ベクター(SVG/PDF)あり。"
+        }
+      ],
+      "files": []
+    }
+  ]
 }
