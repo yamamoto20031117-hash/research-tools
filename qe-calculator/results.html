@@ -269,22 +269,20 @@ function scheduleAuto() {
 async function load() {
   document.getElementById('err').textContent = '';
   let data;
+  // 静的スナップショット(data/results.json)を主として即描画。Firebase 待ちのブランクを無くす。
   try {
-    data = await fetchWithTimeout(LIVE_URL, LIVE_TIMEOUT_MS);
-    if (!data || !data.results) throw new Error('Firebase にまだ QE 結果がありません');
-    setMode(true);
-  } catch (eLive) {
-    try {
-      data = await fetchWithTimeout(STATIC_URL, 5000);
-      setMode(false);
-    } catch (eStatic) {
-      setMode(false);
-      document.getElementById('err').textContent = '読み込み失敗: ' + eStatic.message;
-      return;
-    }
+    data = await fetchWithTimeout(STATIC_URL, 5000);
+    setMode(false);
+    render(data);
+  } catch (eStatic) {
+    document.getElementById('err').textContent = '読み込み失敗: ' + eStatic.message;
+    return;
   }
-  render(data);
-  scheduleAuto();
+  // Firebase の qe ルールが設定済みでライブデータがあれば、上書きしてライブ表示(失敗は無視)。
+  try {
+    const live = await fetchWithTimeout(LIVE_URL, LIVE_TIMEOUT_MS);
+    if (live && live.results) { setMode(true); render(live); scheduleAuto(); }
+  } catch (eLive) { /* 静的のまま */ }
 }
 
 function hasDetails(r) {
