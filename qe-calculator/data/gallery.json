@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-06-10T10:00:00",
+  "generated_at": "2026-06-10T01:30:00",
   "systems": [
     {
       "id": "helicene_uv",
       "title": "中性ヘリセン (DBPO double[5]helicene) — UV-vis 吸収(実測)",
-      "config": "溶液, 200–600 nm 測定",
+      "config": "溶液, 200–600 nm 測定 (JASCO .vspd)",
       "summary": {
-        "notes": "強い π–π* 帯 ~300–355 nm(極大 ~299.5/326/337/343/354.5 nm)、弱い HOMO→LUMO 帯 441.5 nm。中性体=黄色。λ<250 nm は検出器飽和。"
+        "notes": "強い π–π* 帯 ~300–355 nm(極大 ~299.5/326/337/343/354.5 nm)、弱い HOMO→LUMO 帯 441.5 nm。中性体=黄色。λ<250 nm は検出器飽和のため非表示。"
       },
       "figures": [
         {
@@ -16,6 +16,41 @@
           "svg": "uv/helicene_uv.svg",
           "pdf": "uv/helicene_uv.pdf",
           "caption": "中性ヘリセンの吸収。インセット=441.5 nm の弱い HOMO→LUMO 帯(可視域)のズーム。発表用ベクター(SVG/PDF)あり。"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": "ct_feasibility",
+      "title": "ヘリセン → VSe₂ 電荷移動 (CT) の可否判定",
+      "config": "DFT(QE, PBE)+ 実測 E_ox(JPCL2021 SI)の突き合わせ",
+      "summary": {
+        "notes": "ヘリセン HOMO(−4.89〜−4.95 eV)が VSe₂ の E_F=−φ(薄スラブ DFT φ=5.0 eV / 文献 5.4–5.6 eV)より高い → 電子は helicene→VSe₂ へ自発移動=「漬けたら入る側」。φ の薄スラブ値は過小評価気味で、文献 φ なら明確に有利。"
+      },
+      "figures": [
+        {
+          "key": "energy_diagram",
+          "title": "CT エネルギー準位図",
+          "png": "presentation/ct_energy_diagram.png",
+          "svg": "presentation/ct_energy_diagram.svg",
+          "pdf": "presentation/ct_energy_diagram.pdf",
+          "caption": "ヘリセン HOMO/LUMO と VSe₂ の E_F(=−φ)の相対位置。HOMO > E_F なので電子移動(緑矢印)が熱力学的に有利。HOMO は DFT(B3LYP)−4.89 eV / 実測 E_ox 換算 −4.95 eV。"
+        },
+        {
+          "key": "work_function",
+          "title": "VSe₂ slab 仕事関数 φ",
+          "png": "presentation/phi_plot.png",
+          "svg": "presentation/phi_plot.svg",
+          "pdf": "presentation/phi_plot.pdf",
+          "caption": "VSe₂ スラブの面内平均静電ポテンシャル V(z)(pp.x plot_num=11, pk1891)。両端の平坦部=真空準位 E_vac=5.64 eV、E_F=0.65 eV → φ=4.99 eV。中央の深い谷は V/Se の原子コア。"
+        },
+        {
+          "key": "summary_table",
+          "title": "主要パラメータ一覧",
+          "png": "presentation/summary_table.png",
+          "svg": "presentation/summary_table.svg",
+          "pdf": "presentation/summary_table.pdf",
+          "caption": "分子・HOMO/LUMO・E_ox・UV-vis・VSe₂ φ/E_F/磁化・CT 判定を 1 枚に集約。値は DFT 実計算(pk1702/1891)と実測(JPCL2021 SI, .vspd)由来。"
         }
       ],
       "files": []
