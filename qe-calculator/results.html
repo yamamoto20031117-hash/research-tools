@@ -335,10 +335,10 @@ function render(data) {
       `<td>${badge}</td>` +
       `<td>${escape(r.formula||'-')}</td>` +
       `<td>${r.natoms||'-'}</td>` +
-      `<td>${r.total_energy_ev !== undefined ? r.total_energy_ev.toFixed(4) : '-'}</td>` +
-      `<td>${r.fermi_energy_ev !== undefined ? r.fermi_energy_ev.toFixed(4) : '-'}</td>` +
-      `<td>${r.band_gap_ev !== undefined ? (r.is_metallic ? 'metal' : r.band_gap_ev.toFixed(3)) : '-'}</td>` +
-      `<td>${r.total_magnetization !== undefined ? r.total_magnetization.toFixed(3) : '-'}</td>` +
+      `<td>${r.total_energy_ev != null ? r.total_energy_ev.toFixed(4) : '-'}</td>` +
+      `<td>${r.fermi_energy_ev != null ? r.fermi_energy_ev.toFixed(4) : '-'}</td>` +
+      `<td>${r.band_gap_ev != null ? (r.is_metallic ? 'metal' : r.band_gap_ev.toFixed(3)) : (r.is_metallic ? 'metal' : '-')}</td>` +
+      `<td>${r.total_magnetization != null ? r.total_magnetization.toFixed(3) : '-'}</td>` +
       `<td><span style="color:#888;font-size:.74rem">${r.ctime ? new Date(r.ctime).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-'}</span></td>` +
       `<td>${detailCell}</td>` +
       '</tr>';
