@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QE 結果ギャラリー — research-tools</title>
+<style>
+  :root{ --bg:#0c1014; --panel:#141a21; --line:#243038; --fg:#e7eef3; --mut:#8aa0ad; --acc:#3bf0ff; --acc2:#b46cff; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN",sans-serif;line-height:1.5}
+  header{padding:20px 24px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(12,16,20,.92);backdrop-filter:blur(6px);z-index:10}
+  h1{margin:0;font-size:1.15rem;letter-spacing:.02em}
+  h1 small{color:var(--mut);font-weight:400;font-size:.8rem;margin-left:.6em}
+  .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .bar input,.bar select{background:#0e141a;border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:6px 10px;font-size:.85rem}
+  .meta{color:var(--mut);font-size:.78rem;margin-left:auto}
+  main{padding:22px 24px;max-width:1200px;margin:0 auto}
+  .empty{color:var(--mut);text-align:center;padding:64px 12px;border:1px dashed var(--line);border-radius:14px}
+  .empty code{color:var(--acc);background:#0e141a;padding:2px 6px;border-radius:5px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:22px}
+  .card h2{margin:0 0 4px;font-size:1.05rem}
+  .sub{color:var(--mut);font-size:.8rem;margin-bottom:10px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px}
+  .chip{background:#0e141a;border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:.74rem;color:var(--mut)}
+  .chip b{color:var(--fg);font-weight:600}
+  .figs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+  .fig{background:#0e141a;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+  .fig .ft{padding:9px 12px;font-size:.82rem;font-weight:600;border-bottom:1px solid var(--line)}
+  .fig .img{padding:8px;display:flex;align-items:center;justify-content:center;background:#fff;cursor:zoom-in;min-height:150px}
+  .fig .img img{max-width:100%;height:auto;display:block}
+  .fig .cap{padding:8px 12px;font-size:.74rem;color:var(--mut)}
+  .fig .dl{padding:8px 12px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}
+  .fig .dl a{color:var(--acc);font-size:.74rem;text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:2px 8px}
+  .fig .dl a:hover{border-color:var(--acc)}
+  .fig .nofig{padding:26px 12px;text-align:center;color:var(--mut);font-size:.8rem;background:#0e141a}
+  .files{margin-top:14px;border-top:1px dashed var(--line);padding-top:12px}
+  .files h3{font-size:.82rem;color:var(--mut);margin:0 0 8px;font-weight:600}
+  .files a{display:inline-flex;align-items:center;gap:6px;color:var(--fg);font-size:.78rem;text-decoration:none;background:#0e141a;border:1px solid var(--line);border-radius:7px;padding:4px 10px;margin:0 8px 8px 0}
+  .files a:hover{border-color:var(--acc)}
+  .files .fsz{color:var(--mut);font-size:.7rem}
+  /* lightbox */
+  #lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:50;padding:24px}
+  #lb.on{display:flex}
+  #lb img{max-width:95vw;max-height:90vh;background:#fff;border-radius:8px}
+  #lb .x{position:absolute;top:18px;right:24px;color:#fff;font-size:1.8rem;cursor:pointer;background:none;border:none}
+  a.back{color:var(--mut);font-size:.8rem;text-decoration:none}
+  a.back:hover{color:var(--acc)}
+</style>
+</head>
+<body>
+<header>
+  <a class="back" href="/">← research-tools</a> &nbsp;·&nbsp; <a class="back" href="results.html">結果一覧 (live) →</a>
+  <h1>QE 結果ギャラリー <small>第一原理計算の発表用フィギュア & 出力ファイル</small></h1>
+  <div class="bar">
+    <input id="q" type="text" placeholder="系名・母体・分子で絞り込み…">
+    <select id="figfilter">
+      <option value="">全ての図</option>
+      <option value="bands">バンド構造</option>
+      <option value="dos">DOS / PDOS</option>
+      <option value="deltarho">電荷移動 Δρ</option>
+      <option value="magnetic">磁気</option>
+    </select>
+    <span class="meta" id="gen">—</span>
+  </div>
+</header>
+<main id="main"><div class="empty">読み込み中…</div></main>
+
+<div id="lb"><button class="x" onclick="closeLb()">×</button><img id="lbimg" alt=""></div>
+
+<script>
+const DATA_URL = 'data/gallery.json';
+let SYS = [];
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);}
+function fpath(p){return p ? 'data/' + p.replace(/^\/+/,'') : '';}
+
+async function load(){
+  try{
+    const r = await fetch(DATA_URL + '?_=' + Date.now(), {cache:'no-store'});
+    const d = await r.json();
+    SYS = d.systems || [];
+    document.getElementById('gen').textContent =
+      d.generated_at ? '生成: ' + new Date(d.generated_at).toLocaleString('ja-JP') + ` (${SYS.length} 系)` : `${SYS.length} 系`;
+  }catch(e){ SYS = []; document.getElementById('gen').textContent='まだデータがありません'; }
+  render();
+}
+
+function render(){
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const ff = document.getElementById('figfilter').value;
+  const main = document.getElementById('main');
+  let list = SYS;
+  if(q) list = list.filter(s => [s.title,s.host,s.intercalant,s.id].join(' ').toLowerCase().includes(q));
+
+  if(list.length === 0){
+    main.innerHTML = `<div class="empty">
+      表示できる結果がまだありません。<br><br>
+      lab-ubuntu で完了した計算を <code>python3 export_gallery.py</code> で書き出し、<br>
+      <code>git add data &amp;&amp; git commit &amp;&amp; git push</code> すると、ここに発表クオリティの図が並びます。</div>`;
+    return;
+  }
+
+  main.innerHTML = list.map(s => {
+    const sm = s.summary || {};
+    const chips = [
+      sm.formula && `<span class="chip">式 <b>${esc(sm.formula)}</b></span>`,
+      sm.natoms!=null && `<span class="chip">原子数 <b>${sm.natoms}</b></span>`,
+      sm.total_energy_ev!=null && `<span class="chip">E<sub>tot</sub> <b>${(+sm.total_energy_ev).toFixed(3)} eV</b></span>`,
+      sm.fermi_ev!=null && `<span class="chip">E<sub>F</sub> <b>${(+sm.fermi_ev).toFixed(3)} eV</b></span>`,
+      sm.gap_ev!=null && `<span class="chip">gap <b>${sm.is_metallic?'metal':(+sm.gap_ev).toFixed(3)+' eV'}</b></span>`,
+      sm.total_magnetization!=null && `<span class="chip">M <b>${(+sm.total_magnetization).toFixed(2)} μ<sub>B</sub></b></span>`,
+      s.pk!=null && `<span class="chip">PK <b>${s.pk}</b></span>`,
+    ].filter(Boolean).join('');
+
+    let figs = (s.figures||[]);
+    if(ff) figs = figs.filter(f => f.key===ff);
+    const figHtml = figs.length ? figs.map(f => {
+      const img = f.png ? fpath(f.png) : (f.svg?fpath(f.svg):'');
+      const dl = ['png','svg','pdf'].filter(k=>f[k]).map(k=>`<a href="${fpath(f[k])}" download>${k.toUpperCase()}</a>`).join('');
+      return `<div class="fig">
+        <div class="ft">${esc(f.title||f.key)}</div>
+        ${img?`<div class="img" onclick="openLb('${img}')"><img loading="lazy" src="${img}" alt="${esc(f.title||'')}"></div>`:`<div class="nofig">図未生成</div>`}
+        ${f.caption?`<div class="cap">${esc(f.caption)}</div>`:''}
+        ${dl?`<div class="dl">${dl}</div>`:''}
+      </div>`;
+    }).join('') : `<div class="nofig" style="grid-column:1/-1">この系の図はまだ生成されていません</div>`;
+
+    const files = (s.files||[]);
+    const filesHtml = files.length ? `<div class="files"><h3>📄 出力ファイル</h3>${
+      files.map(f=>`<a href="${fpath(f.path)}" download>${esc(f.name)}${f.bytes?` <span class="fsz">(${fmtBytes(f.bytes)})</span>`:''}</a>`).join('')
+    }</div>` : '';
+
+    return `<div class="card">
+      <h2>${esc(s.title||s.id)}</h2>
+      ${s.config||s.ctime?`<div class="sub">${esc(s.config||'')}${s.ctime?` · ${new Date(s.ctime).toLocaleString('ja-JP')}`:''}</div>`:''}
+      <div class="chips">${chips}</div>
+      <div class="figs">${figHtml}</div>
+      ${filesHtml}
+    </div>`;
+  }).join('');
+}
+
+function fmtBytes(b){ if(b<1024)return b+' B'; if(b<1048576)return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
+function openLb(src){ document.getElementById('lbimg').src=src; document.getElementById('lb').classList.add('on'); }
+function closeLb(){ document.getElementById('lb').classList.remove('on'); }
+document.getElementById('lb').addEventListener('click',e=>{ if(e.target.id==='lb') closeLb(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeLb(); });
+document.getElementById('q').addEventListener('input',render);
+document.getElementById('figfilter').addEventListener('change',render);
+load();
+</script>
+</body>
+</html>
