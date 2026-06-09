@@ -307,7 +307,7 @@ function render(data) {
   const total = all.length;
   const done = all.filter(r => r.finished_ok).length;
   const running = all.filter(r => ['running','waiting','created'].includes(r.state)).length;
-  const failed = all.filter(r => ['excepted','killed'].includes(r.state)).length;
+  const failed = all.filter(r => ['excepted','killed'].includes(r.state) || (r.state === 'finished' && !r.finished_ok)).length;
   document.getElementById('stats').innerHTML = `
     <div class="stat"><div class="stat-label">total</div><div class="stat-val">${total}</div></div>
     <div class="stat"><div class="stat-label">完了</div><div class="stat-val" style="color:#5fd592">${done}</div></div>
