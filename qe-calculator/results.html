@@ -205,7 +205,9 @@ const STATE_BADGE = {
   running: 'running', killed: 'failed', excepted: 'failed', unknown: 'other'
 };
 
-const LIVE_BASE = 'https://ubuntu26.tail74586a.ts.net';
+// QE 結果は lab-ubuntu の qe_sender.py が Firebase RTDB の qe/ 名前空間に push し、
+// ここから読む（誰でも閲覧可）。RTDB は <base>/<path>.json で JSON をそのまま返す。
+const LIVE_BASE = 'https://research-tools-board-default-rtdb.firebaseio.com/qe';
 const LIVE_URL = LIVE_BASE + '/results.json';
 const STATIC_URL = 'data/results.json';
 const LIVE_TIMEOUT_MS = 6000;
@@ -231,7 +233,8 @@ async function fetchWithTimeout(url, ms) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
-    const res = await fetch(url + (url.includes('?') ? '&' : '?') + '_=' + Date.now(), {signal: ctrl.signal});
+    // Firebase RTDB REST は未知のクエリ (_=…) に 400 を返すため cache-buster は付けず no-store で取得
+    const res = await fetch(url, {signal: ctrl.signal, cache: 'no-store'});
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.json();
   } finally {
@@ -245,8 +248,8 @@ function setMode(live) {
   const lbl = document.getElementById('mode-label');
   if (live) {
     el.className = 'live';
-    lbl.textContent = 'LIVE (Tailscale)';
-    el.title = 'Ubuntu ワークステーションから直接取得 (5 秒ごと自動更新)';
+    lbl.textContent = 'LIVE (Firebase)';
+    el.title = 'lab-ubuntu の qe_sender.py が Firebase に push した結果 (5 秒ごと自動更新)';
   } else {
     el.className = 'cached';
     lbl.textContent = 'CACHED';
@@ -267,6 +270,7 @@ async function load() {
   let data;
   try {
     data = await fetchWithTimeout(LIVE_URL, LIVE_TIMEOUT_MS);
+    if (!data || !data.results) throw new Error('Firebase にまだ QE 結果がありません');
     setMode(true);
   } catch (eLive) {
     try {
@@ -395,14 +399,15 @@ async function fetchEndpoint(tabKey, pk) {
   const ep = ENDPOINT[tabKey];
   if (!ep) throw new Error('unknown endpoint: ' + tabKey);
   if (dataCache[ep.cache][pk]) return dataCache[ep.cache][pk];
-  const res = await fetch(`${LIVE_BASE}/${ep.url}/${pk}?_=${Date.now()}`);
+  const res = await fetch(`${LIVE_BASE}/${ep.url}/${pk}.json`, {cache: 'no-store'});
   let data;
   try {
     data = await res.json();
   } catch (e) {
-    throw new Error(`サーバが空レスポンス (HTTP ${res.status}) — ${ep.url} エンドポイントが古いか、計算がまだそのデータを生成してない可能性`);
+    throw new Error(`空レスポンス (HTTP ${res.status}) — ${ep.url} データがまだ Firebase に push されていない可能性`);
   }
-  if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
+  if (data === null) throw new Error(`${ep.url} データがまだありません (lab-ubuntu の qe_sender.py 未送信)`);
   dataCache[ep.cache][pk] = data;
   return data;
 }
