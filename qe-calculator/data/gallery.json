@@ -25,7 +25,7 @@
       "title": "ヘリセン → VSe₂ 電荷移動 (CT) の可否判定",
       "config": "DFT(QE, PBE)+ 実測 E_ox(JPCL2021 SI)の突き合わせ",
       "summary": {
-        "notes": "ヘリセン HOMO(−4.89〜−4.95 eV)が VSe₂ の E_F=−φ(薄スラブ DFT φ=5.0 eV / 文献 5.4–5.6 eV)より高い → 電子は helicene→VSe₂ へ自発移動=「漬けたら入る側」。φ の薄スラブ値は過小評価気味で、文献 φ なら明確に有利。"
+        "notes": "ヘリセン HOMO(−4.89〜−4.95 eV)が VSe₂ の E_F=−φ(本 DFT 4.99 = 文献 PBE 5.02 eV, Kezilebieke et al. Commun. Phys. 2020)より僅かに高い → 電子は helicene→VSe₂ へ自発移動するが margin は ~0.05 eV と小さく robust でない(route A 実験で確認)。"
       },
       "figures": [
         {
