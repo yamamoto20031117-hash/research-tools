@@ -242,7 +242,6 @@
         <option value="CoPS3">CoPS₃</option>
       </optgroup>
       <optgroup label="炭素系">
-        <option value="graphene">グラフェン</option>
         <option value="graphite">グラファイト</option>
       </optgroup>
     </select>
@@ -468,7 +467,6 @@ const DB = {
   CoPS3: { m:'Co', x:'S', defPhase:'MPS3', a:5.901, cMPS3:6.370, bond:2.51, bond_pp:2.18, bond_ps:2.04, hpp:1.10, isMPS3:true },
   // --- 炭素系 (ハニカム格子・単一元素) — TMD ビルダーには載らないため専用分岐で描画 ---
   // a = 2.46 Å (γ=120°), C–C = a/√3 = 1.42 Å。graphite は Bernal AB 積層 (c=6.71 Å, 層間 3.35 Å)。
-  graphene: { m:'C', x:'C', defPhase:'CARBON', a:2.46, ccBond:1.42, isCarbon:true, nlayers:1 },
   graphite: { m:'C', x:'C', defPhase:'CARBON', a:2.46, c:6.71, dInter:3.35, ccBond:1.42, isCarbon:true, nlayers:2 },
 };
 const MCOL_DEFAULT = { V:0x2e8bc0,Ti:0x7799aa,Mo:0x8855bb,W:0x4466aa,Nb:0x22aa88,Ta:0x667788,Pt:0xaabbcc,Zr:0x55aa77,Re:0xaa6644,Ni:0x4cb16d,Fe:0xcc6644,Mn:0xa05ab8,Co:0x3a78c4 };
@@ -1116,7 +1114,7 @@ function buildCarbon() {
   const info=DB[curMat];
   const a=info.a;                       // 2.46 Å
   const ccBond=info.ccBond||1.42;       // C–C 最近接
-  // グラファイトは sl-layers で層数を可変、グラフェンは常に 1 層
+  // グラファイトは sl-layers で層数を可変
   const numLayers = info.nlayers===1 ? 1 : parseInt(document.getElementById('sl-layers').value);
   const showCell=document.getElementById('chk-cell').checked;
   const showPoly=document.getElementById('chk-poly').checked; // 炭素では多面体は無意味だが UI 破壊回避のため読むだけ
@@ -1132,7 +1130,15 @@ function buildCarbon() {
 
   // hex 格子ベクトル (γ=120°): a1=(a,0), a2=(-a/2, a√3/2) — 既存 fracToXZ と同じ規約
   // 2 副格子 A=(0,0), B=(1/3,2/3); graphite B 層は A 層上から (1/3 シフト) → AB 積層
-  const interStep=info.dInter||3.35;    // 層間 3.35 Å
+  // --- 層間拡大 + 挿入分子 (TMD パスと同じ規約) ---
+  // graphite の面内シート厚は ~0 (単原子面) なので sandwich=0、vdW gap = dInter (3.35 Å)。
+  // layerStep = vdW gap だけ → expansion 倍率と inter.minGap で広がる。
+  const expansion=parseFloat(document.getElementById('sl-gap').value);  // 1.0–5.0 倍率
+  const interKey=document.getElementById('sel-inter').value;
+  const inter=INTER[interKey];
+  const baseInter=info.dInter||3.35;                  // expansion=1 で 3.35 Å (素のグラファイト)
+  const effExpansion=Math.max(expansion, inter.minGap);
+  const interStep=baseInter*effExpansion;             // 広がった層間
   const Na=parseInt(document.getElementById('sl-na').value);
   const Nb=parseInt(document.getElementById('sl-nb').value);
 
@@ -1174,6 +1180,111 @@ function buildCarbon() {
     }
   }
 
+  // --- 挿入分子 (インターカレーション) — TMD パスと同じ配置ロジックを複製 ---
+  // graphite の面は厚さ 0 なので「ギャップ」= 層間距離 interStep そのもの。
+  // ギャップ中心 = (l+0.5)*interStep。各層間に分子を中心寄せで配置する。
+  if(interKey!=='none' && numLayers>=2 && inter.atoms && inter.atoms.length>0){
+    const matIBond=new THREE.MeshPhongMaterial({color:0xaaaaaa,transparent:true,opacity:0.6});
+    const sp=inter.spacing;
+
+    // 1) 3軸回転行列 (TMD と同じ規約: Y(rC)·Z(rB)·X(rA))
+    const rA=parseFloat(document.getElementById('sl-rot-a').value)*Math.PI/180;
+    const rB=parseFloat(document.getElementById('sl-rot-b').value)*Math.PI/180;
+    const rC=parseFloat(document.getElementById('sl-rot-c').value)*Math.PI/180;
+    const rotMat=new THREE.Matrix4().makeRotationY(rC)
+      .multiply(new THREE.Matrix4().makeRotationZ(rB))
+      .multiply(new THREE.Matrix4().makeRotationX(rA));
+
+    // 2) 回転後の座標
+    const rotCoords=inter.atoms.map(at=>new THREE.Vector3(at.dx,at.dy,at.dz).applyMatrix4(rotMat));
+
+    // 3) 層間圧縮 (TMD と同じ。graphite のギャップ = interStep)
+    const yVals=rotCoords.map(v=>v.y);
+    const molHeight=Math.max(...yVals)-Math.min(...yVals);
+    const vdwBuf=1.5;
+    const availGap=Math.max(0.5, interStep-vdwBuf);
+    const compF = molHeight>0.1 ? Math.min(1.0, availGap/molHeight) : 1.0;
+
+    // 4) 結合長保存型の圧縮座標 (TMD と同じ反復補正)
+    const compCoords=rotCoords.map(v=>new THREE.Vector3(v.x, v.y*compF, v.z));
+    if(compF<0.999 && inter.bonds && inter.bonds.length>0){
+      const origLengths=inter.bonds.map(([ai,bi])=>rotCoords[ai].distanceTo(rotCoords[bi]));
+      for(let iter=0;iter<5;iter++){
+        inter.bonds.forEach(([ai,bi],bIdx)=>{
+          const L=origLengths[bIdx];
+          const pa=compCoords[ai], pb=compCoords[bi];
+          const dx=pb.x-pa.x, dy=pb.y-pa.y, dz=pb.z-pa.z;
+          const curL=Math.sqrt(dx*dx+dy*dy+dz*dz);
+          if(curL<0.01) return;
+          const cxB=(pa.x+pb.x)/2, cyB=(pa.y+pb.y)/2, czB=(pa.z+pb.z)/2;
+          const dyNew=dy;
+          const latSq=dx*dx+dz*dz;
+          const needLatSq=L*L-dyNew*dyNew;
+          if(needLatSq>0 && latSq>0.001){
+            const latScale=Math.sqrt(needLatSq/latSq);
+            const dxNew=dx*latScale, dzNew=dz*latScale;
+            pa.x=cxB-dxNew/2; pa.z=czB-dzNew/2;
+            pb.x=cxB+dxNew/2; pb.z=czB+dzNew/2;
+            pa.y=cyB-dyNew/2; pb.y=cyB+dyNew/2;
+          } else if(needLatSq<=0){
+            const newDy=Math.sign(dy)*L*0.95;
+            const remLat=Math.sqrt(Math.max(0,L*L-newDy*newDy));
+            const latDir=latSq>0.001?Math.sqrt(latSq):1;
+            pa.x=cxB-(dx/latDir)*remLat/2; pa.z=czB-(dz/latDir)*remLat/2;
+            pb.x=cxB+(dx/latDir)*remLat/2; pb.z=czB+(dz/latDir)*remLat/2;
+            pa.y=cyB-newDy/2; pb.y=cyB+newDy/2;
+          }
+        });
+      }
+    }
+    // 圧縮後の重心で y センタリング
+    const compCenterY=compCoords.reduce((s,v)=>s+v.y,0)/compCoords.length;
+    compCoords.forEach(v=>v.y-=compCenterY);
+    window._lastCompF=compF;
+
+    // 5) 面内の配置点 (TMD と同じ中心対称格子, hex fracToXZ)
+    const numI=Math.max(1, Math.floor(Na/sp));
+    const numJ=Math.max(1, Math.floor(Nb/sp));
+    const offI=(Na-(numI-1)*sp)/2;
+    const offJ=(Nb-(numJ-1)*sp)/2;
+    const placePts=[];
+    for(let ni=0;ni<numI;ni++) for(let nj=0;nj<numJ;nj++){
+      const[bx,bz]=fracToXZ(offI+ni*sp, offJ+nj*sp, a);
+      if(bx<dXMin||bx>dXMax||bz<dZMin||bz>dZMax) continue;
+      placePts.push({bx,bz});
+    }
+    if(placePts.length===0){
+      const[cbx,cbz]=fracToXZ(Na/2,Nb/2,a);
+      placePts.push({bx:cbx,bz:cbz});
+    }
+
+    const scaleI=parseFloat(document.getElementById('sl-atom-i').value)||1.0;
+    for(let l=0;l<numLayers-1;l++){
+      const gapCenterY=(l+0.5)*interStep;  // 層 l と l+1 の中間
+      for(let pi=0;pi<placePts.length;pi++){
+        const{bx,bz}=placePts[pi];
+        compCoords.forEach((rv,idx)=>{
+          const at=inter.atoms[idx];
+          const geo=new THREE.SphereGeometry(at.r*scaleI,16,16);
+          const mat=new THREE.MeshPhongMaterial({color:at.color,shininess:60});
+          const mesh=new THREE.Mesh(geo,mat);
+          mesh.position.set(bx+rv.x+off.x+interOffset.dx, gapCenterY+rv.y+off.y, bz+rv.z+off.z+interOffset.dz);
+          mesh.userData={isAtom:true,el:at.el||'?',isInter:true,atomIdx:idx};
+          structGroup.add(mesh);
+        });
+        if(inter.bonds){
+          inter.bonds.forEach(([ai,bi])=>{
+            const r1=compCoords[ai], r2=compCoords[bi];
+            const p1=new THREE.Vector3(bx+r1.x+off.x+interOffset.dx, gapCenterY+r1.y+off.y, bz+r1.z+off.z+interOffset.dz);
+            const p2=new THREE.Vector3(bx+r2.x+off.x+interOffset.dx, gapCenterY+r2.y+off.y, bz+r2.z+off.z+interOffset.dz);
+            const c=makeCyl(p1,p2,0.05*bondScale,matIBond);
+            if(c){c.userData={isInter:true};structGroup.add(c);}
+          });
+        }
+      }
+    }
+  }
+
   // 単位胞（面内 hex セル）
   if(showCell){
     const matL=new THREE.LineBasicMaterial({color:0x58a6ff,transparent:true,opacity:0.3});
@@ -1194,15 +1305,29 @@ function buildCarbon() {
   }
 
   // 情報パネル・凡例
-  updateCarbonInfo(info,numLayers);
+  updateCarbonInfo(info,numLayers,interStep,effExpansion);
   updateCarbonLegend();
 
-  // 炭素では意味の無い UI を片付ける（壊れ防止）
+  // 金属–金属結合は炭素では無意味なので隠す
   document.getElementById('mm-bond-group').style.display='none';
-  document.getElementById('ilayer-dist-panel').style.display='none';
-  // 層間ギャップ倍率は炭素では効かないので実距離だけ表示
-  document.getElementById('v-gap').value='—';
-  document.getElementById('v-gap-abs').value=info.nlayers===1?'0':interStep.toFixed(3);
+
+  // 層間ギャップ倍率と実距離を表示 (TMD と同じ)
+  document.getElementById('v-gap').value = effExpansion>expansion?effExpansion.toFixed(1):expansion.toFixed(1);
+  document.getElementById('v-gap-abs').value = interStep.toFixed(3);
+
+  // 層間距離パネル (C面–C面)。chk-dist 連動で表示。
+  const ildPanel=document.getElementById('ilayer-dist-panel');
+  const showDist=document.getElementById('chk-dist').checked;
+  if(showDist && numLayers>=2){
+    let panelHTML=`<div class="ild-title">層間 C面–C面 距離</div>`;
+    for(let l=0;l<numLayers-1;l++){
+      panelHTML+=`<div class="ild-row">L${l+1}–L${l+2}: <span style="color:#ffcc44;font-weight:bold">${interStep.toFixed(3)} Å</span></div>`;
+    }
+    ildPanel.innerHTML=panelHTML;
+    ildPanel.style.display='block';
+  } else {
+    ildPanel.style.display='none';
+  }
 
   // カメラ自動フィット
   const structW=(dXMax-dXMin), structH=Math.max(0.5,(numLayers-1)*interStep), structD=(dZMax-dZMin);
@@ -1215,23 +1340,24 @@ function buildCarbon() {
   }
 }
 
-function updateCarbonInfo(info,numLayers){
-  let html;
-  if(info.nlayers===1){
-    html=`<strong>グラフェン (graphene)</strong><br>`+
-      `空間群: <span class="hl">P6/mmm (No.191, 単層)</span><br>構造型: ハニカム (sp² 炭素)<br>`+
-      `a = ${info.a.toFixed(3)} Å (単層), C–C = <span class="hl">${(info.ccBond||1.42).toFixed(2)} Å</span><br>`+
-      `配位: 平面三方 (3 配位)<br>`+
-      `<span style="color:#555;font-size:.68rem">Wyckoff: C 2c (⅓,⅔) — 2 副格子 A/B</span>`;
-  } else {
-    html=`<strong>グラファイト (graphite)</strong><br>`+
-      `空間群: <span class="hl">P6₃/mmc (No.194, Bernal)</span><br>構造型: ハニカム (sp²) AB 積層<br>`+
-      `a = ${info.a.toFixed(3)} Å, c = ${(info.c||6.71).toFixed(2)} Å, 層間 ${(info.dInter||3.35).toFixed(2)} Å, AB 積層<br>`+
-      `C–C (面内) = <span class="hl">${(info.ccBond||1.42).toFixed(2)} Å</span><br>`+
-      `配位: 平面三方 (3 配位)、層間は vdW<br>`+
-      `表示層数: ${numLayers}<br>`+
-      `<span style="color:#555;font-size:.68rem">Wyckoff: C 2b(0,0,¼)+2c(⅓,⅔,¼)</span>`;
-  }
+function updateCarbonInfo(info,numLayers,interStep,effExpansion){
+  const pristine=info.dInter||3.35;
+  const cur=(interStep!==undefined)?interStep:pristine;
+  const widened=(effExpansion!==undefined && effExpansion>1.001);
+  // 現在の層間（拡大時は素の 3.35 Å と拡大後を併記してインターカレーション拡大を可視化）
+  const interLine = widened
+    ? `層間 <span class="hl">${cur.toFixed(2)} Å</span> (素: ${pristine.toFixed(2)} Å ×${effExpansion.toFixed(1)})`
+    : `層間 ${pristine.toFixed(2)} Å`;
+  const interKey=document.getElementById('sel-inter').value;
+  const interLabel=(interKey&&interKey!=='none'&&INTER[interKey])
+    ? `<br>挿入分子: <span class="hl">${INTER[interKey].name}</span> (層間に配置)` : '';
+  const html=`<strong>グラファイト (graphite)</strong><br>`+
+    `空間群: <span class="hl">P6₃/mmc (No.194, Bernal)</span><br>構造型: ハニカム (sp²) AB 積層<br>`+
+    `a = ${info.a.toFixed(3)} Å, c = ${(info.c||6.71).toFixed(2)} Å, ${interLine}, AB 積層<br>`+
+    `C–C (面内) = <span class="hl">${(info.ccBond||1.42).toFixed(2)} Å</span><br>`+
+    `配位: 平面三方 (3 配位)、層間は vdW<br>`+
+    `表示層数: ${numLayers}${interLabel}<br>`+
+    `<span style="color:#555;font-size:.68rem">Wyckoff: C 2b(0,0,¼)+2c(⅓,⅔,¼)</span>`;
   document.getElementById('info').innerHTML=html;
 }
 
@@ -1243,7 +1369,14 @@ function updateCarbonLegend(){
   document.getElementById('leg-m-name').textContent='C (炭素)';
   document.getElementById('leg-x-name').textContent='C (炭素)';
   document.getElementById('leg-p').style.display='none';
-  document.getElementById('leg-inter').style.display='none';
+  // 挿入分子を選んでいれば凡例を表示 (TMD と同じ)
+  const interKey=document.getElementById('sel-inter').value;
+  const li=document.getElementById('leg-inter');
+  if(interKey&&interKey!=='none'&&INTER[interKey]){
+    li.style.display='flex';
+    document.getElementById('leg-i-dot').style.background='#'+INTER[interKey].color.toString(16).padStart(6,'0');
+    document.getElementById('leg-i-name').textContent=INTER[interKey].name;
+  } else li.style.display='none';
 }
 
 function buildStructure() {
@@ -2240,7 +2373,20 @@ document.getElementById('v-gap-abs').addEventListener('change',function(){
   if(isNaN(targetDist)||targetDist<=0) return;
   // 現在の材料のパラメータ
   const info=DB[curMat], phase=curPhase;
-  if(info.isCarbon) return; // 炭素系は層間ギャップ倍率の概念が無いので何もしない
+  // 炭素系 (graphite): 層間 = baseInter × 倍率 → 倍率 = targetDist / baseInter
+  if(info.isCarbon){
+    const baseInter=info.dInter||3.35;
+    let ratioC=Math.max(1.0, Math.round((targetDist/baseInter)*10)/10);
+    const maxR=parseFloat(document.getElementById('sl-gap').max);
+    if(ratioC>maxR){
+      document.getElementById('sl-gap').max=ratioC;
+      document.getElementById('v-gap').max=ratioC;
+    }
+    document.getElementById('sl-gap').value=ratioC;
+    document.getElementById('v-gap').value=ratioC.toFixed(1);
+    buildStructure();
+    return;
+  }
   const c_layer=phase==='2H'?info.c2H/2:phase==='3R'?(info.c3R||info.c2H*1.5)/3:phase==='1Tp'?(info.c1Tp||info.c1T*2)/(info.nlc||2):phase==='MPS3'?(info.cMPS3||6.3):info.c1T;
   const r_inp=info.a/S3;
   const d_xm=info.dxm||(phase==='MPS3'
