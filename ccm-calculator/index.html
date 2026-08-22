@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CCM Calculator — Research Tools</title>
+<script src="https://cdn.jsdelivr.net/npm/jsme-editor/jsme.nocache.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#0a0e17;color:#ccc;font:15px/1.65 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","Segoe UI",Roboto,sans-serif;min-height:100vh}
+#loader{position:fixed;inset:0;z-index:9999;background:#0a0e17;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .4s}
+#loader.gone{opacity:0;pointer-events:none}
+.spin{width:36px;height:36px;border:3px solid rgba(88,166,255,.2);border-top-color:#58a6ff;border-radius:50%;animation:sp .9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#lmsg{color:#9ad0ff;font-size:.86rem;max-width:300px;text-align:center;line-height:1.6}
+#lstep{color:#555;font-size:.74rem;margin-top:2px;max-width:340px;text-align:center}
+.topbar{padding:9px 20px;background:rgba(10,14,23,.92);border-bottom:1px solid rgba(88,166,255,.1);display:flex;align-items:center;gap:14px}
+.topbar a{color:#58a6ff;text-decoration:none;font-size:.8rem;font-weight:600}
+.topbar a:hover{color:#9ad0ff}
+.topbar .sep{color:#444}
+.topbar .ttl{color:#ccc;font-size:.82rem}
+header{padding:20px 24px 14px;border-bottom:1px solid rgba(88,166,255,.07);background:rgba(20,25,40,.5)}
+header h1{font-size:1.15rem;color:#fff}
+header p{margin-top:4px;color:#666;font-size:.8rem}
+.wrap{display:grid;grid-template-columns:minmax(360px,430px) 1fr;gap:16px;padding:16px 20px 48px;max-width:1480px;margin:0 auto}
+@media(max-width:940px){.wrap{grid-template-columns:1fr}}
+.card{background:rgba(20,25,40,.85);border:1px solid rgba(88,166,255,.1);border-radius:11px;padding:16px}
+.card+.card{margin-top:12px}
+h2{margin:0 0 11px;font-size:.7rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#58a6ff}
+.tabs{display:flex;gap:3px;background:rgba(10,14,23,.8);padding:3px;border-radius:7px;margin-bottom:12px}
+.tabs button{flex:1;border:0;background:transparent;color:#555;padding:7px 4px;border-radius:6px;font:inherit;font-size:.82rem;cursor:pointer}
+.tabs button.on{background:rgba(88,166,255,.15);color:#9ad0ff;font-weight:600}
+.pane{display:none}.pane.on{display:block}
+input[type=text],textarea{width:100%;padding:8px 10px;border:1px solid rgba(88,166,255,.15);border-radius:7px;background:rgba(10,14,23,.6);color:#ccc;font:inherit;font-size:.86rem}
+textarea{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;font-size:.78rem;min-height:120px;resize:vertical}
+input[type=text]:focus,textarea:focus{outline:none;border-color:#58a6ff}
+label.lbl{display:block;font-size:.75rem;color:#666;margin:0 0 4px}
+.hint{font-size:.73rem;color:#555;margin-top:5px;line-height:1.5}
+#jsme_box{border:1px solid rgba(88,166,255,.12);border-radius:7px;overflow:hidden;min-height:350px;background:#fff}
+.opts{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid rgba(88,166,255,.08);font-size:.8rem}
+.opts label{display:flex;gap:6px;align-items:center;color:#888;cursor:pointer}
+.opts select{padding:4px 6px;border:1px solid rgba(88,166,255,.15);border-radius:6px;background:rgba(10,14,23,.6);color:#ccc;font:inherit;font-size:.8rem}
+.go{margin-top:12px;width:100%;padding:10px;border:0;border-radius:8px;background:#2563eb;color:#fff;font:inherit;font-weight:700;font-size:.92rem;cursor:pointer;transition:background .15s}
+.go:hover:not(:disabled){background:#3b82f6}
+.go:disabled{opacity:.5;cursor:progress}
+.score{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.big{font-size:48px;font-weight:700;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums;color:#fff}
+.unit{color:#666;font-size:.8rem}
+.bar{height:7px;border-radius:4px;background:rgba(255,255,255,.06);margin:12px 0 4px;overflow:hidden;border:1px solid rgba(88,166,255,.1)}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#22c55e,#eab308,#ef4444)}
+.sc{display:flex;justify-content:space-between;font-size:.68rem;color:#555}
+table.kv{width:100%;border-collapse:collapse;font-size:.8rem}
+table.kv td{padding:4px 0;border-bottom:1px solid rgba(88,166,255,.06);vertical-align:top}
+table.kv td:first-child{color:#666;width:46%;white-space:nowrap}
+table.kv td:last-child{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;font-size:.76rem;word-break:break-all}
+.vbtns{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px}
+.vbtns button{border:1px solid rgba(88,166,255,.15);background:rgba(20,25,40,.8);color:#888;padding:4px 9px;border-radius:5px;font:inherit;font-size:.76rem;cursor:pointer}
+.vbtns button.on{border-color:#58a6ff;color:#58a6ff;background:rgba(88,166,255,.1)}
+.viewer{position:relative;width:100%;height:360px;border:1px solid rgba(88,166,255,.12);border-radius:7px;overflow:hidden;background:#0b0d11}
+.leg{display:flex;gap:10px;font-size:.72rem;color:#666;margin-top:6px;flex-wrap:wrap}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:3px;vertical-align:-1px}
+.dl{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.dl a{font-size:.73rem;color:#58a6ff;text-decoration:none;border:1px solid rgba(88,166,255,.2);padding:4px 9px;border-radius:5px}
+.dl a:hover{background:rgba(88,166,255,.08)}
+.cb{font-size:.78rem}
+.crow{display:grid;grid-template-columns:65px 1fr 54px;gap:7px;align-items:center;padding:2px 0}
+.cbg{height:5px;border-radius:3px;background:rgba(255,255,255,.05);overflow:hidden}
+.cbg i{display:block;height:100%;background:#58a6ff}
+.cv{text-align:right;font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;font-size:.73rem;color:#666}
+.note{background:rgba(180,83,9,.12);border-left:3px solid #b45309;padding:7px 10px;border-radius:0 6px 6px 0;font-size:.76rem;margin-top:6px;color:#ccc;line-height:1.5}
+.err{background:rgba(185,28,28,.12);border-left:3px solid #b91c1c;padding:9px 11px;border-radius:0 6px 6px 0;color:#f87171;font-size:.83rem}
+.muted{color:#666;font-size:.8rem;margin-top:0}
+code{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;font-size:.76rem;background:rgba(88,166,255,.1);padding:1px 5px;border-radius:4px;color:#9ad0ff}
+</style>
+</head>
+<body>
+<div id="loader">
+  <div class="spin"></div>
+  <div id="lmsg">CCM Calculator を初期化中...</div>
+  <div id="lstep"></div>
+</div>
+
+<div class="topbar">
+  <a href="/">&#8592; Research Tools</a>
+  <span class="sep">|</span>
+  <span class="ttl">CCM Calculator</span>
+</div>
+
+<header>
+  <h1>連続キラリティ尺度 &#8212; Continuous Chirality Measure</h1>
+  <p>Zabrodsky&#8211;Peleg&#8211;Avnir 法 &#160;&#183;&#160; 計算はブラウザ内&#65288;Pyodide + NumPy&#65289;で完結します</p>
+</header>
+
+<div class="wrap">
+  <!-- 左列：入力 -->
+  <div>
+    <div class="card">
+      <h2>構造の入力</h2>
+      <div class="tabs">
+        <button class="on" data-tab="draw">描画</button>
+        <button data-tab="smiles">SMILES</button>
+        <button data-tab="file">MOL / XYZ</button>
+      </div>
+
+      <div class="pane on" id="pane-draw">
+        <div id="jsme_box"></div>
+        <p class="hint">くさび形結合ツールで立体を指定してください。</p>
+      </div>
+
+      <div class="pane" id="pane-smiles">
+        <label class="lbl">SMILES&#65288;立体異性体表記&#65289;</label>
+        <input type="text" id="in-smiles" placeholder="C[C@H](N)C(=O)O" autocomplete="off">
+        <p class="hint"><code>@</code> / <code>@@</code> で立体を指定。3D 座標は OpenChemLib で生成します。</p>
+      </div>
+
+      <div class="pane" id="pane-file">
+        <label class="lbl">MOL / SDF / XYZ を貼り付け&#65288;または選択&#65289;</label>
+        <textarea id="in-file" placeholder="V2000 MOL ブロック、または XYZ 形式&#10;&#10;原子数&#10;コメント行&#10;C  0.0000  0.0000  0.0000&#10;..."></textarea>
+        <p class="hint">
+          <input type="file" id="fileinput" accept=".mol,.sdf,.xyz,.txt" style="font-size:.76rem;color:#888">
+        </p>
+        <p class="hint">3D 座標が含まれていればそのまま使います。含まれない場合は OpenChemLib で配座を生成します。</p>
+      </div>
+
+      <div class="opts">
+        <label><input type="checkbox" id="opt-h"> 水素を含める</label>
+        <label>対象群
+          <select id="opt-groups">
+            <option value="S1,S2,S4,S6,S8" selected>S1&#12316;S8&#65288;既定&#65289;</option>
+            <option value="S1,S2,S4">S1 + S2 + S4</option>
+            <option value="S1,S2">S1 + S2</option>
+            <option value="S1">S1 のみ</option>
+            <option value="S2,S4,S6,S8">S1 なし&#65288;CSM&#65289;</option>
+          </select>
+        </label>
+        <label>置換の範囲
+          <select id="opt-topology">
+            <option value="bonds" selected>グラフ自己同型</option>
+            <option value="element">同一元素すべて</option>
+          </select>
+        </label>
+        <label title="重心を質量重心にします">
+          <input type="checkbox" id="opt-mass"> 質量重み重心
+        </label>
+      </div>
+
+      <button class="go" id="go" disabled>初期化中...</button>
+    </div>
+
+    <div class="card" id="notescard" style="display:none">
+      <h2>計算メモ</h2>
+      <div id="notes"></div>
+    </div>
+  </div>
+
+  <!-- 右列：結果 -->
+  <div>
+    <div class="card" id="helpcard">
+      <h2>使い方</h2>
+      <p class="muted">構造を与えて「CCM を計算」を押すと、その立体構造が<strong>完全なアキラル構造からどれだけ離れているか</strong>を 0&#12316;100 で返します。</p>
+      <table class="kv" style="margin-top:10px">
+        <tr><td>CCM = 0</td><td>アキラル&#65288;鏡映面あり&#65289;</td></tr>
+        <tr><td>CCM &lt; 1</td><td>ほぼアキラル</td></tr>
+        <tr><td>CCM &#8776; 1&#12316;10</td><td>典型的なキラル有機分子</td></tr>
+        <tr><td>CCM &gt; 20</td><td>強くキラル</td></tr>
+      </table>
+      <p class="hint" style="margin-top:8px">例: <code>C[C@H](N)C(=O)O</code>&#65288;L-アラニン&#65289;</p>
+    </div>
+
+    <div class="card" id="result" style="display:none">
+      <h2>結果</h2>
+      <div class="score">
+        <span class="big" id="ccmval">&#8211;</span>
+        <span class="unit" id="ccmunit">CCM &#160;&#40;0 = アキラル &#8230; 100&#41;</span>
+      </div>
+      <div class="bar"><i id="ccmbar" style="width:0%"></i></div>
+      <div class="sc"><span>0 アキラル</span><span>強くキラル 100</span></div>
+      <table class="kv" id="kv" style="margin-top:10px"></table>
+    </div>
+
+    <div class="card" id="viewcard" style="display:none">
+      <h2>立体構造 と 最近接アキラル構造</h2>
+      <div class="vbtns">
+        <button class="on" data-mode="overlay">重ね合わせ</button>
+        <button data-mode="input">入力構造</button>
+        <button data-mode="achiral">最近接アキラル</button>
+        <button data-mode="contrib">原子寄与</button>
+        <button data-mode="element" id="elembtn">対称要素</button>
+      </div>
+      <div class="viewer" id="viewer"></div>
+      <div class="leg" id="legend"></div>
+      <div class="dl" id="downloads"></div>
+    </div>
+
+    <div class="card" id="contribcard" style="display:none">
+      <h2>原子ごとの寄与</h2>
+      <div class="cb" id="contrib"></div>
+      <p class="hint">各原子の変位の寄与 &#8212; 合計が CCM。</p>
+    </div>
+
+    <div class="card" id="errcard" style="display:none">
+      <div class="err" id="err"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ──────────────────────────────────────
+   ローダー表示
+────────────────────────────────────── */
+function setStep(msg, sub) {
+  document.getElementById('lmsg').textContent = msg;
+  document.getElementById('lstep').textContent = sub || '';
+}
+
+/* ──────────────────────────────────────
+   スクリプト動的読み込み
+────────────────────────────────────── */
+function loadScript(src) {
+  return new Promise(function(res, rej) {
+    var s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+/* ──────────────────────────────────────
+   OpenChemLib (SMILES → 3D 座標)
+────────────────────────────────────── */
+var OCL = null;
+
+async function ensureOCL() {
+  if (OCL) return;
+  setStep('OpenChemLib を読み込み中...');
+  await loadScript('https://cdn.jsdelivr.net/npm/openchemlib/dist/openchemlib-full.js');
+  OCL = window.OCL;
+  if (!OCL) throw new Error('OpenChemLib の読み込みに失敗しました');
+}
+
+var ELEM_BY_NO = ['','H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al',
+  'Si','P','S','Cl','Ar','K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn',
+  'Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr','Nb','Mo','Tc','Ru','Rh','Pd',
+  'Ag','Cd','In','Sn','Sb','Te','I','Xe'];
+
+function smilesTo3D(smiles) {
+  if (!OCL) throw new Error('OpenChemLib が読み込まれていません');
+  var mol;
+  try { mol = OCL.Molecule.fromSmiles(smiles); }
+  catch(e) { throw new Error('SMILES を解釈できません: ' + smiles); }
+  mol.addImplicitHydrogens();
+
+  var gen = new OCL.ConformerGenerator(42);
+  gen.initializeConformers(mol, 0);
+  var conf = gen.getNextConformerAsMolecule();
+  if (!conf) throw new Error('3D 座標の生成に失敗しました。別の SMILES を試すか、XYZ/MOL ファイルを使ってください。');
+
+  var n = conf.getAllAtoms();
+  var symbols = [], coords = [];
+  for (var i = 0; i < n; i++) {
+    symbols.push(conf.getAtomLabel(i));
+    coords.push([conf.getAtomX(i), conf.getAtomY(i), conf.getAtomZ(i)]);
+  }
+  var bonds = [];
+  for (var b = 0; b < conf.getAllBonds(); b++) {
+    bonds.push([conf.getBondAtom(0, b), conf.getBondAtom(1, b)]);
+  }
+  return { symbols: symbols, coords: coords, bonds: bonds };
+}
+
+/* ──────────────────────────────────────
+   共有結合半径による結合推定
+────────────────────────────────────── */
+var COV = {H:.31,He:.28,Li:1.28,Be:.96,B:.84,C:.76,N:.71,O:.66,F:.57,Na:1.66,
+  Mg:1.41,Al:1.21,Si:1.11,P:1.07,S:1.05,Cl:1.02,K:2.03,Ca:1.76,Fe:1.42,
+  Co:1.38,Ni:1.24,Cu:1.32,Zn:1.22,Br:1.20,I:1.39,Pt:1.36,Au:1.36};
+
+function bondsByCovRadius(syms, coords) {
+  var bonds = [];
+  for (var i = 0; i < syms.length; i++) {
+    var ri = COV[syms[i]] !== undefined ? COV[syms[i]] : 1.5;
+    for (var j = i+1; j < syms.length; j++) {
+      var rj = COV[syms[j]] !== undefined ? COV[syms[j]] : 1.5;
+      var dx=coords[i][0]-coords[j][0], dy=coords[i][1]-coords[j][1], dz=coords[i][2]-coords[j][2];
+      if (Math.sqrt(dx*dx+dy*dy+dz*dz) < 1.25*(ri+rj)) bonds.push([i,j]);
+    }
+  }
+  return bonds;
+}
+
+/* ──────────────────────────────────────
+   MOL ブロック (V2000) パーサー
+────────────────────────────────────── */
+function parseMolBlock(text) {
+  var lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  var ci = -1;
+  // Standard V2000: counts line at index 3
+  for (var i = 2; i < Math.min(8, lines.length); i++) {
+    if (lines[i].indexOf('V2000') >= 0 || lines[i].indexOf('V3000') >= 0) { ci = i; break; }
+    var m = lines[i].match(/^\s*(\d+)\s+(\d+)/);
+    if (m && parseInt(m[1]) > 0 && ci < 0) { ci = i; break; }
+  }
+  if (ci < 0) throw new Error('MOL ブロックの counts line が見つかりません');
+  var parts = lines[ci].trim().split(/\s+/);
+  var nAtoms = parseInt(parts[0]), nBonds = parseInt(parts[1]);
+  if (isNaN(nAtoms) || nAtoms <= 0) throw new Error('原子数が読み取れません');
+
+  var symbols = [], coords = [];
+  for (var a = ci+1; a < ci+1+nAtoms; a++) {
+    var p = (lines[a]||'').trim().split(/\s+/);
+    if (p.length < 4) throw new Error('原子行 ' + a + ' が短すぎます');
+    coords.push([parseFloat(p[0]), parseFloat(p[1]), parseFloat(p[2])]);
+    symbols.push(p[3]);
+  }
+  var bonds = [];
+  for (var bb = ci+1+nAtoms; bb < ci+1+nAtoms+(nBonds||0); bb++) {
+    var p2 = (lines[bb]||'').trim().split(/\s+/);
+    if (p2.length >= 2) bonds.push([parseInt(p2[0])-1, parseInt(p2[1])-1]);
+  }
+  var has3D = coords.some(function(c){ return Math.abs(c[2]) > 0.05; });
+  return { symbols: symbols, coords: coords, bonds: bonds, has3D: has3D };
+}
+
+/* ──────────────────────────────────────
+   XYZ パーサー
+────────────────────────────────────── */
+function parseXYZ(text) {
+  var lines = text.trim().replace(/\r/g,'').split('\n');
+  var n0 = parseInt(lines[0]);
+  var body = (!isNaN(n0) && lines.length >= n0+2)
+    ? lines.slice(2, 2+n0)
+    : lines.filter(function(l){ return l.trim().match(/^[A-Za-z]{1,3}\s/); });
+  var symbols = [], coords = [];
+  for (var i = 0; i < body.length; i++) {
+    var p = body[i].trim().split(/\s+/);
+    if (p.length < 4) continue;
+    symbols.push(p[0][0].toUpperCase() + (p[0].slice(1)||'').toLowerCase());
+    coords.push([parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])]);
+  }
+  return { symbols: symbols, coords: coords, bonds: bondsByCovRadius(symbols, coords) };
+}
+
+/* ──────────────────────────────────────
+   入力解析（タブ → 原子データ）
+────────────────────────────────────── */
+async function parseInput(includeH) {
+  var notes = [];
+  var data;
+
+  if (activeTab === 'draw') {
+    if (!jsmeApplet) throw new Error('描画エディタが読み込まれていません');
+    var smi = jsmeApplet.smiles();
+    if (!smi) throw new Error('構造が描かれていません');
+    await ensureOCL();
+    data = smilesTo3D(smi);
+    notes.push('JSME の SMILES から OpenChemLib で 3D 配座を生成しました（単一配座）。');
+  } else if (activeTab === 'smiles') {
+    var smi2 = document.getElementById('in-smiles').value.trim();
+    if (!smi2) throw new Error('SMILES が入力されていません');
+    await ensureOCL();
+    data = smilesTo3D(smi2);
+    notes.push('OpenChemLib で 3D 配座を生成しました（単一配座）。複数配座統計が必要な場合は外部生成の XYZ をご利用ください。');
+  } else {
+    var t = document.getElementById('in-file').value.trim();
+    if (!t) throw new Error('座標が入力されていません');
+    var isMol = t.indexOf('M  END') >= 0 || t.indexOf('V2000') >= 0 || t.indexOf('V3000') >= 0
+      || (t.split('\n').length > 4 && /^\s*\d+\s+\d+/.test((t.split('\n')[3]||'')));
+    if (isMol) {
+      data = parseMolBlock(t);
+      if (!data.has3D) {
+        notes.push('MOL ブロックに 3D 座標が含まれていません。z = 0 のまま計算します。正確な値には DFT / MM 最適化済み XYZ をご利用ください。');
+      }
+    } else {
+      data = parseXYZ(t);
+    }
+  }
+
+  // 水素を外す
+  if (!includeH) {
+    var keep = [];
+    for (var k = 0; k < data.symbols.length; k++) {
+      if (data.symbols[k] !== 'H') keep.push(k);
+    }
+    var remap = new Array(data.symbols.length).fill(-1);
+    keep.forEach(function(orig, ni){ remap[orig] = ni; });
+    data.symbols = keep.map(function(i){ return data.symbols[i]; });
+    data.coords  = keep.map(function(i){ return data.coords[i]; });
+    data.bonds   = (data.bonds||[])
+      .filter(function(e){ return remap[e[0]]>=0 && remap[e[1]]>=0; })
+      .map(function(e){ return [remap[e[0]], remap[e[1]]]; });
+  }
+
+  if (data.symbols.length < 3)
+    throw new Error('原子が 3 個未満では CCM を定義できません。水素を含めるオプションを試してください。');
+  if (data.coords.some(function(c){ return c.some(function(v){ return isNaN(v); }); }))
+    throw new Error('座標に数値でない値が含まれています');
+  if (!data.bonds || data.bonds.length === 0)
+    data.bonds = bondsByCovRadius(data.symbols, data.coords);
+
+  data.notes = notes;
+  return data;
+}
+
+/* ──────────────────────────────────────
+   JSME
+────────────────────────────────────── */
+var jsmeApplet = null;
+window.jsmeOnLoad = function() {
+  jsmeApplet = new JSApplet.JSME('jsme_box', '100%', '346px', {options: 'star,nocanonize'});
+};
+
+/* ──────────────────────────────────────
+   タブ切替
+────────────────────────────────────── */
+var activeTab = 'draw';
+document.querySelectorAll('.tabs button').forEach(function(b) {
+  b.onclick = function() {
+    document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+    activeTab = b.dataset.tab;
+    document.querySelectorAll('.pane').forEach(function(p){ p.classList.remove('on'); });
+    document.getElementById('pane-' + activeTab).classList.add('on');
+  };
+});
+document.getElementById('fileinput').onchange = function(e) {
+  var f = e.target.files[0]; if (!f) return;
+  var r = new FileReader();
+  r.onload = function(ev){ document.getElementById('in-file').value = ev.target.result; };
+  r.readAsText(f);
+};
+
+/* ──────────────────────────────────────
+   Pyodide 初期化
+────────────────────────────────────── */
+var pyodide = null, pyReady = false;
+
+async function initPyodide() {
+  setStep('Pyodide を読み込み中...');
+  await loadScript('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
+
+  setStep('Python インタープリタを起動中...');
+  pyodide = await window.loadPyodide();
+
+  setStep('NumPy を読み込み中...');
+  await pyodide.loadPackage('numpy');
+
+  setStep('CCM エンジンを読み込み中...');
+  var base = window.location.pathname.replace(/\/[^\/]*$/, '');
+  if (!base) base = '';
+  var measureSrc = await fetch(base + '/ccm/measure.py').then(function(r) {
+    if (!r.ok) throw new Error('measure.py の取得に失敗しました (HTTP ' + r.status + ')');
+    return r.text();
+  });
+
+  pyodide.FS.mkdir('/ccm_engine');
+  pyodide.FS.writeFile('/ccm_engine/__init__.py', '');
+  pyodide.FS.writeFile('/ccm_engine/measure.py', measureSrc);
+
+  pyodide.runPython(
+    'import sys, importlib.util as iu\n' +
+    'sys.path.insert(0, "/")\n' +
+    'def _reg(name, path, sl=None):\n' +
+    '    sp = iu.spec_from_file_location(name, path, submodule_search_locations=sl)\n' +
+    '    m = iu.module_from_spec(sp); sys.modules[name] = m; sp.loader.exec_module(m); return m\n' +
+    'pkg = _reg("ccm_engine", "/ccm_engine/__init__.py", ["/ccm_engine"])\n' +
+    'meas= _reg("ccm_engine.measure", "/ccm_engine/measure.py")\n' +
+    'pkg.measure = meas\n'
+  );
+
+  // verify
+  pyodide.runPython('from ccm_engine.measure import ccm, element_permutations, permutation_count, EXHAUSTIVE_LIMIT');
+
+  pyReady = true;
+  document.getElementById('loader').classList.add('gone');
+  var btn = document.getElementById('go');
+  btn.disabled = false;
+  btn.textContent = 'CCM を計算';
+}
+
+initPyodide().catch(function(e) {
+  document.getElementById('lmsg').textContent = '初期化に失敗しました: ' + e.message;
+  document.getElementById('lstep').textContent = 'ページを再読み込みしてください。';
+  document.querySelector('#loader .spin').style.display = 'none';
+});
+
+/* ──────────────────────────────────────
+   計算ボタン
+────────────────────────────────────── */
+document.getElementById('go').onclick = async function() {
+  if (!pyReady) return;
+  var btn = document.getElementById('go');
+  document.getElementById('errcard').style.display = 'none';
+
+  var includeH = document.getElementById('opt-h').checked;
+  var groups   = document.getElementById('opt-groups').value.split(',');
+  var topology = document.getElementById('opt-topology').value;
+  var useMass  = document.getElementById('opt-mass').checked;
+
+  var atomData;
+  try { atomData = await parseInput(includeH); }
+  catch(e) { return showErr(e.message); }
+
+  btn.disabled = true; btn.textContent = '計算中...';
+  try {
+    var result = await runCCM(atomData, groups, topology, useMass, includeH);
+    if (result.error) throw new Error(result.error);
+    render(result);
+  } catch(e) { showErr(e.message); }
+  finally { btn.disabled = false; btn.textContent = 'CCM を計算'; }
+};
+
+/* ──────────────────────────────────────
+   Pyodide で CCM 計算
+────────────────────────────────────── */
+var PY_CALC = `
+import json, math, numpy as np
+from ccm_engine.measure import ccm, element_permutations, permutation_count, EXHAUSTIVE_LIMIT
+
+p = json.loads(_payload)
+symbols = p['symbols']
+coords  = np.array(p['coords'], dtype=float)
+bonds   = p['bonds']
+groups  = tuple(p['groups'])
+topology = p['topology']
+use_mass = p['useMass']
+include_h= p['includeH']
+n = len(symbols)
+
+adj = [set() for _ in range(n)]
+for ij in bonds:
+    i,j = int(ij[0]), int(ij[1])
+    if 0<=i<n and 0<=j<n:
+        adj[i].add(j); adj[j].add(i)
+
+def _graph_autos(syms, adj_):
+    by_s = {}
+    for i,s in enumerate(syms): by_s.setdefault(s,[]).append(i)
+    perms=[]; mapping=[-1]*len(syms); used=[False]*len(syms)
+    def dfs(node):
+        if len(perms)>=EXHAUSTIVE_LIMIT: return
+        if node==len(syms): perms.append(list(mapping)); return
+        for t in by_s.get(syms[node],[]):
+            if used[t]: continue
+            ok=True
+            for nb in adj_[node]:
+                if nb<node and mapping[nb] not in adj_[t]: ok=False; break
+            if not ok: continue
+            mapping[node]=t; used[t]=True; dfs(node+1); mapping[node]=-1; used[t]=False
+    dfs(0)
+    return perms
+
+notes = list(p.get('notes',[]))
+if topology=='bonds':
+    perms = _graph_autos(symbols, adj)
+    if len(perms)>=EXHAUSTIVE_LIMIT:
+        notes.append('自己同型探索が上限に達しました。値は上界の可能性があります。')
+elif topology=='element':
+    cnt = permutation_count(symbols)
+    perms = None if cnt>EXHAUSTIVE_LIMIT else element_permutations(symbols)
+else:
+    perms = element_permutations(symbols)
+
+MASSES={'H':1.008,'C':12.011,'N':14.007,'O':15.999,'F':18.998,'S':32.06,'Cl':35.45,
+        'P':30.974,'Br':79.904,'I':126.904,'B':10.81,'Si':28.086,'Se':78.96,'Ge':72.63}
+masses=[MASSES.get(s,12.0) for s in symbols] if use_mass else None
+
+NL = chr(10)
+def _ext(c): return float(np.linalg.norm(c,axis=1).max())*1.35+0.8
+def _pquad(ax,c):
+    u=np.asarray(ax,float); u/=np.linalg.norm(u)
+    h=np.array([1.,0.,0.]) if abs(u[0])<.9 else np.array([0.,1.,0.])
+    e1=np.cross(u,h); e1/=np.linalg.norm(e1); e2=np.cross(u,e1); rv=_ext(c)
+    return [(rv*(s1*e1+s2*e2)).tolist() for s1,s2 in ((1,1),(-1,1),(-1,-1),(1,-1))]
+def _aseg(ax,c):
+    u=np.asarray(ax,float); u/=np.linalg.norm(u); rv=_ext(c)
+    return [(-rv*u).tolist(),(rv*u).tolist()]
+def _sel(g,ax,c):
+    if g=='S1': return {'kind':'plane','label':'最適な鏡映面 (S1)','plane':_pquad(ax,c),'seg':None}
+    if g=='S2': return {'kind':'centre','label':'対称心 (S2)','plane':None,'seg':None}
+    return {'kind':'axis','label':g+' 回映軸','plane':None,'seg':_aseg(ax,c)}
+def _mb(syms,ca):
+    n2=len(syms)
+    ls=['','  CCM','',str(n2).rjust(3)+'  0  0  0  0  0  0  0  0  0999 V2000']
+    for s,c in zip(syms,ca.tolist()):
+        ls.append(('%10.4f%10.4f%10.4f %-3s 0  0  0  0  0  0  0  0  0  0  0  0')%(c[0],c[1],c[2],s))
+    ls.append('M  END'); return NL.join(ls)
+def _xyz(syms,ca,title):
+    ls=[str(len(syms)),title]
+    for s,c in zip(syms,ca.tolist()): ls.append('%s  %.6f  %.6f  %.6f'%(s,c[0],c[1],c[2]))
+    return NL.join(ls)
+
+_result = None
+try:
+    r = ccm(coords, symbols, perms, groups=groups, masses=masses)
+    el = _sel(r.group, r.axis, r.coords)
+    gnames={str(g).strip().upper() for g in groups}
+    is_ccm='S1' in gnames
+    desc='CCM' if is_ccm else 'CSM('+','.join(groups)+')'
+    if not is_ccm:
+        notes.append('S1（鏡映面）を外しているため表示値は CSM です。CCM なら 33.33 を超えません。')
+    if not r.exact:
+        notes.append('置換の規模が大きいため割当探索を使用しています。値は上界です。')
+    ord2 = sorted(range(n), key=lambda i:-r.per_atom[i])
+    fml=''.join((s+str(symbols.count(s)) if symbols.count(s)>1 else s) for s in dict.fromkeys(symbols))
+    _result = {
+        'ccm': round(float(r.value),4),
+        'descriptor': desc,
+        'exhaustive': bool(r.exact),
+        'group': str(r.group),
+        'per_group': {k:round(float(v),4) for k,v in r.per_group.items()},
+        'rmsd': round(float(r.rmsd),4),
+        'n_atoms': n,
+        'n_permutations': int(r.n_permutations),
+        'formula': fml,
+        'notes': notes,
+        'per_atom': [{'i':i,'symbol':r.symbols[i],'value':round(float(r.per_atom[i]),4)} for i in ord2],
+        'input_mol':   _mb(r.symbols, r.coords),
+        'achiral_mol': _mb(r.symbols, r.achiral_coords),
+        'input_xyz':   _xyz(r.symbols, r.coords, 'CCM='+str(round(float(r.value),4))),
+        'achiral_xyz': _xyz(r.symbols, r.achiral_coords, 'nearest achiral'),
+        'plane':        el['plane'],
+        'axis_segment': el['seg'],
+        'element_kind': el['kind'],
+        'element_label': el['label'],
+    }
+except Exception as ex:
+    _result = {'error': str(ex)}
+json.dumps(_result)
+`;
+
+async function runCCM(atomData, groups, topology, useMass, includeH) {
+  pyodide.globals.set('_payload', JSON.stringify({
+    symbols:  atomData.symbols,
+    coords:   atomData.coords,
+    bonds:    atomData.bonds || [],
+    groups: groups, topology: topology, useMass: useMass, includeH: includeH,
+    notes: atomData.notes || [],
+  }));
+  var res = await pyodide.runPythonAsync(PY_CALC);
+  return JSON.parse(res);
+}
+
+/* ──────────────────────────────────────
+   3D 描画 (3Dmol.js)
+────────────────────────────────────── */
+var last = null, viewer3d = null, viewMode = 'overlay';
+
+function heat(t) {
+  var c = [[59,130,246],[250,204,21],[239,68,68]];
+  var i = Math.min(1,Math.max(0,t))*2, k = Math.floor(i), f = i-k;
+  var a = c[Math.min(k,1)], b2 = c[Math.min(k+1,2)];
+  return '#'+a.map(function(v,n){ return Math.round(v+(b2[n]-v)*f).toString(16).padStart(2,'0'); }).join('');
+}
+
+async function draw3d() {
+  if (!last) return;
+  if (typeof $3Dmol === 'undefined') {
+    await loadScript('https://cdn.jsdelivr.net/npm/3dmol/build/3Dmol-min.js');
+  }
+  var el = document.getElementById('viewer');
+  el.innerHTML = '';
+  viewer3d = $3Dmol.createViewer(el, {backgroundColor: '#0b0d11'});
+  var legend = [];
+
+  if (viewMode==='input'||viewMode==='overlay'||viewMode==='element') {
+    viewer3d.addModel(last.input_mol,'mol').setStyle({},{stick:{radius:.13},sphere:{scale:.20}});
+    legend.push(['#7c8698','入力構造']);
+  }
+  if (viewMode==='achiral'||viewMode==='overlay') {
+    var thin = (viewMode==='overlay');
+    viewer3d.addModel(last.achiral_mol,'mol').setStyle({},{
+      stick:{radius:thin?.07:.13,color:'#22c55e',opacity:thin?.8:1},
+      sphere:{scale:thin?.10:.20,color:'#22c55e'}
+    });
+    legend.push(['#22c55e','最近接アキラル']);
+  }
+  if (viewMode==='contrib') {
+    var vals = {};
+    last.per_atom.forEach(function(a){ vals[a.i]=a.value; });
+    var mx = Math.max.apply(null, last.per_atom.map(function(a){ return a.value; }).concat([1e-9]));
+    viewer3d.addModel(last.input_mol,'mol').setStyle({},{
+      stick:{radius:.15,colorfunc:function(a){ return heat((vals[a.index]||0)/mx); }},
+      sphere:{scale:.30,colorfunc:function(a){ return heat((vals[a.index]||0)/mx); }}
+    });
+    legend.push(['#3b82f6','寄与 小'],['#facc15','中'],['#ef4444','寄与 大']);
+  }
+  if (viewMode==='element') {
+    if (last.plane) {
+      viewer3d.addCustom({
+        vertexArr: last.plane.map(function(p){ return {x:p[0],y:p[1],z:p[2]}; }),
+        faceArr:[0,1,2,0,2,3,2,1,0,3,2,0], color:'#60a5fa', alpha:.30
+      });
+      legend.push(['#60a5fa', last.element_label||'鏡映面']);
+    }
+    if (last.axis_segment) {
+      var p0=last.axis_segment[0], p1=last.axis_segment[1];
+      viewer3d.addCylinder({
+        start:{x:p0[0],y:p0[1],z:p0[2]}, end:{x:p1[0],y:p1[1],z:p1[2]},
+        radius:.06, color:'#60a5fa', alpha:.9, fromCap:2, toCap:2
+      });
+      viewer3d.addSphere({center:{x:0,y:0,z:0},radius:.16,color:'#60a5fa'});
+      legend.push(['#60a5fa', last.element_label||'回映軸']);
+    }
+    if (last.element_kind==='centre') {
+      viewer3d.addSphere({center:{x:0,y:0,z:0},radius:.28,color:'#60a5fa',alpha:.85});
+      legend.push(['#60a5fa', last.element_label||'対称心']);
+    }
+  }
+
+  document.getElementById('legend').innerHTML = legend.map(function(lp){
+    return '<span><span class="sw" style="background:'+lp[0]+'"></span>'+lp[1]+'</span>';
+  }).join('');
+  viewer3d.zoomTo(); viewer3d.zoom(1.25); viewer3d.render();
+}
+
+document.querySelectorAll('.vbtns button').forEach(function(b) {
+  b.onclick = function() {
+    document.querySelectorAll('.vbtns button').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on'); viewMode = b.dataset.mode; draw3d();
+  };
+});
+
+/* ──────────────────────────────────────
+   結果描画
+────────────────────────────────────── */
+function escH(s) {
+  return s.replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+  });
+}
+
+function render(j) {
+  last = j;
+  document.getElementById('helpcard').style.display = 'none';
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('viewcard').style.display = 'block';
+  document.getElementById('contribcard').style.display = 'block';
+
+  document.getElementById('ccmval').textContent = j.ccm.toFixed(3);
+  document.getElementById('ccmunit').textContent = (j.descriptor||'CCM') + '  (0 = アキラル … 100)';
+  document.getElementById('ccmbar').style.width = Math.min(100, Math.max(1.2, j.ccm)).toFixed(1) + '%';
+
+  var pgStr = Object.keys(j.per_group).length > 1
+    ? ' — ' + Object.entries(j.per_group).map(function(e){ return e[0]+':'+e[1]; }).join('、')
+    : '';
+  document.getElementById('kv').innerHTML = [
+    ['分子式', j.formula],
+    ['原子数', j.n_atoms + ' 個'],
+    ['最小群', j.group + pgStr],
+    ['アキラル RMSD', j.rmsd.toFixed(4) + ' Å'],
+    ['探索した置換', j.exhaustive ? j.n_permutations+'（全数）' : '全列挙せず（上界）'],
+  ].map(function(r){ return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>'; }).join('');
+
+  var nc = document.getElementById('notescard');
+  if (j.notes && j.notes.length) {
+    nc.style.display = 'block';
+    document.getElementById('notes').innerHTML = j.notes.map(function(n){
+      return '<div class="note">'+escH(n)+'</div>';
+    }).join('');
+  } else {
+    nc.style.display = 'none';
+  }
+
+  var mx2 = Math.max.apply(null, j.per_atom.map(function(a){ return a.value; }).concat([1e-9]));
+  document.getElementById('contrib').innerHTML = j.per_atom.slice(0,24).map(function(a) {
+    return '<div class="crow"><span>'+a.symbol+'#'+a.i+'</span>'
+      + '<span class="cbg"><i style="width:'+(100*a.value/mx2).toFixed(1)+'%"></i></span>'
+      + '<span class="cv">'+a.value.toFixed(4)+'</span></div>';
+  }).join('');
+
+  var eb = document.getElementById('elembtn');
+  eb.style.display = (j.plane||j.axis_segment||j.element_kind==='centre') ? '' : 'none';
+  eb.textContent = j.element_kind==='plane' ? '鏡映面'
+                 : j.element_kind==='axis'  ? j.group+' 軸'
+                 : '対称心';
+
+  document.getElementById('downloads').innerHTML = [
+    makeLink('入力 .xyz', j.input_xyz,   'input.xyz'),
+    makeLink('アキラル .xyz', j.achiral_xyz, 'achiral.xyz'),
+    makeLink('アキラル .mol', j.achiral_mol, 'achiral.mol'),
+  ].join('');
+
+  draw3d();
+}
+
+function makeLink(label, text, name) {
+  var url = URL.createObjectURL(new Blob([text], {type: 'text/plain'}));
+  return '<a href="'+url+'" download="'+name+'">'+label+'</a>';
+}
+
+function showErr(msg) {
+  document.getElementById('err').textContent = msg;
+  document.getElementById('errcard').style.display = 'block';
+}
+</script>
+</body>
+</html>

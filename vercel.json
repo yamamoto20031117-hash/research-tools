@@ -1,11 +1,14 @@
 {
   "rewrites": [
     { "source": "/tmd-viewer", "destination": "/tmd-viewer/index.html" },
+    { "source": "/spin-texture", "destination": "/spin-texture/index.html" },
+    { "source": "/chirality-ciss", "destination": "/chirality-ciss/index.html" },
     { "source": "/xrd-plotter", "destination": "/xrd-plotter/index.html" },
     { "source": "/squid-plotter", "destination": "/squid-plotter/index.html" },
     { "source": "/cfms-plotter", "destination": "/cfms-plotter/index.html" },
     { "source": "/showcase", "destination": "/showcase/index.html" },
-    { "source": "/crowdfunding-demo", "destination": "/crowdfunding-demo/index.html" }
+    { "source": "/crowdfunding-demo", "destination": "/crowdfunding-demo/index.html" },
+    { "source": "/ccm-calculator", "destination": "/ccm-calculator/index.html" }
   ],
   "headers": [
     {
