@@ -144,71 +144,6 @@
   .setup-notice{padding:16px;text-align:center;color:#666;font-size:.78rem;border-bottom:1px solid rgba(255,255,255,0.04)}
   .setup-notice a{color:#58a6ff}
 
-  /* ===== Locked tools (鎖でバッテン + 錠前) ===== */
-  .tool-section[data-locked="true"]{position:relative}
-  .tool-section[data-locked="true"] .card{
-    position:relative;
-    filter:grayscale(70%) brightness(0.55) contrast(0.9);
-    transition:filter .25s ease;
-  }
-  .tool-section[data-locked="true"] .card::before{
-    content:'';position:absolute;inset:0;border-radius:12px;pointer-events:none;
-    background:radial-gradient(ellipse at center,rgba(0,0,0,0.0) 30%,rgba(0,0,0,0.55) 100%);
-    z-index:3;
-  }
-  .tool-section[data-locked="true"] .card .launch{cursor:not-allowed}
-  /* 1枚のPNGをそのまま表示。clip-path分割はアニメ用だったので不要。 */
-  .tool-section[data-locked="true"] .chain-wrap{
-    position:absolute;
-    left:50%; top:50%;
-    transform:translate(-50%,-50%);
-    width:100%;
-    aspect-ratio:1536/1024;
-    pointer-events:none;z-index:4;
-    transition: opacity .35s ease;
-  }
-  .tool-section[data-locked="true"].unlocking .chain-wrap{ opacity:0; }
-  .tool-section[data-locked="true"] .chain-img{
-    position:absolute;inset:0;
-    background:url('/lock-chain.webp') no-repeat center center;
-    background-size:contain;
-    filter: drop-shadow(0 0 14px rgba(252,211,77,0.5));
-  }
-
-  /* unlocked → chain消える */
-  body.rt-unlocked .tool-section[data-locked="true"] .card{filter:none}
-  body.rt-unlocked .tool-section[data-locked="true"] .card::before,
-  body.rt-unlocked .tool-section[data-locked="true"] .chain-wrap{display:none}
-  body.rt-unlocked .tool-section[data-locked="true"] .card .launch{cursor:pointer}
-
-  /* ===== Password modal ===== */
-  #lock-modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
-  #lock-modal.visible{display:flex}
-  #lock-modal .backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.72);backdrop-filter:blur(6px)}
-  #lock-modal .panel{position:relative;background:#10141c;border:1px solid rgba(252,211,77,0.4);
-    border-radius:14px;padding:26px 30px;max-width:380px;width:100%;
-    box-shadow:0 20px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(252,211,77,0.15) inset}
-  #lock-modal h3{color:#fcd34d;font-size:1.1rem;margin-bottom:6px;text-align:center;letter-spacing:.04em}
-  #lock-modal p{color:#aabad6;font-size:.82rem;text-align:center;margin-bottom:18px;line-height:1.5}
-  #lock-modal .ico{display:block;margin:0 auto 12px;width:54px;height:54px}
-  #lock-input{width:100%;background:#0c0f15;border:1px solid #2a3040;color:#fff;
-    padding:10px 14px;border-radius:7px;font-size:1rem;font-family:inherit;letter-spacing:.1em;
-    transition:border-color .15s}
-  #lock-input:focus{outline:none;border-color:#fcd34d;box-shadow:0 0 0 3px rgba(252,211,77,0.15)}
-  #lock-input.shake{animation:shake .4s ease-in-out}
-  @keyframes shake{
-    0%,100%{transform:translateX(0)}
-    25%{transform:translateX(-6px)}
-    75%{transform:translateX(6px)}
-  }
-  #lock-error{color:#ff7a7a;font-size:.78rem;text-align:center;min-height:1.2em;margin-top:8px}
-  #lock-modal .actions{display:flex;gap:10px;margin-top:14px;justify-content:flex-end}
-  #lock-modal button{padding:7px 16px;border-radius:6px;font-size:.85rem;font-weight:600;
-    border:none;cursor:pointer;font-family:inherit;transition:background .15s}
-  #lock-modal .btn-go{background:linear-gradient(135deg,#fcd34d,#f59e0b);color:#3a1a05}
-  #lock-modal .btn-go:hover{filter:brightness(1.08)}
-  #lock-modal .btn-cancel{background:transparent;color:#aabad6;border:1px solid #2a3040}
-  #lock-modal .btn-cancel:hover{border-color:#fcd34d;color:#fff}
 
   /* ===== 管理者パネル ===== */
   #admin-btn{display:none;background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.35);border-radius:8px;padding:5px 12px;font-size:.78rem;color:#eab308;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
@@ -498,7 +433,7 @@
 </div>
 
 <!-- ===== DMM リアルタイムモニター ===== -->
-<div class="tool-section" data-tool="dmm-monitor" data-locked="true">
+<div class="tool-section" data-tool="dmm-monitor">
   <div class="card">
     <div class="card-top">
       <div class="icon">&#9889;</div>
@@ -555,7 +490,7 @@
 
 
 <!-- ===== DMM リアルタイムモニター 2 ===== -->
-<div class="tool-section" data-tool="dmm-monitor-2" data-locked="true">
+<div class="tool-section" data-tool="dmm-monitor-2">
   <div class="card">
     <div class="card-top">
       <div class="icon">&#9889;</div>
@@ -611,7 +546,7 @@
 </div>
 
 <!-- ===== SQUID 磁化データプロッター ===== -->
-<div class="tool-section" data-tool="squid-plotter" data-locked="true">
+<div class="tool-section" data-tool="squid-plotter">
   <div class="card">
     <div class="card-top">
       <div class="icon">&#129532;</div>
@@ -666,7 +601,7 @@
 
 
 <!-- ===== CFMS 低温物性モニター ===== -->
-<div class="tool-section" data-tool="cfms-plotter" data-locked="true">
+<div class="tool-section" data-tool="cfms-plotter">
   <div class="card">
     <div class="card-top">
       <div class="icon">&#10052;</div>
@@ -723,7 +658,7 @@
 </div>
 
 <!-- ===== QE 計算ランチャー ===== -->
-<div class="tool-section" data-tool="qe-calculator" data-locked="true">
+<div class="tool-section" data-tool="qe-calculator">
   <div class="card">
     <div class="card-top">
       <div class="icon">&#9883;</div>
@@ -782,7 +717,7 @@
   </div>
 </div>
 
-<div class="tool-section" data-tool="Temudraw" data-locked="true">
+<div class="tool-section" data-tool="Temudraw">
   <div class="card">
     <div class="card-top">
       <div class="icon">🧪</div>
@@ -843,31 +778,6 @@
 </main>
 
 <!-- Password modal for locked tools -->
-<div id="lock-modal">
-  <div class="backdrop"></div>
-  <div class="panel">
-    <svg class="ico" viewBox="0 0 100 120">
-      <defs>
-        <linearGradient id="lockGrad-modal" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#fde68a"/>
-          <stop offset="50%" stop-color="#f59e0b"/>
-          <stop offset="100%" stop-color="#7c2d12"/>
-        </linearGradient>
-      </defs>
-      <path d="M 28 56 L 28 42 A 22 22 0 0 1 72 42 L 72 56" fill="none" stroke="#a8a8b8" stroke-width="8" stroke-linecap="round"/>
-      <rect x="14" y="50" width="72" height="60" rx="8" fill="url(#lockGrad-modal)" stroke="#3a1a05" stroke-width="1.5"/>
-      <circle cx="50" cy="76" r="6" fill="#3a1a05"/>
-      <rect x="46" y="76" width="8" height="16" rx="2" fill="#3a1a05"/>
-    </svg>
-    <h3>🔒 ロック中</h3>
-    <input id="lock-input" type="password" autocomplete="off" placeholder="パスワード">
-    <div id="lock-error"></div>
-    <div class="actions">
-      <button class="btn-cancel" type="button" onclick="window._closeLock()">キャンセル</button>
-      <button class="btn-go" type="button" onclick="window._submitLock()">解除</button>
-    </div>
-  </div>
-</div>
 
 <!-- 管理者パネル -->
 <div id="admin-ov" class="admin-ov" hidden>
@@ -896,6 +806,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="/assets/rt-firebase.js"></script>
 
 <script>
 // =====================================================
@@ -906,18 +817,9 @@
 //  4. ルールは database.rules.json（リポジトリ直下）を適用すること。
 //     旧来の { ".read": true, ".write": true } は誰でも他人の投稿を
 //     削除できるため使わない。
-//  5. 下の firebaseConfig を自分の値に差し替え
+//  5. 設定値は /assets/rt-firebase.js（全ツール共通の唯一の正）を直す
 // =====================================================
-const firebaseConfig = {
-  apiKey: "AIzaSyClK3vIE_SQ7SGdXWbmWzZ51MdeBappDKY",
-  authDomain: "research-tools-board.firebaseapp.com",
-  databaseURL: "https://research-tools-board-default-rtdb.firebaseio.com",
-  projectId: "research-tools-board",
-  storageBucket: "research-tools-board.firebasestorage.app",
-  messagingSenderId: "919441103197",
-  appId: "1:919441103197:web:2bb09e95d4b3034648f0b4",
-  measurementId: "G-7JCBM41RH4"
-};
+const firebaseConfig = window.RT_FIREBASE_CONFIG;
 
 let db=null, firebaseReady=false, fbUid=null, fbDegraded=false;
 
@@ -1320,113 +1222,30 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 
   // ===== Lock setup =====
-  installLockOverlays();
-  applyUnlockedState();
 });
 
-// =====================================================
-//  Lock / password gate
-// =====================================================
-// パスワードはここで定義。研究室メンバーに共有する文字列を入れてください。
-// 変更したら全員に再共有 → 各ブラウザで再度入力が必要。
-const LOCK_PASSWORD = 'suda2026';
-// Bump this when you want to force everyone back to the locked state
-// (e.g. after rotating the password, or fixing the lock visuals).
-const LOCK_STORAGE_KEY = 'rt-unlocked-v3';
+// ロック機構は削除（2026-08-23）。クライアント側パスワードはソースに
+// 書いてある以上どうやっても秘密にできず、実際このロックは直URLで素通り
+// していた。守れていないのに研究室名由来の文字列だけが漏れていたため撤去。
 
-function isUnlocked(){
-  return localStorage.getItem(LOCK_STORAGE_KEY) === 'true';
-}
-function applyUnlockedState(){
-  if(isUnlocked()) document.body.classList.add('rt-unlocked');
-}
-
-// Chain markup: 3 copies of the same lock-chain.webp clip-pathed into
-// left half / right half / central padlock.
-const CHAIN_HTML = `<div class="chain-img"></div>`;
-
-function installLockOverlays(){
-  document.querySelectorAll('.tool-section[data-locked="true"]').forEach(section => {
-    const card = section.querySelector('.card');
-    if(!card) return;
-    if(card.querySelector('.chain-wrap')) return; // already installed
-    const wrap = document.createElement('div');
-    wrap.className = 'chain-wrap';
-    wrap.innerHTML = CHAIN_HTML;
-    card.appendChild(wrap);
-  });
-}
-
-// Intercept clicks on locked launch links
-document.addEventListener('click', e => {
-  if(isUnlocked()) return;
-  const section = e.target.closest('.tool-section[data-locked="true"]');
-  if(!section) return;
-  // Only intercept launch link clicks (not board, not card hover)
-  const launch = e.target.closest('.launch');
-  const card = e.target.closest('.card');
-  if(!launch && !card) return;
-  // Don't gate the thread board interactions
-  if(e.target.closest('.board')) return;
-  e.preventDefault();
-  const target = launch ? launch.getAttribute('href') : section.querySelector('.launch')?.getAttribute('href');
-  window._openLock(target || '');
-}, true);
-
-window._openLock = function(redirectUrl){
-  const modal = document.getElementById('lock-modal');
-  modal.dataset.redirect = redirectUrl || '';
-  modal.classList.add('visible');
-  const input = document.getElementById('lock-input');
-  input.value = '';
-  document.getElementById('lock-error').textContent = '';
-  setTimeout(() => input.focus(), 50);
-};
-window._closeLock = function(){
-  document.getElementById('lock-modal').classList.remove('visible');
-};
-window._submitLock = function(){
-  const input = document.getElementById('lock-input');
-  const errEl = document.getElementById('lock-error');
-  if(input.value === LOCK_PASSWORD){
-    localStorage.setItem(LOCK_STORAGE_KEY, 'true');
-    const url = document.getElementById('lock-modal').dataset.redirect;
-    window._closeLock();
-
-    // Fade out chain overlays, then promote to fully-unlocked state.
-    document.querySelectorAll('.tool-section[data-locked="true"]').forEach(s => {
-      s.classList.add('unlocking');
-    });
-    setTimeout(() => {
-      document.body.classList.add('rt-unlocked');
-      if(url) location.href = url;
-    }, 380);
-  } else {
-    errEl.textContent = 'パスワードが違います';
-    input.classList.add('shake');
-    setTimeout(() => input.classList.remove('shake'), 400);
-  }
-};
-
-// Enter key submits, Escape cancels
-document.addEventListener('keydown', e => {
-  const modal = document.getElementById('lock-modal');
-  if(!modal.classList.contains('visible')) return;
-  if(e.key === 'Enter'){ e.preventDefault(); window._submitLock(); }
-  if(e.key === 'Escape'){ e.preventDefault(); window._closeLock(); }
-});
-
-// ===== 管理者モード =====
-// 有効化: ページ上部の "Research Tools" タイトルを 7 回クリック → パスワード入力
-// パスワード: admin-rt-2026 （必要に応じて変更）
-// 有効化: "Research Tools" タイトルを 7 回クリック（3秒以内）→ パスワード入力
+// ===== 管理者パネル =====
+// 表示切替: ページ上部の "Research Tools" タイトルを 7 回クリック（3秒以内）
+//
+// 管理者パネルの「表示/非表示」だけをこのブラウザに覚えさせるキー。
+// これは UI の出し分けであって権限ではない。
+//
+// 以前はここに平文の管理者パスワードを持っていたが、静的サイトのソースに
+// 書いた文字列は誰でも読めるため秘密として機能しない（＝守れていないのに
+// 漏れるだけ）。実際の権限は DB ルール側の admins ノードで持つ:
+//   /admins/<Firebase認証uid>: true
+// ここに載っている uid だけが他人の投稿を削除できる。詳細は
+// database.rules.README.md を参照。
 const ADMIN_KEY = 'rt-admin-v1';
-const ADMIN_PW  = 'admin-rt-2026';
 
-// 既にこのブラウザで認証済みならボタンを表示
+// 既にこのブラウザで表示ONにしていればボタンを出す
 if(localStorage.getItem(ADMIN_KEY)==='1') document.getElementById('admin-btn').style.display='';
 
-// 7回クリック起動
+// 7回クリックで表示を切り替え
 (function(){
   let cnt=0, timer=null;
   const h1=document.querySelector('header h1');
@@ -1436,19 +1255,15 @@ if(localStorage.getItem(ADMIN_KEY)==='1') document.getElementById('admin-btn').s
     timer=setTimeout(()=>cnt=0, 3000);
     if(cnt>=7){
       cnt=0;
-      if(localStorage.getItem(ADMIN_KEY)==='1'){
-        if(confirm('管理者モードを解除しますか？')){
+      const on=localStorage.getItem(ADMIN_KEY)==='1';
+      if(on){
+        if(confirm('管理者パネルを隠しますか？')){
           localStorage.removeItem(ADMIN_KEY);
           document.getElementById('admin-btn').style.display='none';
         }
-      } else {
-        const pw=prompt('管理者パスワードを入力:');
-        if(pw===ADMIN_PW){
-          localStorage.setItem(ADMIN_KEY,'1');
-          document.getElementById('admin-btn').style.display='';
-        } else if(pw!==null){
-          alert('パスワードが違います');
-        }
+      }else{
+        localStorage.setItem(ADMIN_KEY,'1');
+        document.getElementById('admin-btn').style.display='';
       }
     }
   });

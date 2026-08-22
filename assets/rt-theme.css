@@ -1,0 +1,38 @@
+/* =====================================================================
+   research-tools 共通ダークテーマ
+
+   cfms-plotter / dmm-monitor / dmm-monitor-2 の 3 ファイルで完全に一致して
+   いたルールだけを集めてある。少しでも差があるルール（.chart-wrap や
+   @media(max-width:600px) など）はページ側に残した。
+
+   各ページの <style> はこの後に読み込まれるので、ページ固有の上書きは
+   これまでどおり効く。
+   ===================================================================== */
+
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo','Hiragino Sans',sans-serif;min-height:100vh}
+
+header{padding:20px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+  border-bottom:1px solid rgba(255,255,255,0.06)}
+header h1{font-size:1.2rem;color:#fff;display:flex;align-items:center;gap:10px}
+header h1 .icon{font-size:1.5rem}
+.back-link{color:#58a6ff;text-decoration:none;font-size:.8rem}
+.back-link:hover{text-decoration:underline}
+
+/* チャート */
+.chart-section{padding:0 24px 20px}
+.chart-controls{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.chart-controls label{font-size:.78rem;color:#888}
+.chart-controls button{padding:4px 14px;background:rgba(88,166,255,0.15);color:#58a6ff;border:1px solid rgba(88,166,255,0.3);
+  border-radius:4px;font-size:.78rem;cursor:pointer;transition:.15s}
+.chart-controls button:hover{background:rgba(88,166,255,0.25)}
+canvas{display:block;width:100%}
+
+/* テーブル */
+table{width:100%;border-collapse:collapse;font-size:.75rem}
+th{background:rgba(88,166,255,0.08);color:#58a6ff;font-weight:600;position:sticky;top:0;z-index:1}
+th,td{padding:6px 12px;text-align:right;border-bottom:1px solid rgba(255,255,255,0.04)}
+td:first-child,th:first-child{text-align:left}
+tr:hover td{background:rgba(88,166,255,0.03)}
+
+footer{padding:16px 24px;color:#444;font-size:.7rem;text-align:center;border-top:1px solid rgba(255,255,255,0.04)}

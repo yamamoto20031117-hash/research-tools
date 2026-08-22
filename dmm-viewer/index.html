@@ -140,6 +140,7 @@
 
 <footer>DMM Data Viewer — Research Tools</footer>
 
+<script src="/assets/rt-plot.js"></script>
 <script>
 // ===== 状態 =====
 let rawData=[];       // {time, voltage, current}
@@ -271,19 +272,9 @@ function redraw(){
   const uyMin=parseFloat(document.getElementById('yMinR').value);
   const uyMax=parseFloat(document.getElementById('yMaxR').value);
 
-  // Nice axis
-  function niceNum(range,round){
-    if(range<=0) return 1;
-    const exp=Math.floor(Math.log10(range));
-    const frac=range/Math.pow(10,exp);
-    let nice;
-    if(round){nice=frac<1.5?1:frac<3?2:frac<7?5:10;}
-    else{nice=frac<=1?1:frac<=2?2:frac<=5?5:10;}
-    return nice*Math.pow(10,exp);
-  }
-
+  // Nice axis（実体は /assets/rt-plot.js の rtNiceNum）
   const yRange=yDataMax-yDataMin||1;
-  const yTick=niceNum(yRange/5,true);
+  const yTick=rtNiceNum(yRange/5,true);
   let yMin=isNaN(uyMin)?Math.floor(yDataMin/yTick)*yTick:uyMin;
   let yMax=isNaN(uyMax)?Math.ceil(yDataMax/yTick)*yTick:uyMax;
   if(yMin>=yMax){yMin=yDataMin-Math.abs(yDataMin)*0.1;yMax=yDataMax+Math.abs(yDataMax)*0.1;}
@@ -303,7 +294,7 @@ function redraw(){
   // グリッド
   ctx.strokeStyle='#e8e8e8';ctx.lineWidth=0.5;
   const yTicks=[];
-  const yStep=niceNum((yMax-yMin)/5,true);
+  const yStep=rtNiceNum((yMax-yMin)/5,true);
   for(let v=Math.ceil(yMin/yStep)*yStep;v<=yMax+yStep*0.001;v+=yStep){
     yTicks.push(v);
     const y=yPx(v);
@@ -311,7 +302,7 @@ function redraw(){
   }
 
   // X軸グリッド
-  const xStep=niceNum((xMax-xMin)/6,true);
+  const xStep=rtNiceNum((xMax-xMin)/6,true);
   const xTicks=[];
   for(let v=Math.ceil(xMin/xStep)*xStep;v<=xMax+xStep*0.001;v+=xStep){
     xTicks.push(v);

@@ -285,6 +285,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="/assets/rt-firebase.js"></script>
+<script src="/assets/rt-fileload.js"></script>
+<script src="/assets/rt-plot.js"></script>
 <script>
 const COLORS=['#2F5496','#CC0000','#228B22','#FF8C00','#8B008B','#008B8B','#B22222','#4169E1'];
 let fileList=[]; // {name, label, color, x[], y[], peaks[], yOffset, yScale}
@@ -306,10 +309,9 @@ function handleFiles(files){
   }
 }
 
+// エンコーディング総当り＋バイナリフォールバックは /assets/rt-fileload.js
 function readFile(file){
   const ext='.'+file.name.split('.').pop().toLowerCase();
-  const encodings=['shift_jis','utf-8','euc-jp','iso-8859-1'];
-  let tryIdx=0;
 
   function addData(data){
     if(data&&data.x.length>5){
@@ -324,44 +326,14 @@ function readFile(file){
     return false;
   }
 
-  function tryRead(){
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const text=e.target.result;
-      // RASフォーマットを検出
-      let data=null;
-      if(ext==='.ras'||text.includes('*RAS_DATA_START')){
-        data=parseRAS(text);
-      } else {
-        data=parseGenericXRD(text);
-      }
-      if(addData(data)) return;
-
-      tryIdx++;
-      if(tryIdx<encodings.length){ tryRead(); }
-      else {
-        // バイナリとして読み直し
-        const binReader=new FileReader();
-        binReader.onload=ev=>{
-          const arr=new Uint8Array(ev.target.result);
-          let binText='';
-          for(let i=0;i<arr.length;i++){
-            const b=arr[i];
-            if(b===0x09) binText+='\t'; else if(b===0x0A) binText+='\n'; else if(b===0x0D) continue;
-            else if(b>=0x20&&b<=0x7E) binText+=String.fromCharCode(b); else binText+=' ';
-          }
-          let d2=null;
-          if(binText.includes('*RAS_DATA_START')) d2=parseRAS(binText);
-          else d2=parseGenericXRD(binText);
-          if(!addData(d2)) alert('データを読み取れませんでした: '+file.name);
-        };
-        binReader.readAsArrayBuffer(file);
-      }
-    };
-    reader.onerror=()=>{ tryIdx++; if(tryIdx<encodings.length) tryRead(); else alert('読み込み失敗: '+file.name); };
-    reader.readAsText(file, encodings[tryIdx]);
-  }
-  tryRead();
+  rtReadFileMultiEncoding(file, (text, isBinaryFallback)=>{
+    // RASフォーマットを検出。バイナリで読み直したときは拡張子ではなく
+    // マーカーだけで判定する（元の挙動のまま）。
+    const isRas = isBinaryFallback
+      ? text.includes('*RAS_DATA_START')
+      : (ext==='.ras'||text.includes('*RAS_DATA_START'));
+    return addData(isRas ? parseRAS(text) : parseGenericXRD(text));
+  });
 }
 
 // ===== Rigaku .ras ファイルパーサー =====
@@ -1018,16 +990,12 @@ function resetLabelOffsets(){
   }
 }
 
+// 仮数の丸めは /assets/rt-plot.js の rtNiceStep（÷8 とガードはこのツール固有）
 function calcStep(range){
   if(!range||range<=0||!isFinite(range)) return 1;
   const raw=range/8;
   if(raw<=0||!isFinite(raw)) return 1;
-  const mag=Math.pow(10,Math.floor(Math.log10(raw)));
-  const norm=raw/mag;
-  if(norm<=1.5) return mag;
-  if(norm<=3.5) return 2*mag;
-  if(norm<=7.5) return 5*mag;
-  return 10*mag;
+  return rtNiceStep(raw);
 }
 
 // ===== FWHM計算 =====
@@ -2115,15 +2083,7 @@ function initFirebase(){
     script2.src='https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js';
     script2.onload=()=>{
       try{
-        firebase.initializeApp({
-          apiKey:"AIzaSyClK3vIE_SQ7SGdXWbmWzZ51MdeBappDKY",
-          authDomain:"research-tools-board.firebaseapp.com",
-          databaseURL:"https://research-tools-board-default-rtdb.firebaseio.com",
-          projectId:"research-tools-board",
-          storageBucket:"research-tools-board.firebasestorage.app",
-          messagingSenderId:"359837086498",
-          appId:"1:359837086498:web:your_app_id"
-        });
+        firebase.initializeApp(window.RT_FIREBASE_CONFIG);
         fbDb=firebase.database();
         fbReady=true;
         startLiveListening();

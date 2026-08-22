@@ -147,6 +147,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="/assets/rt-fileload.js"></script>
+<script src="/assets/rt-plot.js"></script>
 <script>
 const COLORS=['#CC0000','#2F5496','#228B22','#FF8C00','#8B008B','#008B8B','#B22222','#4169E1'];
 let fileList=[]; // {name, label, color, temp[], field[], moment[], mass, marker}
@@ -168,54 +170,19 @@ function handleFiles(files){
   for(const f of files) readFile(f);
 }
 
+// エンコーディング総当り＋バイナリフォールバックは /assets/rt-fileload.js
 function readFile(file){
-  const encodings=['shift_jis','utf-8','euc-jp','iso-8859-1'];
-  let tryIdx=0;
-  function tryRead(){
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const data=parseSQUID(e.target.result, file.name);
-      if(data&&data.moment.length>3){
-        const idx=fileList.length;
-        const label=file.name.replace(/\.(dat|csv|txt)$/i,'');
-        fileList.push({name:file.name, label, color:COLORS[idx%COLORS.length],
-          temp:data.temp, field:data.field, moment:data.moment, mass:0, marker:'circle'});
-        autoDetectMode();
-        updateUI();
-      } else {
-        tryIdx++;
-        if(tryIdx<encodings.length) tryRead();
-        else {
-          // バイナリフォールバック
-          const binReader=new FileReader();
-          binReader.onload=ev=>{
-            const arr=new Uint8Array(ev.target.result);
-            let text='';
-            for(let i=0;i<arr.length;i++){
-              const b=arr[i];
-              if(b===0x09)text+='\t';else if(b===0x0A)text+='\n';else if(b===0x0D)continue;
-              else if(b>=0x20&&b<=0x7E)text+=String.fromCharCode(b);else text+=' ';
-            }
-            const data2=parseSQUID(text, file.name);
-            if(data2&&data2.moment.length>3){
-              const idx2=fileList.length;
-              const label2=file.name.replace(/\.(dat|csv|txt)$/i,'');
-              fileList.push({name:file.name, label:label2, color:COLORS[idx2%COLORS.length],
-                temp:data2.temp, field:data2.field, moment:data2.moment, mass:0, marker:'circle'});
-              autoDetectMode();
-              updateUI();
-            } else {
-              alert('データを読み取れませんでした: '+file.name);
-            }
-          };
-          binReader.readAsArrayBuffer(file);
-        }
-      }
-    };
-    reader.onerror=()=>{tryIdx++;if(tryIdx<encodings.length)tryRead();else alert('読み込み失敗: '+file.name);};
-    reader.readAsText(file, encodings[tryIdx]);
-  }
-  tryRead();
+  rtReadFileMultiEncoding(file, text=>{
+    const data=parseSQUID(text, file.name);
+    if(!(data&&data.moment.length>3)) return false;
+    const idx=fileList.length;
+    const label=file.name.replace(/\.(dat|csv|txt)$/i,'');
+    fileList.push({name:file.name, label, color:COLORS[idx%COLORS.length],
+      temp:data.temp, field:data.field, moment:data.moment, mass:0, marker:'circle'});
+    autoDetectMode();
+    updateUI();
+    return true;
+  });
 }
 
 function parseSQUID(text, filename){
@@ -700,15 +667,10 @@ function drawMarker(ctx, x, y, size, shape){
   ctx.fill();
 }
 
+// 仮数の丸めは /assets/rt-plot.js の rtNiceStep（÷6 はこのツール固有）
 function calcStep(range){
   if(range<=0) return 1;
-  const raw=range/6;
-  const mag=Math.pow(10,Math.floor(Math.log10(raw)));
-  const norm=raw/mag;
-  if(norm<=1.5) return mag;
-  if(norm<=3.5) return 2*mag;
-  if(norm<=7.5) return 5*mag;
-  return 10*mag;
+  return rtNiceStep(range/6);
 }
 
 function formatTick(v){

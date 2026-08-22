@@ -357,16 +357,9 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="/assets/rt-firebase.js"></script>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyClK3vIE_SQ7SGdXWbmWzZ51MdeBappDKY",
-  authDomain: "research-tools-board.firebaseapp.com",
-  databaseURL: "https://research-tools-board-default-rtdb.firebaseio.com",
-  projectId: "research-tools-board",
-  storageBucket: "research-tools-board.firebasestorage.app",
-  messagingSenderId: "359837086498",
-  appId: "1:359837086498:web:your_app_id"
-};
+const firebaseConfig = window.RT_FIREBASE_CONFIG;
 
 let db=null, firebaseReady=false;
 try{

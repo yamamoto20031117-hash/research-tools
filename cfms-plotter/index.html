@@ -5,17 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>CFMS Plotter — 低温物性データプロッター</title>
+<!-- 共通ダークテーマ。ページ固有のスタイルより前に読むこと（上書きはページ側が勝つ） -->
+<link rel="stylesheet" href="/assets/rt-theme.css">
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{background:#0a0e17;color:#ccc;font-family:'Helvetica Neue',Arial,'Segoe UI','Meiryo','Hiragino Sans',sans-serif;min-height:100vh}
-
-  header{padding:20px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
-    border-bottom:1px solid rgba(255,255,255,0.06)}
-  header h1{font-size:1.2rem;color:#fff;display:flex;align-items:center;gap:10px}
-  header h1 .icon{font-size:1.5rem}
-  .back-link{color:#58a6ff;text-decoration:none;font-size:.8rem}
-  .back-link:hover{text-decoration:underline}
-
   /* 自動受信パネル */
   .auto-panel{margin:16px 24px;background:rgba(20,25,40,0.85);border:1px solid rgba(255,255,255,0.06);
     border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
@@ -100,32 +92,19 @@
   .s-card.field .value{color:#a78bfa}
   .s-card.info .value{color:#888;font-size:1rem}
 
-  /* チャート */
-  .chart-section{padding:0 24px 20px}
-  .chart-controls{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-  .chart-controls label{font-size:.78rem;color:#888}
+  /* チャート（共通分は /assets/rt-theme.css） */
   .chart-controls select{background:#0e1220;border:1px solid #2a3040;border-radius:4px;
     color:#ddd;padding:4px 8px;font-size:.78rem}
-  .chart-controls button{padding:4px 14px;background:rgba(88,166,255,0.15);color:#58a6ff;border:1px solid rgba(88,166,255,0.3);
-    border-radius:4px;font-size:.78rem;cursor:pointer;transition:.15s}
-  .chart-controls button:hover{background:rgba(88,166,255,0.25)}
 
   .chart-wrap{background:#f8f9fa;border:1px solid #ddd;border-radius:8px;overflow:hidden}
-  canvas{display:block;width:100%}
 
-  /* テーブル */
+  /* テーブル（table / th / td の共通分は /assets/rt-theme.css） */
   .table-section{padding:0 24px 24px}
   .table-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
   .table-header h2{font-size:.9rem;color:#fff}
   .table-wrap{max-height:300px;overflow-y:auto;background:rgba(15,18,28,0.6);border:1px solid rgba(255,255,255,0.06);
     border-radius:8px;scrollbar-width:thin}
-  table{width:100%;border-collapse:collapse;font-size:.75rem}
-  th{background:rgba(88,166,255,0.08);color:#58a6ff;font-weight:600;position:sticky;top:0;z-index:1}
-  th,td{padding:6px 12px;text-align:right;border-bottom:1px solid rgba(255,255,255,0.04)}
-  td:first-child,th:first-child{text-align:left}
-  tr:hover td{background:rgba(88,166,255,0.03)}
 
-  footer{padding:16px 24px;color:#444;font-size:.7rem;text-align:center;border-top:1px solid rgba(255,255,255,0.04)}
   .hidden{display:none}
 
   @media(max-width:600px){
@@ -229,16 +208,10 @@
 
 <footer>CFMS Plotter v1.0 — Cryogenic CFMS-5T — Research Tools</footer>
 
+<script src="/assets/rt-firebase.js"></script>
+<script src="/assets/rt-plot.js"></script>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyClK3vIE_SQ7SGdXWbmWzZ51MdeBappDKY",
-  authDomain: "research-tools-board.firebaseapp.com",
-  databaseURL: "https://research-tools-board-default-rtdb.firebaseio.com",
-  projectId: "research-tools-board",
-  storageBucket: "research-tools-board.firebasestorage.app",
-  messagingSenderId: "359837086498",
-  appId: "1:359837086498:web:your_app_id"
-};
+const firebaseConfig = window.RT_FIREBASE_CONFIG;
 
 // ===== Firebase 遅延ロード（自動受信ONで初めてCDNを読む: 約197KB gzip） =====
 let db = null, firebaseReady = false, fbLoading = null;
@@ -692,19 +665,10 @@ function fmtR(v){
 }
 
 
-// ===== Nice tick =====
-function niceNum(range,round){
-  if(range<=0)return 1;
-  const exp=Math.floor(Math.log10(range));
-  const frac=range/Math.pow(10,exp);
-  let nice;
-  if(round){if(frac<1.5)nice=1;else if(frac<3)nice=2;else if(frac<7)nice=5;else nice=10;}
-  else{if(frac<=1)nice=1;else if(frac<=2)nice=2;else if(frac<=5)nice=5;else nice=10;}
-  return nice*Math.pow(10,exp);
-}
+// ===== Nice tick （niceNum の実体は /assets/rt-plot.js の rtNiceNum）=====
 function calcTicks(dMin,dMax,n){
   const range=dMax-dMin||1;
-  const spacing=niceNum(range/(n-1),true);
+  const spacing=rtNiceNum(range/(n-1),true);
   const lo=Math.floor(dMin/spacing)*spacing;
   const hi=Math.ceil(dMax/spacing)*spacing;
   const ticks=[];
