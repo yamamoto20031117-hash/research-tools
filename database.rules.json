@@ -1,0 +1,58 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "boards": {
+      ".read": "auth != null",
+
+      "$boardId": {
+        "threads": {
+          ".indexOn": "lastActivity",
+
+          "$threadId": {
+            ".write": "auth != null && ( (!data.exists() && newData.child('uid').val() === auth.uid) || (data.exists() && data.child('uid').val() === auth.uid) )",
+            ".validate": "newData.hasChildren(['title','name','body','created','lastActivity']) || newData.hasChildren(['lastActivity'])",
+            "title":        { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200" },
+            "name":         { ".validate": "newData.isString() && newData.val().length <= 50" },
+            "body":         { ".validate": "newData.isString() && newData.val().length <= 2000" },
+            "created":      { ".validate": "newData.isNumber()" },
+            "uid":          { ".validate": "newData.isString() && newData.val().length <= 128" },
+
+            "lastActivity": {
+              ".write": "auth != null",
+              ".validate": "newData.isNumber()"
+            },
+
+            "replies": {
+              "$replyId": {
+                ".write": "auth != null && ( (!data.exists() && newData.child('fbuid').val() === auth.uid) || (data.exists() && data.child('fbuid').val() === auth.uid) )",
+                ".validate": "!newData.exists() || newData.hasChildren(['name','body','time','uid'])",
+                "name":  { ".validate": "newData.isString() && newData.val().length <= 50" },
+                "body":  { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 2000" },
+                "time":  { ".validate": "newData.isNumber()" },
+                "uid":   { ".validate": "newData.isString() && newData.val().length <= 64" },
+                "fbuid": { ".validate": "newData.isString() && newData.val().length <= 128" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "profiles": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null",
+        "name":    { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 50" },
+        "updated": { ".validate": "newData.isNumber()" }
+      }
+    },
+
+    "crowdfund": { ".read": "auth != null", ".write": "auth != null" },
+
+    "dmm":  { ".read": true, ".write": true },
+    "dmm2": { ".read": true, ".write": true },
+    "cfms": { ".read": true, ".write": true }
+  }
+}

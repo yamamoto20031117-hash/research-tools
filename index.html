@@ -894,6 +894,7 @@
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
 <script>
@@ -901,8 +902,11 @@
 //  Firebase 設定
 //  1. https://console.firebase.google.com でプロジェクト作成
 //  2. Realtime Database を有効化（リージョン: asia-southeast1 推奨）
-//  3. ルールを { "rules": { ".read": true, ".write": true } } に設定
-//  4. 下の firebaseConfig を自分の値に差し替え
+//  3. Authentication で「匿名」プロバイダを有効化
+//  4. ルールは database.rules.json（リポジトリ直下）を適用すること。
+//     旧来の { ".read": true, ".write": true } は誰でも他人の投稿を
+//     削除できるため使わない。
+//  5. 下の firebaseConfig を自分の値に差し替え
 // =====================================================
 const firebaseConfig = {
   apiKey: "AIzaSyClK3vIE_SQ7SGdXWbmWzZ51MdeBappDKY",
@@ -915,14 +919,40 @@ const firebaseConfig = {
   measurementId: "G-7JCBM41RH4"
 };
 
-let db=null, firebaseReady=false;
-try{
-  if(firebaseConfig.apiKey!=="YOUR_API_KEY"){
+let db=null, firebaseReady=false, fbUid=null, fbDegraded=false;
+
+// DB ルールを「認証必須・自分の投稿だけ削除可」に締めるため、匿名サインインを
+// してから読み書きする（投稿に uid を載せてルール側で本人確認するため）。
+//
+// ただし Authentication がまだ有効化されていない環境でも板が止まらないよう、
+// 認証に失敗しても DB へのアクセス自体は続行する（＝従来どおりの無認証アクセス）。
+// 締めたルールを適用済みならここで弾かれるが、その場合は loadThreads 側の
+// エラーハンドラが画面に理由を出す。無言で空になることはない。
+const whenFirebaseReady = (function initFirebase(){
+  if(firebaseConfig.apiKey==="YOUR_API_KEY") return Promise.resolve(false);
+  try{
     firebase.initializeApp(firebaseConfig);
     db=firebase.database();
-    firebaseReady=true;
+  }catch(e){
+    console.warn('Firebase init failed:',e);
+    return Promise.resolve(false);
   }
-}catch(e){console.warn('Firebase init failed:',e);}
+  return firebase.auth().signInAnonymously()
+    .then(cred=>{
+      fbUid=cred&&cred.user?cred.user.uid:null;
+      firebaseReady=true;
+      return true;
+    })
+    .catch(e=>{
+      // 例: auth/configuration-not-found = コンソールで匿名プロバイダが未有効。
+      // 板は動かし続けるが、この状態では投稿に uid が載らず本人確認ができない。
+      console.warn('匿名認証に失敗。無認証のまま継続します（DB ルールを締めるには'
+        +' Firebase コンソールで Authentication → 匿名 を有効化してください）:',
+        e&&e.code, e&&e.message);
+      fbDegraded=true; firebaseReady=true;
+      return true;
+    });
+})();
 
 // 接続ステータス（非表示）
 const connEl=document.getElementById('conn-status');
@@ -1107,7 +1137,11 @@ function deleteReply(t,key){
   if(!confirm('このコメントを削除しますか？')) return;
   const id=window['_curThread_'+t];if(!id)return;
   if(firebaseReady){
-    db.ref('boards/'+t+'/threads/'+id+'/replies/'+key).remove();
+    db.ref('boards/'+t+'/threads/'+id+'/replies/'+key).remove()
+      .catch(e=>{
+        console.warn('削除に失敗:',e);
+        alert('削除できませんでした（自分の投稿のみ削除できます）: '+(e&&e.message||e));
+      });
   }else{
     const arr=getLocal(t);
     const th=arr.find(x=>x.id===id);
@@ -1149,6 +1183,15 @@ function loadThreads(t){
         const th=arr.find(x=>x.id===curId);
         if(th) renderThread(t,th,true);
       }
+    }, err=>{
+      // ルールに弾かれた等。旧実装はここが無く、板が無言で「0スレッド」になっていた。
+      console.warn('板の購読に失敗 ('+t+'):',err&&err.code,err&&err.message);
+      const body=document.querySelector('#board-'+t+' .board-body');
+      if(body&&!body.querySelector('.setup-notice')){
+        const n=document.createElement('div');n.className='setup-notice';
+        n.textContent='板を読み込めませんでした（'+(err&&err.code||'error')+'）。DB ルールを確認してください。';
+        body.prepend(n);
+      }
     });
 
     // 個別スレッドの child_changed も監視（より即座のレス反映）
@@ -1174,12 +1217,17 @@ function createThread(t){
   const now=Date.now();
 
   if(firebaseReady){
-    db.ref('boards/'+t+'/threads').push().set({title,name:name||'名無しさん',body,created:now,lastActivity:now})
+    // uid を保存しておくと、DB ルール側で「自分の投稿だけ削除可」を強制できる
+    db.ref('boards/'+t+'/threads').push().set({title,name:name||'名無しさん',body,created:now,lastActivity:now,uid:fbUid})
       .then(()=>{
         document.getElementById('nt-title-'+t).value='';
         document.getElementById('nt-name-'+t).value='';
         document.getElementById('nt-body-'+t).value='';
         hideNewThread(t);
+      })
+      .catch(e=>{
+        console.warn('スレッド作成に失敗:',e);
+        alert('投稿できませんでした: '+(e&&e.message||e));
       });
   }else{
     const arr=getLocal(t);
@@ -1212,14 +1260,19 @@ function postReply(t){
   const body=document.getElementById('rp-body-'+t).value.trim();
   if(!body){alert('本文を入力してください');return;}
   const now=Date.now();
-  const replyData={name:name||'名無しさん',body,time:now,uid:getUid()};
+  // uid は表示用（端末ローカル）、fbuid は DB ルールが本人確認に使う認証 uid
+  const replyData={name:name||'名無しさん',body,time:now,uid:getUid(),fbuid:fbUid};
 
   if(firebaseReady){
     // push で新しいキーにレスを追加（リアルタイム反映）
     const tRef=db.ref('boards/'+t+'/threads/'+id);
     tRef.child('replies').push().set(replyData)
       .then(()=>tRef.update({lastActivity:now}))
-      .then(()=>{document.getElementById('rp-body-'+t).value='';});
+      .then(()=>{document.getElementById('rp-body-'+t).value='';})
+      .catch(e=>{
+        console.warn('返信に失敗:',e);
+        alert('返信できませんでした: '+(e&&e.message||e));
+      });
   }else{
     const arr=getLocal(t);
     const th=arr.find(x=>x.id===id);
@@ -1237,25 +1290,28 @@ function postReply(t){
 // =====================================================
 //  初期化
 // =====================================================
-document.addEventListener('DOMContentLoaded',()=>{
-  if(!firebaseReady){
-    document.querySelectorAll('.board-body').forEach(b=>{
-      const n=document.createElement('div');n.className='setup-notice';
-      n.innerHTML='&#128270; ローカルモード（このブラウザのみ保存）<br><small>全ユーザー共有にするには <a href="https://console.firebase.google.com" target="_blank">Firebase</a> を設定してください</small>';
-      b.prepend(n);
-    });
-  }
-  loadThreads('tmd-viewer');
-  loadThreads('xrd-plotter');
-  loadThreads('squid-plotter');
-  loadThreads('dmm-monitor');
-  loadThreads('dmm-monitor-2');
-  loadThreads('cfms-plotter');
-  loadThreads('qe-calculator');
+const BOARD_IDS=['tmd-viewer','xrd-plotter','squid-plotter','dmm-monitor',
+                 'dmm-monitor-2','cfms-plotter','qe-calculator','Temudraw'];
 
-  // ===== 共有プロフィール =====
+document.addEventListener('DOMContentLoaded',()=>{
+  // 匿名サインインの結果が出てから板を読む。認証前に db.ref を叩くと
+  // ルールに弾かれて無言で空になるため、必ずここで待つ。
+  whenFirebaseReady.then(ok=>{
+    if(!ok){
+      document.querySelectorAll('.board-body').forEach(b=>{
+        const n=document.createElement('div');n.className='setup-notice';
+        n.innerHTML='&#128270; ローカルモード（このブラウザのみ保存）<br><small>全ユーザー共有にするには <a href="https://console.firebase.google.com" target="_blank">Firebase</a> の匿名認証を有効化してください</small>';
+        b.prepend(n);
+      });
+    }
+    BOARD_IDS.forEach(loadThreads);
+    // プロフィール同期も認証後でないと購読できない
+    loadProfile();
+    applyProfileToNameInputs();
+  });
+
+  // ===== 共有プロフィール（Firebase 非依存の部分は先に）=====
   bridgeLinks();
-  loadProfile();
   applyProfileToNameInputs();
   // lab-play 側「管理」ボタンから ?admin=open で飛んできた場合に自動オープン
   if(new URLSearchParams(location.search).get('admin')==='open'&&localStorage.getItem(ADMIN_KEY)==='1'){
