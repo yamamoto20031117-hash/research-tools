@@ -227,6 +227,31 @@
 
   <div class="peak-list" id="peakList">
     <h3>検出ピーク（n欄に回折次数 1,2,3.. を入力 → グラフに (001) 等で表示）</h3>
+
+    <!-- (00l) 系列インデクシング -->
+    <div style="background:#0e1220;border:1px solid #2a3040;border-radius:6px;padding:9px 11px;margin-bottom:10px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <strong style="font-size:.78rem;color:#9ad0ff">(00l) 系列判定</strong>
+        <label style="font-size:.75rem;color:#888">層間距離 c の許容ずれ
+          <input type="number" id="tolDPct" value="1.0" min="0.05" max="3" step="0.05"
+                 style="width:62px;background:#141a2a;border:1px solid #2a3040;border-radius:4px;padding:3px 5px;color:#ddd;font-size:.75rem;text-align:right"> %
+        </label>
+        <label style="font-size:.75rem;color:#888">系列に必要な本数
+          <input type="number" id="minSeriesPeaks" value="3" min="2" max="8" step="1"
+                 style="width:48px;background:#141a2a;border:1px solid #2a3040;border-radius:4px;padding:3px 5px;color:#ddd;font-size:.75rem;text-align:center">
+        </label>
+        <button class="btn" onclick="autoIdentify00l()">再判定</button>
+        <button class="btn" onclick="dropRejectedPeaks()">系列外を削除</button>
+      </div>
+      <p style="font-size:.7rem;color:#666;margin:7px 0 0;line-height:1.5">
+        sinθ は次数 l に比例する（sinθ_l = l·λ/2c）。各ピークを (00l) と仮定したときの c が
+        系列内で揃うかを見て、揃わないものをノイズ／異相として除外します。許容ずれは 2θ ではなく
+        c で指定するため、低角ほど自動的に厳しくなります（目視の判断と一致）。
+        値を小さくすると厳しく、大きくすると緩くなります。
+      </p>
+      <div id="seriesReport" style="margin-top:7px;border-top:1px solid #1e2536;padding-top:7px"></div>
+    </div>
+
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
       <label style="font-size:.78rem;color:#888">手動追加:</label>
       <select id="manualPeakDs" style="background:#0e1220;border:1px solid #2a3040;border-radius:4px;padding:3px 6px;color:#ddd;font-size:.78rem"></select>
@@ -411,8 +436,8 @@ function updateUI(){
     document.getElementById('chartWrap').style.display='block';
     const allX=fileList.flatMap(f=>f.x);
     const el1=document.getElementById('xMin'), el2=document.getElementById('xMax');
-    if(!el1.value) el1.value=Math.floor(Math.min(...allX));
-    if(!el2.value) el2.value=Math.ceil(Math.max(...allX));
+    if(!el1.value) el1.value=Math.floor(arrMin(allX));
+    if(!el2.value) el2.value=Math.ceil(arrMax(allX));
     // タイトルデフォルト: ファイル名（未入力で且つ一度も編集されていない場合）
     const titleEl=document.getElementById('plotTitle');
     if(!titleEl.dataset.edited){
@@ -481,7 +506,7 @@ function normalizeOverlay(){
   document.getElementById('displayMode').value='overlay';
   // 各データセットの検出ピーク中の最大強度を取得
   const maxPeakVals=fileList.map(f=>{
-    if(!f.peaks||f.peaks.length===0) return Math.max(...f.y); // ピーク未検出ならデータ全体の最大値
+    if(!f.peaks||f.peaks.length===0) return arrMax(f.y); // ピーク未検出ならデータ全体の最大値
     return Math.max(...f.peaks.map(p=>p.y));
   });
   const globalMax=Math.max(...maxPeakVals);
@@ -1055,6 +1080,7 @@ function detectPeaks(){
   fileList.forEach((f, fi)=>{
     const x=f.x, y=f.y, nn=y.length;
     const peaks=[];
+    const peaks_idx=new Map();  // ピーク -> データ配列上のインデックス（谷判定に使う）
 
     function smooth(data, w){
       return data.map((_,i)=>{
@@ -1076,7 +1102,7 @@ function detectPeaks(){
     // ---- ノイズ推定: 隣接点差分の中央絶対偏差 (MAD) ----
     // バックグラウンド・ピーク形状に依存しないロバストな推定。
     // rolling minimum のバイアスや残差フィルタのアーティファクトを避ける。
-    const maxY = Math.max(...y);
+    const maxY = arrMax(y);
     const absDiffs = [];
     for(let i=1;i<nn;i++) absDiffs.push(Math.abs(y[i]-y[i-1]));
     absDiffs.sort((a,b)=>a-b);
@@ -1095,7 +1121,7 @@ function detectPeaks(){
 
     for(const pass of passes){
       const {sy, win, promRange} = pass;
-      const maxSy = Math.max(...sy);
+      const maxSy = arrMax(sy);
 
       for(let i=5; i<nn-5; i++){
         // 局所最大条件
@@ -1119,12 +1145,33 @@ function detectPeaks(){
           if(y[j]>bestY){bestY=y[j];bestJ=j;}
         }
 
-        // 重複チェック
-        const dupIdx = peaks.findIndex(p=>Math.abs(x[bestJ]-p.x)<1.0);
+        // 重複チェック。旧実装は 1.0° 固定で、低角では 0.6° 程度しか離れて
+        // いない別々の (00l) 反射（例: 2相共存試料）を1本に併合していた。
+        // 距離だけでなく「間に谷があるか」で判定する: 2つの候補の間の最小値が
+        // 低い方のピークより十分下がっていれば、それは独立した反射である。
+        const dupIdx = peaks.findIndex(p=>{
+          if(Math.abs(x[bestJ]-p.x)>=1.0) return false;
+          if(Math.abs(x[bestJ]-p.x)<0.15) return true;   // ほぼ同一点は無条件に重複
+          // 2点間の谷を探す
+          let ja=peaks_idx.get(p), jb=bestJ;
+          if(ja===undefined) return true;
+          if(ja>jb){const t=ja;ja=jb;jb=t;}
+          let valley=Infinity;
+          for(let k=ja;k<=jb;k++) if(sy[k]<valley) valley=sy[k];
+          const lo=Math.min(sy[ja], sy[jb]);
+          const base=Math.min(baseline[ja], baseline[jb]);
+          // 谷が「低い方の山」の高さの半分以下まで落ちていれば別ピーク扱い
+          return !(valley < base + (lo-base)*0.5);
+        });
         if(dupIdx>=0){
-          if(bestY>peaks[dupIdx].y) peaks[dupIdx]={x:x[bestJ],y:bestY,label:'',fwhm:null,_baseY:0};
+          if(bestY>peaks[dupIdx].y){
+            peaks[dupIdx]={x:x[bestJ],y:bestY,label:'',fwhm:null,_baseY:0};
+            peaks_idx.set(peaks[dupIdx], bestJ);
+          }
         } else {
-          peaks.push({x:x[bestJ],y:bestY,label:'',fwhm:null,_baseY:0});
+          const np={x:x[bestJ],y:bestY,label:'',fwhm:null,_baseY:0};
+          peaks.push(np);
+          peaks_idx.set(np, bestJ);
         }
       }
     }
@@ -1140,166 +1187,218 @@ function detectPeaks(){
   redraw();
 }
 
-// ===== (00l) 自動同定（複数シリーズ対応） =====
-// TMD層間距離測定に特化: Bragg則 2d sin(θ) = lλ より sin(θ_l) = l * sin(θ_1)
-// 複数の層間距離が混在する場合、シリーズA, B, C... として別々に同定
+// 大量データで Math.min(...arr) が RangeError（約12.5万点）になるため自前実装
+function arrMin(a){let m=Infinity;for(let i=0;i<a.length;i++)if(a[i]<m)m=a[i];return m;}
+function arrMax(a){let m=-Infinity;for(let i=0;i<a.length;i++)if(a[i]>m)m=a[i];return m;}
+
+// ===== (00l) 系列インデクシング =====
+// Bragg 則 λ = 2 d sinθ と、(00l) 反射の d = c/l から
+//     sin θ_l = l · λ/(2c)
+// すなわち sinθ は次数 l に厳密に比例する（原点を通る直線）。
+//
+// 【旧実装の誤り】許容誤差を 2θ の絶対値（0.8°固定）で判定していた。
+// しかし同じ 0.8° でも層間距離 c に対する意味は角度で激変する:
+//     2θ= 5.9° → Δc/c = 13.5%
+//     2θ=60.0° → Δc/c =  1.2%
+// (001) が現れる低角ほど桁違いに緩くなるため、ノイズがいくらでも
+// 「系列の一員」として通ってしまっていた。
+//
+// 【新実装】許容誤差を「層間距離 c のずれ (%)」で直接指定する。
+// 各ピーク位置での 2θ 窓は Δ(2θ) = 2·(Δc/c)·tanθ に換算されるので、
+// 低角では自動的に厳しく、高角では相応に緩くなる＝目視の判断と一致する。
+const XRD_LAMBDA = 1.5418; // Cu Kα
+
+function xrdOpts(){
+  const g=(id,dflt)=>{ const e=document.getElementById(id); const v=e?parseFloat(e.value):NaN; return isFinite(v)?v:dflt; };
+  return {
+    // c の相対許容ずれ。3% を超えると「c の2倍」を採る偽解に落ちるため上限を切る
+    tol:      Math.min(0.03, Math.max(0.0005, g('tolDPct', 1.0)/100)),
+    minPeaks: Math.max(2, Math.round(g('minSeriesPeaks', 3))),
+    maxOrder: 12,     // 想定する最大次数
+    maxStart: 3,      // 系列の最小次数がこれを超えたら（範囲外で免責されない限り）棄却
+  };
+}
+
+// s0 = sinθ_(001) を仮定して次数を割り当て、強度重み付き最小二乗で精密化する
+function fitSeries00l(peaks, avail, s0init, o){
+  let s0=s0init, members=[];
+  for(let iter=0; iter<4; iter++){
+    const cand=[];
+    for(const j of avail){
+      const s=Math.sin(peaks[j].x*Math.PI/360);
+      if(s<=0) continue;
+      const n=Math.round(s/s0);
+      if(n<1||n>o.maxOrder) continue;
+      // c の相対ずれ: c_j/c_0 - 1 = s/(n·s0) - 1
+      const dev=Math.abs(s/(n*s0)-1);
+      if(dev>o.tol) continue;
+      cand.push({idx:j,n:n,dev:dev,s:s});
+    }
+    // 同一次数に複数ピークが来たら、ずれの小さい方だけを残す
+    const byN=new Map();
+    for(const m of cand){ const p=byN.get(m.n); if(!p||m.dev<p.dev) byN.set(m.n,m); }
+    members=[...byN.values()].sort((a,b)=>a.n-b.n);
+    if(members.length===0) break;
+    // sin θ = n·s0 の重み付き最小二乗: s0 = Σ w·n·s / Σ w·n²
+    let num=0,den=0;
+    for(const m of members){
+      const w=Math.sqrt(Math.max(peaks[m.idx].y,0))+1e-9;
+      num+=w*m.n*m.s; den+=w*m.n*m.n;
+    }
+    if(!(den>0)) break;
+    const s0n=num/den;
+    const conv=Math.abs(s0n/s0-1)<1e-10;
+    s0=s0n;
+    if(conv) break;
+  }
+  return {s0:s0, members:members};
+}
+
+// 系列の確からしさ。適合の近さ・強度・次数の詰まり具合で評価する
+function scoreSeries00l(peaks, res, o, xMin, maxY){
+  const m=res.members;
+  if(m.length<o.minPeaks) return -1;
+  if(!(res.s0>0)) return -1;
+  // 最小次数が大きすぎる系列は棄却。ただし欠けている低次の予測位置が
+  // 測定範囲より低角側にあるなら「測っていないだけ」なので免責する。
+  if(m[0].n>o.maxStart){
+    const sPrev=(m[0].n-1)*res.s0;
+    const predPrev=sPrev<1 ? 2*Math.asin(sPrev)*180/Math.PI : 999;
+    if(predPrev>xMin+0.3) return -1;
+  }
+  let sc=0;
+  for(const mm of m){
+    const rel=Math.sqrt(Math.max(peaks[mm.idx].y,0)/Math.max(maxY,1));
+    sc+=(1-mm.dev/o.tol)*(0.5+rel); // ずれが小さいほど・強いほど高得点
+  }
+  // n=2,7,11 のような飛び飛びの割当を強く減点する。
+  // これは「c を2倍に取れば全ピークが偶数次で説明できてしまう」偽解
+  // （超格子の曖昧性）を潰すための項でもある。真の格子は次数が詰まる。
+  const span=m[m.length-1].n-m[0].n+1;
+  sc*=Math.pow(m.length/Math.max(span,m.length), 1.5);
+  // 同程度に説明できるなら次数の小さい（＝格子の小さい）解を採る＝簡約格子の慣習
+  sc/=1+0.04*(m.reduce((a,b)=>a+b.n,0)/m.length);
+  return sc;
+}
+
 function autoIdentify00l(){
   if(fileList.length===0) return;
 
-  // まずピーク未検出なら自動検出
   const needDetect=fileList.some(f=>!f.peaks||f.peaks.length===0);
   if(needDetect) detectPeaks();
+
+  const o=xrdOpts();
 
   fileList.forEach(f=>{
     if(!f.peaks||f.peaks.length<1) return;
 
-    // 2θ昇順でソート
     f.peaks.sort((a,b)=>a.x-b.x);
-    // 既存ラベルをクリア
-    f.peaks.forEach(p=>p.label='');
+    f.peaks.forEach(p=>{ p.label=''; p.dev=null; p.cImp=null; p.rejected=false; });
 
-    // 未割り当てピークのインデックスを管理
+    const xMin=f.x&&f.x.length?f.x[0]:0;
+    const maxY=f.peaks.reduce((m,p)=>Math.max(m,p.y),0);
     const assigned=new Array(f.peaks.length).fill(false);
-    let seriesIdx=0; // A=0, B=1, C=2...
+    let seriesIdx=0;
+    const found=[];
 
-    // 繰り返し: 未割り当てピークから(00l)シリーズを探す
-    while(seriesIdx<8){ // 最大8シリーズ
-      const unassigned=[];
-      for(let i=0;i<f.peaks.length;i++){
-        if(!assigned[i]) unassigned.push(i);
-      }
-      if(unassigned.length<2) break; // 残り1個以下なら終了
+    // 未割り当てピークから (00l) 系列を貪欲に抽出する
+    while(seriesIdx<SERIES_LETTERS.length){
+      const avail=[];
+      for(let i=0;i<f.peaks.length;i++) if(!assigned[i]) avail.push(i);
+      if(avail.length<o.minPeaks) break;
 
-      const peakSinTheta=f.peaks.map(p=>Math.sin(p.x*Math.PI/360));
-
-      let bestResult=null;
-      let bestScore=-1;
-
-      // 未割り当てピークの中から(001)候補を試す
-      for(const i of unassigned){
-        const sinTheta1=peakSinTheta[i];
-        if(sinTheta1<=0) continue;
-
-        const matches=[{idx:i, l:1}];
-
-        for(let l=2;l<=10;l++){
-          const targetSin=l*sinTheta1;
-          if(targetSin>=1) break;
-
-          const target2theta=2*Math.asin(targetSin)*180/Math.PI;
-
-          // 未割り当ての中から最も近いピークを探す
-          let bestMatch=-1, bestDiff=Infinity;
-          for(const j of unassigned){
-            if(j===i||matches.some(m=>m.idx===j)) continue;
-            const diff=Math.abs(f.peaks[j].x-target2theta);
-            if(diff<bestDiff){bestDiff=diff;bestMatch=j;}
-          }
-
-          if(bestMatch>=0&&bestDiff<0.8){
-            matches.push({idx:bestMatch, l:l});
-          }
-        }
-
-        // スコア: マッチ数が多いほど良い、低角側の(001)にボーナス
-        const score=matches.length*3+(f.peaks[i].x<25?1:0);
-
-        if(matches.length>=2&&score>bestScore){
-          bestScore=score;
-          bestResult=matches;
+      let best=null,bestScore=-1;
+      // 各ピークが第 l0 次だと仮定して基本波 s0 を立て、総当たりで評価
+      for(const i of avail){
+        const si=Math.sin(f.peaks[i].x*Math.PI/360);
+        if(si<=0) continue;
+        for(let l0=1;l0<=o.maxOrder;l0++){
+          const res=fitSeries00l(f.peaks, avail, si/l0, o);
+          const sc=scoreSeries00l(f.peaks, res, o, xMin, maxY);
+          if(sc>bestScore){ bestScore=sc; best=res; }
         }
       }
+      if(!best||bestScore<0) break;
 
-      if(!bestResult) break; // もうシリーズが見つからない
-
-      // このシリーズのラベルを設定
       const letter=SERIES_LETTERS[seriesIdx];
-      for(const m of bestResult){
-        f.peaks[m.idx].label=letter+String(m.l);
+      const cRef=XRD_LAMBDA/(2*best.s0);
+      for(const m of best.members){
+        const p=f.peaks[m.idx];
+        p.label=letter+String(m.n);
+        p.dev=m.dev;                                    // c の相対ずれ
+        p.cImp=m.n*XRD_LAMBDA/(2*m.s);                  // このピック単独から出る c
         assigned[m.idx]=true;
       }
+      // 系列の質: ずれの平均が許容値に近いほど「偶然そう見えているだけ」の疑いが濃い
+      const devs=best.members.map(m=>m.dev);
+      found.push({
+        letter:letter, c:cRef, n:best.members.length,
+        devMean: devs.reduce((a,b)=>a+b,0)/devs.length,
+        devMax:  Math.max(...devs),
+        orders:  best.members.map(m=>m.n),
+      });
       seriesIdx++;
     }
 
-    // ===== 欠番補完: 各シリーズの欠番次数の位置にあるraw dataの小さなピークを拾う =====
-    for(let si=0;si<seriesIdx;si++){
-      const letter=SERIES_LETTERS[si];
-      // このシリーズに割り当てられた次数を収集
-      const seriesPeaks=[];
-      f.peaks.forEach((p,idx)=>{
-        const {series, order}=parseSeriesLabel(p.label);
-        if(series===letter&&order) seriesPeaks.push({idx, order, x:p.x});
-      });
-      if(seriesPeaks.length<2) continue;
+    // どの系列にも入らなかったピーク＝層間距離が整合しない＝ノイズ/異相
+    f.peaks.forEach(p=>{ if(!p.label) p.rejected=true; });
+    f.series00l=found;
 
-      // (001)のsin(θ)を求める: 最小次数のピークから逆算
-      seriesPeaks.sort((a,b)=>a.order-b.order);
-      const base=seriesPeaks[0];
-      const sinTheta1=Math.sin(base.x*Math.PI/360)/base.order;
-
-      // 最大次数を決定
-      const maxL=Math.max(...seriesPeaks.map(p=>p.order));
-
-      for(let l=1;l<=maxL;l++){
-        // 既に割り当て済みならスキップ
-        if(seriesPeaks.some(p=>p.order===l)) continue;
-
-        const targetSin=l*sinTheta1;
-        if(targetSin>=1) continue;
-        const target2theta=2*Math.asin(targetSin)*180/Math.PI;
-
-        // raw dataからこの付近（±1.5°）の局所最大を探す
-        let bestJ=-1, bestY=-Infinity;
-        for(let j=0;j<f.x.length;j++){
-          if(Math.abs(f.x[j]-target2theta)<=1.5){
-            if(f.y[j]>bestY){bestY=f.y[j];bestJ=j;}
-          }
-        }
-        if(bestJ<0) continue;
-
-        // 周辺の平均値（ベースライン）と比較してピークが目視で見えるレベルか判定
-        let baseSum=0, baseCnt=0;
-        for(let j=Math.max(0,bestJ-50);j<=Math.min(f.x.length-1,bestJ+50);j++){
-          if(Math.abs(j-bestJ)>10){baseSum+=f.y[j];baseCnt++;}
-        }
-        const baseline=baseCnt>0?baseSum/baseCnt:0;
-        const prominence=bestY-baseline;
-        const maxY=Math.max(...f.y);
-
-        // 目で見てピークとわかるレベル: prominenceが全体最大の3%以上、かつベースラインの30%以上
-        if(prominence>maxY*0.03&&prominence>baseline*0.3){
-          // 既存ピークと重複しないか確認
-          if(!f.peaks.some(p=>Math.abs(p.x-f.x[bestJ])<0.5)){
-            const newPk={x:f.x[bestJ], y:bestY, label:letter+String(l), fwhm:null, _baseY:0};
-            f.peaks.push(newPk);
-            const pi=f.peaks.length-1;
-            f.peaks[pi].fwhm=calcFWHM(f, pi);
-          }
-        }
-      }
-      // 再ソート
-      f.peaks.sort((a,b)=>a.x-b.x);
-    }
-
-    // シリーズが1つだけの場合、シリーズ文字を省略（シンプルに）
+    // 系列が1つだけならシリーズ文字を省く
     if(seriesIdx===1){
       f.peaks.forEach(p=>{
-        const {series, order}=parseSeriesLabel(p.label);
+        const {series,order}=parseSeriesLabel(p.label);
         if(series&&order) p.label=String(order);
       });
     }
   });
 
-  // ラベル位置をリセットして頂点の上に配置
-  fileList.forEach(f=>{
-    if(!f.peaks) return;
-    f.peaks.forEach(p=>{p.offsetX=undefined;p.offsetY=undefined;});
-  });
-
-  // ピークラベル表示をON
+  fileList.forEach(f=>{ if(f.peaks) f.peaks.forEach(p=>{p.offsetX=undefined;p.offsetY=undefined;}); });
   document.getElementById('chkPeakLabel').checked=true;
   refreshPeakTables();
   redraw();
+  reportSeries00l();
+}
+
+// 判定結果の要約を出す（何本が系列に乗り、何本を弾いたか）
+function reportSeries00l(){
+  const el=document.getElementById('seriesReport');
+  if(!el) return;
+  const o=xrdOpts();
+  let html='';
+  fileList.forEach(f=>{
+    if(!f.peaks||f.peaks.length===0) return;
+    const rej=f.peaks.filter(p=>p.rejected).length;
+    const kept=f.peaks.length-rej;
+    html+=`<div style="margin:6px 0"><span style="color:${f.color};font-weight:600">${f.label}</span> `;
+    html+=`<span style="color:#888;font-size:.75rem">${kept}本を系列に同定 / ${rej}本を除外（c のずれ &gt; ${(o.tol*100).toFixed(2)}%）</span>`;
+    (f.series00l||[]).forEach(s=>{
+      // 平均ずれが許容値の 1/3 未満なら実在の系列としてまず信頼できる。
+      // 許容値ぎりぎりに張り付いている系列は偶然の一致を疑う。
+      const r=s.devMean/o.tol;
+      const q=r<0.34?{c:'#22c55e',t:'良好'}:(r<0.67?{c:'#eab308',t:'やや不良'}:{c:'#f87171',t:'要確認（偶然の一致かも）'});
+      html+=`<div style="font-size:.75rem;color:#58a6ff;margin-left:12px">`;
+      html+=`系列${s.letter}: <b>c = ${s.c.toFixed(3)} Å</b>（${s.n}本 / 00${s.orders.join(',00')}）`;
+      html+=` <span style="color:${q.c}">ずれ平均 ${(s.devMean*100).toFixed(3)}%・最大 ${(s.devMax*100).toFixed(3)}% — ${q.t}</span></div>`;
+    });
+    html+='</div>';
+  });
+  el.innerHTML=html||'<span style="color:#666;font-size:.75rem">まだ同定していません</span>';
+}
+
+// 系列に乗らなかったピークを消す
+function dropRejectedPeaks(){
+  let n=0;
+  fileList.forEach(f=>{
+    if(!f.peaks) return;
+    const before=f.peaks.length;
+    f.peaks=f.peaks.filter(p=>!p.rejected);
+    n+=before-f.peaks.length;
+  });
+  refreshPeakTables();
+  redraw();
+  reportSeries00l();
+  if(n===0) alert('除外対象のピークはありません');
 }
 
 // ===== 解析（層間距離・結晶子サイズ） =====
@@ -1371,13 +1470,26 @@ function refreshPeakTables(){
   fileList.forEach((f, fi)=>{
     if(!f.peaks||f.peaks.length===0) return;
     let html=`<h4 style="color:${f.color};margin:12px 0 6px">${f.label} (${f.peaks.length}ピーク)</h4>`;
-    html+=`<table><thead><tr><th>#</th><th>2θ (°)</th><th>強度</th><th>d (Å)</th><th>FWHM (°)</th><th>ラベル</th><th></th></tr></thead><tbody>`;
+    html+=`<table><thead><tr><th>#</th><th>2θ (°)</th><th>強度</th><th>d (Å)</th><th>c (Å)</th><th>c のずれ</th><th>FWHM (°)</th><th>ラベル</th><th></th></tr></thead><tbody>`;
     f.peaks.forEach((p,pi)=>{
       const d=calcDspacing(p.x, p.label);
       const n=extractDiffOrder(p.label);
       const lc=getSeriesColor(p.label, f.color);
-      html+=`<tr><td>${pi+1}</td><td>${p.x.toFixed(3)}</td><td>${p.y.toFixed(1)}</td>`;
+      // 系列外（c が整合しない）ピークは行ごと落として見せる
+      const rowStyle=p.rejected?' style="opacity:.45"':'';
+      html+=`<tr${rowStyle}><td>${pi+1}</td><td>${p.x.toFixed(3)}</td><td>${p.y.toFixed(1)}</td>`;
       html+=`<td style="color:#58a6ff">${d.toFixed(4)}${n?' (n='+n+')':''}</td>`;
+      // このピーク単独から出る層間距離 c = n·λ/(2sinθ)
+      html+=`<td style="color:#9ad0ff">${p.cImp?p.cImp.toFixed(3):'—'}</td>`;
+      if(p.rejected){
+        html+=`<td style="color:#f87171;font-size:.68rem">系列外</td>`;
+      }else if(p.dev!=null){
+        const pct=p.dev*100;
+        const col=pct<0.3?'#22c55e':(pct<0.7?'#eab308':'#f59e0b');
+        html+=`<td style="color:${col}">${pct.toFixed(2)}%</td>`;
+      }else{
+        html+=`<td style="color:#555">—</td>`;
+      }
       html+=`<td>${p.fwhm?p.fwhm.toFixed(4):'—'}</td>`;
       html+=`<td><input type="text" value="${p.label||''}" placeholder="A1,B1.." style="width:50px;background:#0e1220;border:1px solid #2a3040;border-radius:3px;color:${lc};padding:2px 4px;font-size:.72rem;text-align:center;font-weight:bold" onchange="updatePeakLabel(${fi},${pi},this.value)"> <span style="font-size:.65rem;color:#888">${formatPeakLabel(p.label)}</span></td>`;
       html+=`<td><button class="btn" style="padding:1px 6px;font-size:.65rem;color:#f66;border-color:#f66" onclick="deletePeak(${fi},${pi})" title="削除">&times;</button></td></tr>`;
@@ -1397,7 +1509,18 @@ function deletePeak(fi, pi){
 }
 
 function updatePeakLabel(fi, pi, val){
-  fileList[fi].peaks[pi].label=val;
+  const p=fileList[fi].peaks[pi];
+  p.label=val;
+  // 手動でラベルを付け直したら自動判定の結果は無効。次数から c を引き直す。
+  const n=extractDiffOrder(val);
+  if(n){
+    const s=Math.sin(p.x*Math.PI/360);
+    p.cImp = s>0 ? n*XRD_LAMBDA/(2*s) : null;
+    p.rejected=false;
+    p.dev=null;   // 手動指定なので系列からのずれは未定義
+  }else{
+    p.cImp=null; p.dev=null; p.rejected=false;
+  }
   refreshPeakTables();
   redraw();
 }
@@ -1891,8 +2014,8 @@ function resetZoom(){
   document.getElementById('zoomW').value='0';
   if(fileList.length>0){
     const allX=fileList.flatMap(f=>f.x);
-    document.getElementById('xMin').value=Math.floor(Math.min(...allX));
-    document.getElementById('xMax').value=Math.ceil(Math.max(...allX));
+    document.getElementById('xMin').value=Math.floor(arrMin(allX));
+    document.getElementById('xMax').value=Math.ceil(arrMax(allX));
   }
   redraw();
 }
