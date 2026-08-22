@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>キラリティ・CISS 3D ビューア | research-tools</title>
+<style>
+:root{
+  --bg:#0b1016; --panel:#121a24; --line:#22303f; --fg:#e6edf3; --dim:#8b9bb0;
+  --accent:#5cc6ff; --R:#ff4d5a; --S:#3d7bff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Hiragino Sans",sans-serif;overflow:hidden}
+#app{display:flex;height:100vh}
+#side{width:315px;flex:0 0 315px;background:var(--panel);border-right:1px solid var(--line);
+     overflow-y:auto;padding:14px 14px 40px}
+#view{flex:1;position:relative}
+canvas{display:block}
+h1{font-size:15px;margin:0 0 4px}
+.sub{font-size:11px;color:var(--dim);margin:0 0 14px}
+.grp{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:11px;background:#0f1620}
+.grp>label.gl{display:block;font-size:11px;color:var(--accent);letter-spacing:.08em;margin-bottom:8px;font-weight:700}
+.row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.row label{font-size:12px;color:var(--dim);flex:0 0 96px}
+.row input[type=range]{flex:1;accent-color:var(--accent)}
+.row .val{font-size:11px;flex:0 0 44px;text-align:right;font-variant-numeric:tabular-nums}
+select,button{background:#16202c;color:var(--fg);border:1px solid var(--line);border-radius:6px;
+  padding:6px 8px;font-size:12px;font-family:inherit}
+select{width:100%} button{cursor:pointer} button:hover{border-color:var(--accent)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.btns button{width:100%}
+.chk{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);margin-bottom:6px;cursor:pointer}
+.chk input{accent-color:var(--accent)}
+#hud{position:absolute;left:16px;top:14px;font-size:12px;color:var(--dim);
+     background:rgba(11,16,22,.75);padding:9px 13px;border-radius:8px;border:1px solid var(--line);
+     line-height:1.65;pointer-events:none;max-width:520px}
+#hud b{color:var(--fg)}
+.note{font-size:10.5px;color:var(--dim);line-height:1.5;margin-top:6px}
+.preset{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}
+.preset button{font-size:11px;padding:5px 3px}
+.legend{position:absolute;right:16px;top:14px;font-size:11px;background:rgba(11,16,22,.75);
+  padding:8px 11px;border-radius:8px;border:1px solid var(--line);line-height:1.7;pointer-events:none}
+.sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.lab3d{position:absolute;transform:translate(-50%,-50%);font-weight:700;pointer-events:none;
+  white-space:nowrap;text-shadow:0 0 6px rgba(0,0,0,.85),0 0 3px rgba(0,0,0,.9);letter-spacing:.02em}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="side">
+    <h1>キラリティ・CISS 3D ビューア</h1>
+    <p class="sub">スライド素材用 / 背景透過PNG出力対応</p>
+
+    <div class="grp">
+      <label class="gl">シーン</label>
+      <select id="mode">
+        <option value="mirror" selected>鏡像対 (R/S) — 鏡面で向かい合う</option>
+        <option value="helix-single">らせん構造 — 1本（P/M）</option>
+        <option value="ciss">CISS：らせん電子流とスピン偏極</option>
+        <option value="ciss-pair">CISS：R体 vs S体（偏極が反転）</option>
+        <option value="dmi-transfer">分子キラリティ → 界面DMI 転写</option>
+        <option value="intercal">キラル分子の層間挿入</option>
+        <option value="spin-filter">スピンフィルター（電極/分子/電極）</option>
+      </select>
+      <div class="preset">
+        <button data-p="mirror">鏡像対</button>
+        <button data-p="ciss-pair">CISS R/S</button>
+        <button data-p="dmi-transfer">DMI転写</button>
+        <button data-p="intercal">層間挿入</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <label class="gl">らせんの形</label>
+      <div class="row"><label>巻き数</label><input type="range" id="turns" min="1" max="6" step="0.25" value="2.5"><span class="val" id="turnsv">2.5</span></div>
+      <div class="row"><label>半径</label><input type="range" id="rad" min="0.4" max="2.4" step="0.05" value="1.1"><span class="val" id="radv">1.1</span></div>
+      <div class="row"><label>ピッチ</label><input type="range" id="pitch" min="0.8" max="4" step="0.1" value="1.9"><span class="val" id="pitchv">1.9</span></div>
+      <div class="row"><label>太さ</label><input type="range" id="tube" min="0.05" max="0.35" step="0.01" value="0.15"><span class="val" id="tubev">0.15</span></div>
+      <div class="row"><label>原子サイズ</label><input type="range" id="asz" min="0" max="0.5" step="0.02" value="0.22"><span class="val" id="aszv">0.22</span></div>
+    </div>
+
+    <div class="grp">
+      <label class="gl">電子・スピン</label>
+      <div class="row"><label>電子の数</label><input type="range" id="ne" min="0" max="14" step="1" value="7"><span class="val" id="nev">7</span></div>
+      <div class="row"><label>流れの速さ</label><input type="range" id="spd" min="0" max="2.5" step="0.1" value="0.9"><span class="val" id="spdv">0.9</span></div>
+      <label class="chk"><input type="checkbox" id="showSpin" checked> スピン矢印を表示</label>
+      <label class="chk"><input type="checkbox" id="showTrail" checked> 電子の軌跡（らせん）</label>
+    </div>
+
+    <div class="grp">
+      <label class="gl">表示</label>
+      <label class="chk"><input type="checkbox" id="showMirror" checked> 鏡面を表示</label>
+      <label class="chk"><input type="checkbox" id="showLabel" checked> R/S・P/M ラベル</label>
+      <label class="chk"><input type="checkbox" id="spin3d"> 自動回転</label>
+      <div class="row" style="margin-top:8px"><label>視点</label>
+        <select id="camp" style="flex:1">
+          <option value="front">正面（鏡像が並ぶ）</option>
+          <option value="tilt">斜め</option>
+          <option value="axis">らせん軸方向（上から）</option>
+          <option value="side">真横</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grp">
+      <label class="gl">配色</label>
+      <select id="theme">
+        <option value="dark">発表用（暗背景）</option>
+        <option value="light">論文用（白背景）</option>
+      </select>
+    </div>
+
+    <div class="grp">
+      <label class="gl">書き出し</label>
+      <div class="btns">
+        <button id="png">透過PNG</button>
+        <button id="png4k">透過PNG 4K</button>
+        <button id="pngbg">背景付きPNG</button>
+        <button id="seq">回転連番(20枚)</button>
+      </div>
+      <div class="note">透過PNGはPowerPoint/Keynoteにそのまま貼れます。</div>
+    </div>
+
+    <div class="grp">
+      <label class="gl">操作</label>
+      <div class="note">ドラッグ＝回転 / ホイール＝ズーム / 右ドラッグ＝移動<br>キー: 1–4 = 視点、Space = 自動回転</div>
+    </div>
+  </div>
+
+  <div id="view">
+    <div id="hud"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const view=$('view');
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(42,1,0.1,2000);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+view.appendChild(renderer.domElement);
+const root=new THREE.Group(); scene.add(root);
+scene.add(new THREE.AmbientLight(0xffffff,0.66));
+const dl=new THREE.DirectionalLight(0xffffff,0.85); dl.position.set(6,9,8); scene.add(dl);
+const dl2=new THREE.DirectionalLight(0x88bbff,0.28); dl2.position.set(-7,-4,-6); scene.add(dl2);
+function resize(){const w=view.clientWidth,h=view.clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
+addEventListener('resize',resize);
+
+// -------- camera --------
+let camR=17,camTh=Math.PI/2,camPh=1.05,tgt=new THREE.Vector3(0,0,0);
+function updCam(){camera.position.set(tgt.x+camR*Math.sin(camPh)*Math.cos(camTh),tgt.y+camR*Math.cos(camPh),tgt.z+camR*Math.sin(camPh)*Math.sin(camTh));camera.lookAt(tgt);}
+let drag=null;
+renderer.domElement.addEventListener('mousedown',e=>{drag={x:e.clientX,y:e.clientY,b:e.button};e.preventDefault()});
+addEventListener('mouseup',()=>drag=null);
+addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+ if(drag.b===0){camTh-=dx*0.008;camPh=Math.max(0.03,Math.min(Math.PI-0.03,camPh-dy*0.008));}
+ else{const s=camR*0.0016;tgt.x-=dx*s*Math.cos(camTh);tgt.z-=dx*s*Math.sin(camTh);tgt.y+=dy*s;}
+ drag={x:e.clientX,y:e.clientY,b:drag.b};updCam();});
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+renderer.domElement.addEventListener('wheel',e=>{camR=Math.max(3,Math.min(160,camR*(1+e.deltaY*0.0012)));updCam();e.preventDefault()},{passive:false});
+
+// -------- materials --------
+const MC={};
+function mat(hex,opts){const k=hex+JSON.stringify(opts||{});if(!MC[k])MC[k]=new THREE.MeshStandardMaterial(Object.assign({color:hex,roughness:.4,metalness:.15},opts));return MC[k];}
+function col(name){
+  const light=$('theme').value==='light';
+  const P={R:light?0xc0392b:0xff4d5a, S:light?0x1f4e9c:0x3d7bff,
+           bone:light?0x555f6b:0xb9c6d4, atom:light?0x37506b:0x9fb8d0,
+           e:light?0x1a7f37:0x2ecc71, spinUp:light?0xc0392b:0xff4d5a,
+           spinDn:light?0x1f4e9c:0x3d7bff, mirror:light?0x9fb0c4:0x4a6580,
+           tmd_m:0x2e8bc0, tmd_x:0xd48a00, elec:light?0x7a8794:0x8fa2b5};
+  return P[name];
+}
+
+// -------- helpers --------
+function helixPts(turns,radius,pitch,hand,n){
+  const pts=[]; const N=Math.max(24,Math.floor(n||turns*40));
+  const H=turns*pitch;
+  for(let i=0;i<=N;i++){
+    const t=i/N, a=hand*2*Math.PI*turns*t;
+    pts.push(new THREE.Vector3(radius*Math.cos(a), H*(t-0.5), radius*Math.sin(a)));
+  }
+  return pts;
+}
+function tubeFrom(pts,r,color){
+  const cur=new THREE.CatmullRomCurve3(pts);
+  return new THREE.Mesh(new THREE.TubeGeometry(cur,Math.max(40,pts.length*2),r,12,false),mat(color));
+}
+function arrow(len,rad,color,coneScale){
+  const g=new THREE.Group(); const cs=coneScale||1;
+  const sl=len*0.62;
+  const s=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,sl,10),mat(color)); s.position.y=sl/2; g.add(s);
+  const h=new THREE.Mesh(new THREE.ConeGeometry(rad*2.4*cs,len*0.38,12),mat(color)); h.position.y=sl+len*0.19; g.add(h);
+  return g;
+}
+function orient(obj,v){obj.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.clone().normalize());}
+// ラベルは3Dスプライトではなく2D HTMLで描く（切れ・重なりを防ぐ）
+let labels=[];   // {el, pos:THREE.Vector3}
+function addLabel(text,color,pos,size){
+  const el=document.createElement('div');
+  el.className='lab3d';
+  el.textContent=text;
+  el.style.color='#'+color.toString(16).padStart(6,'0');
+  el.style.fontSize=(size||18)+'px';
+  view.appendChild(el);
+  labels.push({el,pos:pos.clone()});
+}
+function clearLabels(){ labels.forEach(l=>l.el.remove()); labels=[]; }
+function updateLabels(){
+  const w=view.clientWidth,h=view.clientHeight;
+  labels.forEach(l=>{
+    const p=l.pos.clone().project(camera);
+    const x=(p.x*0.5+0.5)*w, y=(-p.y*0.5+0.5)*h;
+    const vis=p.z<1;
+    l.el.style.display=vis?'block':'none';
+    l.el.style.left=x+'px'; l.el.style.top=y+'px';
+  });
+}
+function mirrorPlane(w,h){
+  const g=new THREE.Mesh(new THREE.PlaneGeometry(w,h),
+    new THREE.MeshBasicMaterial({color:col('mirror'),transparent:true,opacity:0.18,side:THREE.DoubleSide}));
+  const e=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w,h)),
+    new THREE.LineBasicMaterial({color:col('mirror'),transparent:true,opacity:0.55}));
+  const gr=new THREE.Group(); gr.add(g); gr.add(e); return gr;
+}
+
+// -------- 電子アニメ --------
+let electrons=[];   // {mesh, spin, curve, phase, hand}
+function makeElectrons(curve,hand,n,spinDir){
+  const arr=[];
+  for(let i=0;i<n;i++){
+    const g=new THREE.Group();
+    const b=new THREE.Mesh(new THREE.SphereGeometry(0.16,16,12),mat(col('e'),{emissive:col('e'),emissiveIntensity:.25}));
+    g.add(b);
+    let sp=null;
+    if($('showSpin').checked){
+      sp=arrow(0.85,0.055,spinDir>0?col('spinUp'):col('spinDn'),0.9);
+      orient(sp,new THREE.Vector3(0,spinDir,0));
+      sp.position.y=-0.42*spinDir>0?-0.42:0.42;
+      sp.position.set(0,spinDir>0?-0.42:0.42,0);
+      g.add(sp);
+    }
+    root.add(g);
+    arr.push({mesh:g,curve,phase:i/n,hand});
+  }
+  return arr;
+}
+
+// -------- シーン構築 --------
+const HUD={
+ 'mirror':['鏡像対 (R体 / S体)','同じ分子の鏡像。重ね合わせられない＝キラル。鏡面で向かい合わせに配置'],
+ 'helix-single':['らせん構造（P / M）','右巻き(P)と左巻き(M)。ヘリセンやDNAのらせんキラリティ'],
+ 'ciss':['CISS 効果','キラル分子を通る電子はらせん運動し、スピン軌道相互作用でスピンが一方向に偏極する'],
+ 'ciss-pair':['CISS：R体 vs S体','分子のハンドネスが反転すると、透過電子のスピン偏極も反転する'],
+ 'dmi-transfer':['分子キラリティ → 界面DMI','層間のキラル分子が反転対称性を破り、隣接磁性層に DMI を誘起する（本研究の核心）'],
+ 'intercal':['キラル分子の層間挿入','層状物質の van der Waals ギャップにキラル分子が入り、キラル超格子を作る'],
+ 'spin-filter':['スピンフィルター素子','電極/キラル分子層/電極。非偏極電子が入り、偏極電子が出る']
+};
+
+function clearRoot(){
+  while(root.children.length) root.remove(root.children[0]);
+  electrons=[]; clearLabels();
+}
+
+function build(){
+  clearRoot();
+  const mode=$('mode').value;
+  const turns=+$('turns').value, rad=+$('rad').value, pitch=+$('pitch').value;
+  const tube=+$('tube').value, asz=+$('asz').value;
+  const ne=+$('ne').value;
+  const showLbl=$('showLabel').checked, showMir=$('showMirror').checked;
+
+  const H=turns*pitch;
+
+  function buildHelix(hand,xoff,tint,lbl){
+    const g=new THREE.Group(); g.position.x=xoff;
+    const pts=helixPts(turns,rad,pitch,hand);
+    g.add(tubeFrom(pts,tube,tint));
+    if(asz>0.01){
+      const step=Math.max(1,Math.floor(pts.length/(turns*7)));
+      for(let i=0;i<pts.length;i+=step){
+        const s=new THREE.Mesh(new THREE.SphereGeometry(asz,14,10),mat(col('atom')));
+        s.position.copy(pts[i]); g.add(s);
+      }
+    }
+    if(showLbl&&lbl){ addLabel(lbl,tint,new THREE.Vector3(xoff,H/2+1.0,0),30); }
+    root.add(g);
+    return {g,pts};
+  }
+
+  if(mode==='mirror'||mode==='ciss-pair'){
+    const dx=rad*2.6+1.6;
+    const A=buildHelix( 1,-dx,col('R'),'R');
+    const B=buildHelix(-1, dx,col('S'),'S');
+    if(showMir){ const m=mirrorPlane(H+2.6,H+2.6); m.rotation.y=Math.PI/2; root.add(m); }
+    if(mode==='ciss-pair'&&ne>0){
+      const cA=new THREE.CatmullRomCurve3(A.pts.map(p=>p.clone().add(new THREE.Vector3(-dx,0,0))));
+      const cB=new THREE.CatmullRomCurve3(B.pts.map(p=>p.clone().add(new THREE.Vector3( dx,0,0))));
+      electrons=electrons.concat(makeElectrons(cA, 1,ne, 1));
+      electrons=electrons.concat(makeElectrons(cB,-1,ne,-1));
+      // 出口のスピン矢印（大）
+      [[-dx,1,col('spinUp'),'↑'],[dx,-1,col('spinDn'),'↓']].forEach(([x,d,c])=>{
+        const a=arrow(1.8,0.11,c,1.1);
+        orient(a,new THREE.Vector3(0,d,0));
+        a.position.set(x, d>0? H/2+0.3 : -H/2-0.3-1.8*0, 0);
+        if(d<0){ a.position.y=-H/2-0.3; }
+        root.add(a);
+      });
+    }
+  }
+  else if(mode==='helix-single'){
+    const A=buildHelix(1,0,col('R'),'P');
+    if(ne>0){ const c=new THREE.CatmullRomCurve3(A.pts); electrons=makeElectrons(c,1,ne,1); }
+  }
+  else if(mode==='ciss'){
+    const A=buildHelix(1,0,col('R'),'');
+    const c=new THREE.CatmullRomCurve3(A.pts);
+    if(ne>0) electrons=makeElectrons(c,1,ne,1);
+    // 入口:非偏極(両向き)  出口:偏極(上向き)
+    const inG=new THREE.Group(); inG.position.set(0,-H/2-1.5,0);
+    [[0.9,1],[-0.9,-1]].forEach(([x,d])=>{
+      const a=arrow(0.9,0.06,col(d>0?'spinUp':'spinDn'),0.9);
+      orient(a,new THREE.Vector3(0,d,0)); a.position.set(x,d>0?-0.45:0.45,0); inG.add(a);
+    });
+    root.add(inG);
+    const out=arrow(1.9,0.11,col('spinUp'),1.15);
+    orient(out,new THREE.Vector3(0,1,0)); out.position.set(0,H/2+0.4,0); root.add(out);
+    if(showLbl){
+      addLabel('非偏極 (↑↓)',col('bone'),new THREE.Vector3(0,-H/2-2.9,0),17);
+      addLabel('スピン偏極 (↑)',col('spinUp'),new THREE.Vector3(0,H/2+2.7,0),17);
+    }
+  }
+  else if(mode==='dmi-transfer'){
+    // 下: 磁性層のスピン列（DMIでねじれる）  上: キラル分子
+    const N=9, sp=1.05;
+    for(let i=0;i<N;i++){
+      const x=(i-(N-1)/2)*sp;
+      const tw=(i-(N-1)/2)*0.34;                 // DMIによるねじれ
+      const v=new THREE.Vector3(Math.sin(tw)*0.75,Math.cos(tw),0).normalize();
+      const a=arrow(1.15,0.075,col(v.y>0?'spinUp':'spinDn'),1);
+      orient(a,v); a.position.set(x,-2.4,0);
+      a.position.add(v.clone().multiplyScalar(-0.57));
+      root.add(a);
+    }
+    // 磁性層のスラブ
+    const slab=new THREE.Mesh(new THREE.BoxGeometry(N*sp+0.8,0.32,2.6),
+      mat(col('tmd_m'),{transparent:true,opacity:.55}));
+    slab.position.set(0,-3.15,0); root.add(slab);
+    // 上のキラル分子（らせん）を横倒しで並べる
+    for(let k=-1;k<=1;k++){
+      const pts=helixPts(1.6,0.55,1.05,1);
+      const t=tubeFrom(pts,0.10,col('R'));
+      t.rotation.z=Math.PI/2; t.position.set(k*2.6,-0.55,0); root.add(t);
+    }
+    if(showLbl){
+      addLabel('キラル分子層',col('R'),new THREE.Vector3(0,0.9,0),17);
+      addLabel('磁性層',col('tmd_m'),new THREE.Vector3(0,-4.0,0),17);
+      addLabel('DMI でねじれる',col('e'),new THREE.Vector3(N*sp/2+2.4,-2.2,0),15);
+    }
+  }
+  else if(mode==='intercal'){
+    // TMD層 3枚 + 層間にキラル分子（層は薄く小さく、分子をしっかり見せる）
+    const W=7.4,D=2.2,GAPY=3.0;
+    for(let L=-1;L<=1;L++){
+      const y=L*GAPY;
+      const m=new THREE.Mesh(new THREE.BoxGeometry(W,0.22,D),mat(col('tmd_m'),{transparent:true,opacity:.9}));
+      m.position.set(0,y,0); root.add(m);
+      [-0.42,0.42].forEach(dy=>{
+        const x2=new THREE.Mesh(new THREE.BoxGeometry(W,0.17,D),mat(col('tmd_x'),{transparent:true,opacity:.8}));
+        x2.position.set(0,y+dy,0); root.add(x2);
+      });
+    }
+    // 層間（2箇所）にキラル分子を横倒しで並べる＝層間が「開いている」ことが見える
+    for(let L=-1;L<=0;L++){
+      const y=L*GAPY+GAPY/2;
+      for(let k=-1;k<=1;k++){
+        const pts=helixPts(1.8,0.52,0.95,1);
+        const t=tubeFrom(pts,0.115,col('R'));
+        t.rotation.z=Math.PI/2;                 // らせん軸を面内に倒す
+        t.position.set(k*2.4,y,0); root.add(t);
+      }
+    }
+    // 層間距離の矢印
+    const dgap=arrow(GAPY-0.8,0.045,col('bone'),0.8);
+    orient(dgap,new THREE.Vector3(0,1,0));
+    dgap.position.set(-W/2-0.7,-GAPY/2+0.5,0); root.add(dgap);
+    if(showLbl){
+      addLabel('キラル分子',col('R'),new THREE.Vector3(0,GAPY/2+0.95,0),16);
+      addLabel('層状物質 (TMD)',col('tmd_m'),new THREE.Vector3(0,GAPY+1.5,0),17);
+      addLabel('層間距離 d',col('bone'),new THREE.Vector3(-W/2-2.0,-GAPY/2+0.6,0),14);
+    }
+  }
+  else if(mode==='spin-filter'){
+    const eW=1.0,eH=4.4,eD=3.2;
+    [[-4.2],[4.2]].forEach(([x])=>{
+      const m=new THREE.Mesh(new THREE.BoxGeometry(eW,eH,eD),mat(col('elec'),{metalness:.55,roughness:.3}));
+      m.position.set(x,0,0); root.add(m);
+    });
+    for(let k=-1;k<=1;k++){
+      const pts=helixPts(turns,rad*0.75,pitch*0.75,1);
+      const t=tubeFrom(pts,tube*0.85,col('R'));
+      t.rotation.z=Math.PI/2; t.position.set(0,k*1.5,0); root.add(t);
+      if(ne>0&&k===0){
+        const c=new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(-p.y,p.x*0+p.z*0+0,p.z).set(-p.y,0,p.z)));
+        electrons=makeElectrons(c,1,ne,1);
+      }
+    }
+    if(showLbl){
+      addLabel('非偏極',col('bone'),new THREE.Vector3(-4.2,3.0,0),17);
+      addLabel('スピン偏極',col('spinUp'),new THREE.Vector3(4.2,3.0,0),17);
+      addLabel('キラル分子層',col('R'),new THREE.Vector3(0,-3.0,0),15);
+    }
+  }
+
+  // HUD & legend
+  const L=HUD[mode]||['',''];
+  $('hud').innerHTML=`<b>${L[0]}</b><br><span style="font-size:11px">${L[1]}</span>`;
+  const lg=[];
+  if(mode==='mirror'||mode==='ciss-pair'){
+    lg.push(`<span class="sw" style="background:#${col('R').toString(16)}"></span>R体（右巻き）`);
+    lg.push(`<span class="sw" style="background:#${col('S').toString(16)}"></span>S体（左巻き）`);
+  }
+  if(['ciss','ciss-pair','spin-filter','helix-single'].includes(mode)){
+    lg.push(`<span class="sw" style="background:#${col('e').toString(16)}"></span>電子`);
+    lg.push(`<span class="sw" style="background:#${col('spinUp').toString(16)}"></span>スピン ↑`);
+    lg.push(`<span class="sw" style="background:#${col('spinDn').toString(16)}"></span>スピン ↓`);
+  }
+  if(mode==='intercal'||mode==='dmi-transfer'){
+    lg.push(`<span class="sw" style="background:#${col('tmd_m').toString(16)}"></span>金属層 (M)`);
+    if(mode==='intercal') lg.push(`<span class="sw" style="background:#${col('tmd_x').toString(16)}"></span>カルコゲン層 (X)`);
+    lg.push(`<span class="sw" style="background:#${col('R').toString(16)}"></span>キラル分子`);
+  }
+  $('legend').innerHTML=lg.join('<br>');
+  $('legend').style.display=lg.length?'block':'none';
+}
+
+// -------- UI --------
+function syncLabels(){
+  $('turnsv').textContent=(+$('turns').value).toFixed(2);
+  $('radv').textContent=(+$('rad').value).toFixed(2);
+  $('pitchv').textContent=(+$('pitch').value).toFixed(1);
+  $('tubev').textContent=(+$('tube').value).toFixed(2);
+  $('aszv').textContent=(+$('asz').value).toFixed(2);
+  $('nev').textContent=$('ne').value;
+  $('spdv').textContent=(+$('spd').value).toFixed(1);
+}
+['mode','turns','rad','pitch','tube','asz','ne','showSpin','showTrail','showMirror','showLabel','theme']
+ .forEach(id=>$(id).addEventListener('input',()=>{syncLabels();applyTheme();build();}));
+$('spd').addEventListener('input',syncLabels);
+$('camp').addEventListener('change',()=>setView($('camp').value));
+document.querySelectorAll('.preset button').forEach(b=>b.addEventListener('click',()=>{$('mode').value=b.dataset.p;build();}));
+$('png').addEventListener('click',()=>shot(false,1));
+$('png4k').addEventListener('click',()=>shot(false,4));
+$('pngbg').addEventListener('click',()=>shot(true,2));
+$('seq').addEventListener('click',seq);
+addEventListener('keydown',e=>{
+  if(e.key==='1')setView('front'); if(e.key==='2')setView('tilt');
+  if(e.key==='3')setView('axis');  if(e.key==='4')setView('side');
+  if(e.code==='Space'){$('spin3d').checked=!$('spin3d').checked;e.preventDefault();}
+});
+function applyTheme(){
+  const light=$('theme').value==='light';
+  document.documentElement.style.setProperty('--bg',light?'#f5f7fa':'#0b1016');
+  for(const k in MC) delete MC[k];
+  dl.intensity=light?0.95:0.85;
+}
+function setView(v){
+  $('camp').value=v;
+  if(v==='front'){camTh=Math.PI/2;camPh=1.05;}
+  if(v==='tilt'){camTh=0.7;camPh=1.0;}
+  if(v==='axis'){camTh=Math.PI/2;camPh=0.05;}
+  if(v==='side'){camTh=0;camPh=Math.PI/2;}
+  updCam();
+}
+function shot(withBG,scale){
+  const ow=view.clientWidth,oh=view.clientHeight;
+  renderer.setSize(ow*scale,oh*scale,false);camera.aspect=ow/oh;camera.updateProjectionMatrix();
+  scene.background=withBG?new THREE.Color($('theme').value==='light'?0xffffff:0x0b1016):null;
+  renderer.render(scene,camera);
+  const url=renderer.domElement.toDataURL('image/png');
+  scene.background=null;renderer.setSize(ow,oh,false);camera.updateProjectionMatrix();
+  const a=document.createElement('a');a.download=`${$('mode').value}_${withBG?'bg':'alpha'}_${scale}x.png`;a.href=url;a.click();
+}
+async function seq(){
+  const n=20,th0=camTh;
+  for(let i=0;i<n;i++){
+    camTh=th0+i*2*Math.PI/n;updCam();renderer.render(scene,camera);
+    const a=document.createElement('a');
+    a.download=`${$('mode').value}_${String(i).padStart(2,'0')}.png`;
+    a.href=renderer.domElement.toDataURL('image/png');a.click();
+    await new Promise(r=>setTimeout(r,220));
+  }
+  camTh=th0;updCam();
+}
+
+// -------- loop --------
+let t0=performance.now();
+function loop(){
+  requestAnimationFrame(loop);
+  const now=performance.now(), dt=(now-t0)/1000; t0=now;
+  const spd=+$('spd').value;
+  electrons.forEach(el=>{
+    el.phase=(el.phase+dt*spd*0.14)%1;
+    const p=el.curve.getPoint(el.phase);
+    el.mesh.position.copy(p);
+  });
+  if($('spin3d').checked){camTh+=0.0038;updCam();}
+  updateLabels();
+  renderer.render(scene,camera);
+}
+syncLabels();applyTheme();resize();setView('front');build();loop();
+</script>
+</body>
+</html>

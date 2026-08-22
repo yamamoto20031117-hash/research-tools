@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>磁気テクスチャ 3D ビューア | research-tools</title>
+<style>
+:root{
+  --bg:#0b1016; --panel:#121a24; --line:#22303f; --fg:#e6edf3; --dim:#8b9bb0;
+  --accent:#5cc6ff; --up:#ff4d5a; --down:#3d7bff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Hiragino Sans",sans-serif;overflow:hidden}
+#app{display:flex;height:100vh}
+#side{width:310px;flex:0 0 310px;background:var(--panel);border-right:1px solid var(--line);
+     overflow-y:auto;padding:14px 14px 40px}
+#view{flex:1;position:relative}
+canvas{display:block}
+h1{font-size:15px;margin:0 0 4px;letter-spacing:.02em}
+.sub{font-size:11px;color:var(--dim);margin:0 0 14px}
+.grp{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:11px;background:#0f1620}
+.grp>label.gl{display:block;font-size:11px;color:var(--accent);letter-spacing:.08em;margin-bottom:8px;font-weight:700}
+.row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.row label{font-size:12px;color:var(--dim);flex:0 0 92px}
+.row input[type=range]{flex:1;accent-color:var(--accent)}
+.row .val{font-size:11px;color:var(--fg);flex:0 0 46px;text-align:right;font-variant-numeric:tabular-nums}
+select,button{background:#16202c;color:var(--fg);border:1px solid var(--line);border-radius:6px;
+  padding:6px 8px;font-size:12px;font-family:inherit}
+select{width:100%}
+button{cursor:pointer}
+button:hover{border-color:var(--accent)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.btns button{width:100%}
+.chk{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);margin-bottom:6px;cursor:pointer}
+.chk input{accent-color:var(--accent)}
+#hud{position:absolute;left:16px;top:14px;font-size:12px;color:var(--dim);
+     background:rgba(11,16,22,.72);padding:8px 12px;border-radius:8px;border:1px solid var(--line);
+     line-height:1.65;pointer-events:none}
+#hud b{color:var(--fg)}
+#Q{color:var(--accent);font-weight:700}
+.note{font-size:10.5px;color:var(--dim);line-height:1.5;margin-top:6px}
+.preset{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}
+.preset button{font-size:11px;padding:5px 4px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="side">
+    <h1>磁気テクスチャ 3D ビューア</h1>
+    <p class="sub">スライド素材用 / 背景透過PNG出力対応</p>
+
+    <div class="grp">
+      <label class="gl">テクスチャ</label>
+      <select id="mode">
+        <option value="fm">強磁性 (FM) — 全て平行</option>
+        <option value="afm">反強磁性 (AFM) — 互い違い</option>
+        <option value="helix">らせん (Helical) — 1本のスパイラル</option>
+        <option value="skyrmion-bloch" selected>スキルミオン (Bloch型) — カイラル磁性体</option>
+        <option value="skyrmion-neel">スキルミオン (Néel型) — 極性/界面DMI</option>
+        <option value="antiskyrmion">反スキルミオン (D2d)</option>
+        <option value="meron">メロン格子</option>
+        <option value="skx-lattice">スキルミオン格子 (SkX)</option>
+        <option value="vortex">磁気渦 (Vortex)</option>
+        <option value="dw-neel">磁壁 (Néel walls)</option>
+        <option value="dmi-pair">DMI: 2スピンのねじれ</option>
+      </select>
+      <div class="preset">
+        <button data-p="skyrmion-bloch">Bloch Sk</button>
+        <button data-p="skyrmion-neel">Néel Sk</button>
+        <button data-p="skx-lattice">SkX格子</button>
+        <button data-p="dmi-pair">DMI対</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <label class="gl">形状パラメータ</label>
+      <div class="row"><label>格子サイズ</label><input type="range" id="N" min="7" max="41" step="2" value="21"><span class="val" id="Nv">21</span></div>
+      <div class="row"><label>半径 / 周期</label><input type="range" id="R" min="1.5" max="9" step="0.1" value="4"><span class="val" id="Rv">4.0</span></div>
+      <div class="row"><label>ヘリシティ γ</label><input type="range" id="hel" min="0" max="360" step="5" value="90"><span class="val" id="helv">90°</span></div>
+      <div class="row"><label>極性 (コア)</label><input type="range" id="pol" min="-1" max="1" step="2" value="-1"><span class="val" id="polv">↓</span></div>
+      <div class="row"><label>矢印サイズ</label><input type="range" id="asz" min="0.3" max="1.6" step="0.05" value="0.85"><span class="val" id="aszv">0.85</span></div>
+    </div>
+
+    <div class="grp">
+      <label class="gl">表示</label>
+      <label class="chk"><input type="checkbox" id="showCone" checked> 円錐（矢じり）</label>
+      <label class="chk"><input type="checkbox" id="showBase"> 底面グリッド</label>
+      <label class="chk"><input type="checkbox" id="colorZ" checked> z成分で色付け（赤=上/青=下）</label>
+      <label class="chk"><input type="checkbox" id="spin"> 自動回転</label>
+      <label class="chk"><input type="checkbox" id="showQ" checked> トポロジカル電荷 Q を表示</label>
+      <div class="row" style="margin-top:8px"><label>視点</label>
+        <select id="camp" style="flex:1">
+          <option value="tilt">斜め俯瞰</option>
+          <option value="top">真上（渦が見える）</option>
+          <option value="side">真横（断面）</option>
+          <option value="iso">アイソメ</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grp">
+      <label class="gl">配色</label>
+      <select id="theme">
+        <option value="dark">発表用（暗背景・HUD調）</option>
+        <option value="light">論文用（白背景）</option>
+      </select>
+      <div class="note">論文用は白背景・彩度低めで印刷に耐える設定になります。</div>
+    </div>
+
+    <div class="grp">
+      <label class="gl">書き出し</label>
+      <div class="btns">
+        <button id="png">透過PNG</button>
+        <button id="png4k">透過PNG 4K</button>
+        <button id="pngbg">背景付きPNG</button>
+        <button id="gif">回転連番(20枚)</button>
+      </div>
+      <div class="note">透過PNGはPowerPoint/Keynoteにそのまま貼れます。連番は zip 無しで順次DLされます。</div>
+    </div>
+
+    <div class="grp">
+      <label class="gl">操作</label>
+      <div class="note">
+        ドラッグ＝回転 / ホイール＝ズーム / 右ドラッグ＝平行移動<br>
+        キー: 1–4 = 視点、Space = 自動回転
+      </div>
+    </div>
+  </div>
+
+  <div id="view">
+    <div id="hud"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ============ 基本セットアップ ============
+const view=document.getElementById('view');
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(42,1,0.1,2000);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+view.appendChild(renderer.domElement);
+
+const root=new THREE.Group(); scene.add(root);
+scene.add(new THREE.AmbientLight(0xffffff,0.62));
+const dl=new THREE.DirectionalLight(0xffffff,0.85); dl.position.set(6,10,8); scene.add(dl);
+const dl2=new THREE.DirectionalLight(0x88bbff,0.30); dl2.position.set(-8,-4,-6); scene.add(dl2);
+
+function resize(){
+  const w=view.clientWidth,h=view.clientHeight;
+  renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+addEventListener('resize',resize);
+
+// ============ 簡易オービットコントロール ============
+let camR=26,camTh=0.62,camPh=0.95,tgt=new THREE.Vector3(0,0,0);
+function updCam(){
+  camera.position.set(
+    tgt.x+camR*Math.sin(camPh)*Math.cos(camTh),
+    tgt.y+camR*Math.cos(camPh),
+    tgt.z+camR*Math.sin(camPh)*Math.sin(camTh));
+  camera.lookAt(tgt);
+}
+let drag=null;
+renderer.domElement.addEventListener('mousedown',e=>{drag={x:e.clientX,y:e.clientY,b:e.button};e.preventDefault()});
+addEventListener('mouseup',()=>drag=null);
+addEventListener('mousemove',e=>{
+  if(!drag)return;
+  const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
+  if(drag.b===0){ camTh-=dx*0.008; camPh=Math.max(0.03,Math.min(Math.PI-0.03,camPh-dy*0.008)); }
+  else { const s=camR*0.0016; tgt.x-=dx*s*Math.cos(camTh); tgt.z-=dx*s*Math.sin(camTh); tgt.y+=dy*s; }
+  drag={x:e.clientX,y:e.clientY,b:drag.b}; updCam();
+});
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+renderer.domElement.addEventListener('wheel',e=>{camR=Math.max(4,Math.min(200,camR*(1+e.deltaY*0.0012)));updCam();e.preventDefault()},{passive:false});
+
+// ============ スピン場の定義 ============
+// 各テクスチャは (x,y) -> 単位ベクトル(mx,my,mz) を返す
+function helSign(h){ return Math.cos(h)>=0?1:-1; }   // SkXの巻き方(Bloch/Néel)切替
+function field(mode,x,y,R,helRad,pol){
+  const r=Math.hypot(x,y), phi=Math.atan2(y,x);
+  switch(mode){
+    case 'fm':  return [0,0,1];
+    case 'afm': return [0,0, ((Math.round(x)+Math.round(y))%2===0?1:-1)];
+    case 'helix':{ const q=2*Math.PI/R; return [0,Math.sin(q*x),Math.cos(q*x)]; }
+    case 'skyrmion-bloch': case 'skyrmion-neel': case 'antiskyrmion':{
+      // 半径方向のプロファイル Θ(r): コア=pol方向, 外側=逆向き
+      const th=Math.PI*Math.min(1,r/R);
+      const mz=pol*Math.cos(th), st=Math.sin(th);
+      let Phi;
+      if(mode==='skyrmion-bloch')      Phi=phi+helRad;          // 渦度1, ヘリシティγ
+      else if(mode==='skyrmion-neel')  Phi=phi;                 // 放射状
+      else                             Phi=-phi+helRad;         // 反スキルミオン: 渦度-1
+      return [st*Math.cos(Phi), st*Math.sin(Phi), mz];
+    }
+    case 'meron':{
+      const th=(Math.PI/2)*Math.min(1,r/R);   // 中心↑ → 端で面内 (半分だけ巻く)
+      const mz=pol*Math.cos(th), st=Math.sin(th);
+      const Phi=phi+helRad;
+      return [st*Math.cos(Phi), st*Math.sin(Phi), mz];
+    }
+    case 'skx-lattice':{
+      // triple-q: 120°の3本のらせんを重ねる（中心対称機構と同じ構成）
+      // 3本とも位相0で重ねると原点にコアが立ち、三角格子状に並ぶ
+      const q=2*Math.PI/R;
+      let mx=0,my=0,mz=0;
+      for(let k=0;k<3;k++){
+        const a=k*2*Math.PI/3 + Math.PI/2;
+        const qx=q*Math.cos(a), qy=q*Math.sin(a);
+        const ph=qx*x+qy*y;
+        mz += -Math.cos(ph);                       // 位相0の点でコア(下向き)
+        mx += -Math.sin(ph)*Math.sin(a)*helSign(helRad);
+        my +=  Math.sin(ph)*Math.cos(a)*helSign(helRad);
+      }
+      mz=(mz/3)*(-pol) + 0.42;                     // 一様磁化(背景を上向き)で格子に固定
+      return [mx/3*1.4, my/3*1.4, mz];
+    }
+    case 'vortex':{
+      const core=Math.exp(-(r*r)/(0.35*R*R));
+      const st=Math.sqrt(Math.max(0,1-core*core));
+      return [-st*Math.sin(phi), st*Math.cos(phi), pol*core];
+    }
+    case 'dw-neel':{
+      const w=R*0.55, mzv=Math.tanh(x/w);
+      const st=Math.sqrt(Math.max(0,1-mzv*mzv));
+      return [st,0,mzv];
+    }
+    case 'dmi-pair': return [0,0,1]; // 専用シーンで置換
+  }
+  return [0,0,1];
+}
+
+// ============ 矢印メッシュ ============
+const MAT_CACHE={};
+function mat(hex){ if(!MAT_CACHE[hex]) MAT_CACHE[hex]=new THREE.MeshStandardMaterial({color:hex,roughness:.42,metalness:.12}); return MAT_CACHE[hex]; }
+function colorFor(mz,useZ,theme){
+  if(!useZ) return theme==='light'? 0x37506b : 0x8fb6d9;
+  const t=(mz+1)/2;  // 0(下)..1(上)
+  const c1=new THREE.Color(theme==='light'?0x2b5ea8:0x3d7bff);   // 下=青
+  const c2=new THREE.Color(theme==='light'?0xffffff:0xf0f4f8);   // 中間
+  const c3=new THREE.Color(theme==='light'?0xc0392b:0xff4d5a);   // 上=赤
+  const c=new THREE.Color();
+  if(t<0.5) c.lerpColors(c1,c2,t*2); else c.lerpColors(c2,c3,(t-0.5)*2);
+  return c.getHex();
+}
+
+let arrows=[];
+function buildArrow(len,rad,cone){
+  const g=new THREE.Group();
+  const shaftLen=cone? len*0.62 : len;
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,shaftLen,10), mat(0xffffff));
+  shaft.position.y=shaftLen/2; g.add(shaft);
+  if(cone){
+    const head=new THREE.Mesh(new THREE.ConeGeometry(rad*2.3,len*0.38,12), mat(0xffffff));
+    head.position.y=shaftLen+len*0.19; g.add(head);
+  }
+  g.userData.parts=g.children;
+  return g;
+}
+
+let baseGrid=null;
+function rebuild(){
+  // クリア
+  arrows.forEach(a=>root.remove(a)); arrows=[];
+  if(baseGrid){ root.remove(baseGrid); baseGrid=null; }
+
+  const mode=$('mode').value;
+  const N=+$('N').value, R=+$('R').value;
+  const helRad=(+$('hel').value)*Math.PI/180;
+  const pol=+$('pol').value;
+  const asz=+$('asz').value;
+  const cone=$('showCone').checked, useZ=$('colorZ').checked;
+  const theme=$('theme').value;
+
+  if(mode==='dmi-pair'){ buildDMIPair(asz,theme,helRad); afterBuild(mode,0); return; }
+
+  const half=(N-1)/2, spacing=1.0;
+  let Qsum=0;
+  const m=[];   // Q計算用
+  for(let iy=0;iy<N;iy++){
+    m[iy]=[];
+    for(let ix=0;ix<N;ix++){
+      const x=(ix-half)*spacing, y=(iy-half)*spacing;
+      let v=field(mode,x,y,R,helRad,pol);
+      const n=Math.hypot(v[0],v[1],v[2])||1; v=[v[0]/n,v[1]/n,v[2]/n];
+      m[iy][ix]=v;
+
+      const len=asz*0.95;
+      const a=buildArrow(len,asz*0.085,cone);
+      const col=colorFor(v[2],useZ,theme);
+      a.children.forEach(c=>c.material=mat(col));
+      // 向きを (0,1,0) から v へ
+      const q=new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0,1,0), new THREE.Vector3(v[0],v[2],-v[1]).normalize());
+      a.quaternion.copy(q);
+      a.position.set(x,0,-y);
+      // 矢印の中心を格子点に
+      a.position.add(new THREE.Vector3(v[0],v[2],-v[1]).multiplyScalar(-len*0.5));
+      root.add(a); arrows.push(a);
+    }
+  }
+  // トポロジカル電荷 Q = (1/4π)∫ m·(∂x m × ∂y m)
+  for(let iy=0;iy<N-1;iy++)for(let ix=0;ix<N-1;ix++){
+    const a=m[iy][ix],b=m[iy][ix+1],c=m[iy+1][ix];
+    const dx=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], dy=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+    const cr=[dx[1]*dy[2]-dx[2]*dy[1], dx[2]*dy[0]-dx[0]*dy[2], dx[0]*dy[1]-dx[1]*dy[0]];
+    Qsum += a[0]*cr[0]+a[1]*cr[1]+a[2]*cr[2];
+  }
+  const Q=Qsum/(4*Math.PI);
+
+  if($('showBase').checked){
+    const g=new THREE.GridHelper(N*spacing, N-1,
+      theme==='light'?0xcccccc:0x2a3a4a, theme==='light'?0xdddddd:0x1e2b38);
+    g.position.y=-asz*0.75; root.add(g); baseGrid=g;
+  }
+  afterBuild(mode,Q);
+}
+
+function buildDMIPair(asz,theme,helRad){
+  // 2つのスピン + DMベクトル + 外積の可視化
+  const s1=[0,0,1];
+  const tilt=0.55;
+  const s2=[Math.sin(tilt)*Math.cos(helRad),Math.sin(tilt)*Math.sin(helRad),Math.cos(tilt)];
+  [[-2.2,s1],[2.2,s2]].forEach(([x,v])=>{
+    const a=buildArrow(3.2,0.16,true);
+    a.children.forEach(c=>c.material=mat(colorFor(v[2],true,theme)));
+    a.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(v[0],v[2],-v[1]).normalize());
+    a.position.set(x,-1.6,0);
+    root.add(a); arrows.push(a);
+  });
+  // D ベクトル（面直）
+  const d=buildArrow(2.6,0.12,true);
+  d.children.forEach(c=>c.material=mat(0x2ecc71));
+  d.position.set(0,-1.6,2.6);
+  root.add(d); arrows.push(d);
+  // S1 x S2
+  const cr=[s1[1]*s2[2]-s1[2]*s2[1], s1[2]*s2[0]-s1[0]*s2[2], s1[0]*s2[1]-s1[1]*s2[0]];
+  const n=Math.hypot(...cr)||1;
+  const cv=buildArrow(2.2*n+0.4,0.10,true);
+  cv.children.forEach(c=>c.material=mat(0xf1c40f));
+  cv.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(cr[0]/n,cr[2]/n,-cr[1]/n));
+  cv.position.set(0,-1.6,0);
+  root.add(cv); arrows.push(cv);
+}
+
+const LABELS={
+  'fm':['強磁性 (FM)','全スピンが平行。正味の磁化あり。スキルミオンの背景となる状態'],
+  'afm':['反強磁性 (AFM)','隣接スピンが反平行。正味磁化ほぼゼロ'],
+  'helix':['らせん (Helical)','一方向に進むと回転する1本のスパイラル。トポロジカルには自明'],
+  'skyrmion-bloch':['スキルミオン (Bloch型)','カイラル磁性体 (T/O点群, B20型)。周方向に回る。Q = −1'],
+  'skyrmion-neel':['スキルミオン (Néel型)','極性磁性体 (Cnv) / 界面DMI。放射状に倒れる。Q = −1'],
+  'antiskyrmion':['反スキルミオン','D2d/S4 対称。渦度が逆でBloch/Néelが混在。Q = +1'],
+  'meron':['メロン','半分だけ巻く。Q = ±1/2'],
+  'skx-lattice':['スキルミオン格子 (SkX)','3本のらせんを120°で重ねた triple-q 状態。中心対称系でも出る'],
+  'vortex':['磁気渦 (Vortex)','面内で周回、中心のみ面直。ナノドットの基底状態'],
+  'dw-neel':['磁壁 (Néel wall)','上向き領域と下向き領域の境界。DMIがあると片方の巻き方が選ばれる'],
+  'dmi-pair':['DMI: D·(S₁×S₂)','緑=Dベクトル、黄=S₁×S₂。DMIは隣接スピンを直交方向へねじる']
+};
+function afterBuild(mode,Q){
+  const L=LABELS[mode]||['',''];
+  const qtxt=$('showQ').checked && mode!=='dmi-pair'
+    ? `<br>トポロジカル電荷 <span id="Q">Q = ${Q>=0?'+':''}${Q.toFixed(2)}</span>` : '';
+  $('hud').innerHTML=`<b>${L[0]}</b><br><span style="font-size:11px">${L[1]}</span>${qtxt}`;
+}
+
+// ============ UI ============
+const $=id=>document.getElementById(id);
+function bind(){
+  ['mode','N','R','hel','pol','asz','showCone','showBase','colorZ','showQ','theme'].forEach(id=>{
+    $(id).addEventListener('input',()=>{ syncLabels(); applyTheme(); rebuild(); });
+  });
+  $('camp').addEventListener('change',()=>setView($('camp').value));
+  document.querySelectorAll('.preset button').forEach(b=>
+    b.addEventListener('click',()=>{ $('mode').value=b.dataset.p; rebuild(); }));
+  $('png').addEventListener('click',()=>shot(false,1));
+  $('png4k').addEventListener('click',()=>shot(false,4));
+  $('pngbg').addEventListener('click',()=>shot(true,2));
+  $('gif').addEventListener('click',seq);
+  addEventListener('keydown',e=>{
+    if(e.key==='1')setView('tilt'); if(e.key==='2')setView('top');
+    if(e.key==='3')setView('side'); if(e.key==='4')setView('iso');
+    if(e.code==='Space'){ $('spin').checked=!$('spin').checked; e.preventDefault(); }
+  });
+}
+function syncLabels(){
+  $('Nv').textContent=$('N').value;
+  $('Rv').textContent=(+$('R').value).toFixed(1);
+  $('helv').textContent=$('hel').value+'°';
+  $('polv').textContent=(+$('pol').value>0?'↑':'↓');
+  $('aszv').textContent=(+$('asz').value).toFixed(2);
+}
+function applyTheme(){
+  const light=$('theme').value==='light';
+  document.documentElement.style.setProperty('--bg',light?'#f5f7fa':'#0b1016');
+  scene.background=null;
+  dl.intensity=light?0.95:0.85;
+}
+function setView(v){
+  $('camp').value=v;
+  if(v==='tilt'){camTh=0.62;camPh=0.95;}
+  if(v==='top'){camTh=-Math.PI/2;camPh=0.04;}
+  if(v==='side'){camTh=-Math.PI/2;camPh=Math.PI/2;}
+  if(v==='iso'){camTh=Math.PI/4;camPh=0.96;}
+  updCam();
+}
+
+// ============ 書き出し ============
+function shot(withBG,scale){
+  const w=view.clientWidth*scale, h=view.clientHeight*scale;
+  const old={w:view.clientWidth,h:view.clientHeight};
+  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+  if(withBG){
+    const light=$('theme').value==='light';
+    scene.background=new THREE.Color(light?0xffffff:0x0b1016);
+  } else scene.background=null;
+  renderer.render(scene,camera);
+  const url=renderer.domElement.toDataURL('image/png');
+  scene.background=null;
+  renderer.setSize(old.w,old.h,false); camera.aspect=old.w/old.h; camera.updateProjectionMatrix();
+  const a=document.createElement('a');
+  a.download=`${$('mode').value}_${withBG?'bg':'alpha'}_${scale}x.png`; a.href=url; a.click();
+}
+async function seq(){
+  const n=20, th0=camTh;
+  for(let i=0;i<n;i++){
+    camTh=th0+i*2*Math.PI/n; updCam(); renderer.render(scene,camera);
+    const a=document.createElement('a');
+    a.download=`${$('mode').value}_${String(i).padStart(2,'0')}.png`;
+    a.href=renderer.domElement.toDataURL('image/png'); a.click();
+    await new Promise(r=>setTimeout(r,220));
+  }
+  camTh=th0; updCam();
+}
+
+// ============ ループ ============
+function loop(){
+  requestAnimationFrame(loop);
+  if($('spin').checked){ camTh+=0.0038; updCam(); }
+  renderer.render(scene,camera);
+}
+bind(); syncLabels(); applyTheme(); resize(); setView('tilt'); rebuild(); loop();
+</script>
+</body>
+</html>
