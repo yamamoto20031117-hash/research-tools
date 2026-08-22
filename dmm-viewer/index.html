@@ -148,6 +148,10 @@ let fitMode=false;
 let fitStart=null, fitEnd=null;  // フィット範囲（xの値）
 let dragStart=null;   // ドラッグ開始位置
 
+// 大量データでMath.min(...arr)がRangeErrorになるため自前実装
+function arrMin(a){let m=Infinity;for(let i=0;i<a.length;i++)if(a[i]<m)m=a[i];return m;}
+function arrMax(a){let m=-Infinity;for(let i=0;i<a.length;i++)if(a[i]>m)m=a[i];return m;}
+
 const canvas=document.getElementById('chart');
 const ctx=canvas.getContext('2d');
 
@@ -186,8 +190,8 @@ function parseCSV(text){
       current=parseFloat(cols[2]);
     }
     if(isNaN(timeMs)||isNaN(voltage)||isNaN(current)) continue;
-    if(Math.abs(voltage)>1e6) voltage=0;
-    if(Math.abs(current)>1e6) current=0;
+    // 測定器のオーバーフロー値（9.91e37等）は0にせず行ごと捨てる
+    if(Math.abs(voltage)>1e6||Math.abs(current)>1e6) continue;
     rawData.push({time:timeMs, voltage, current});
   }
   rawData.sort((a,b)=>a.time-b.time);
@@ -258,8 +262,8 @@ function redraw(){
   // データ範囲計算
   let xAll=data.map(d=>getXVal(d));
   let yAll=data.map(d=>getYVal(d));
-  let xDataMin=Math.min(...xAll), xDataMax=Math.max(...xAll);
-  let yDataMin=Math.min(...yAll), yDataMax=Math.max(...yAll);
+  let xDataMin=arrMin(xAll), xDataMax=arrMax(xAll);
+  let yDataMin=arrMin(yAll), yDataMax=arrMax(yAll);
 
   // ユーザー指定範囲
   const uxMin=parseFloat(document.getElementById('xMinR').value);

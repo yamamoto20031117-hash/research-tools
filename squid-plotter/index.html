@@ -152,6 +152,10 @@ const COLORS=['#CC0000','#2F5496','#228B22','#FF8C00','#8B008B','#008B8B','#B222
 let fileList=[]; // {name, label, color, temp[], field[], moment[], mass, marker}
 let currentMode='mh';
 
+// 大量データでMath.min(...arr)がRangeErrorになるため自前実装
+function arrMin(a){let m=Infinity;for(let i=0;i<a.length;i++)if(a[i]<m)m=a[i];return m;}
+function arrMax(a){let m=-Infinity;for(let i=0;i<a.length;i++)if(a[i]>m)m=a[i];return m;}
+
 // ===== ファイル読み込み =====
 const dropZone=document.getElementById('dropZone');
 const fileInput=document.getElementById('fileInput');
@@ -221,6 +225,7 @@ function parseSQUID(text, filename){
   // Quantum Design MPMS/PPMS .dat format
   let headerIdx=-1, colMap={};
   let inData=false;
+  let delim=','; // ヘッダー行で確定。空列を潰さないよう単一文字で分割する
   for(let i=0;i<lines.length;i++){
     const l=lines[i].trim();
 
@@ -228,7 +233,8 @@ function parseSQUID(text, filename){
     if(l==='[Data]'){inData=true;continue;}
     if(inData && headerIdx===-1){
       // [Data]の次の行がヘッダー
-      const cols=l.split(',').map(c=>c.trim().toLowerCase());
+      delim=l.includes('\t')?'\t':',';
+      const cols=l.split(delim).map(c=>c.trim().toLowerCase());
       cols.forEach((c,j)=>{
         if(/^temperature/i.test(c)) colMap.temp=j;
         if(/magnetic field/i.test(c)) colMap.field=j;
@@ -246,7 +252,8 @@ function parseSQUID(text, filename){
     // ヘッダー未検出の場合: カンマ/タブ区切りのヘッダー行を探す
     if(!inData && headerIdx===-1){
       if(/temperature|field|moment|magnetization/i.test(l)&&(l.includes(',')||l.includes('\t'))){
-        const cols=l.split(/[,\t]+/).map(c=>c.trim().toLowerCase());
+        delim=l.includes('\t')?'\t':',';
+        const cols=l.split(delim).map(c=>c.trim().toLowerCase());
         cols.forEach((c,j)=>{
           if(/temp/i.test(c)) colMap.temp=j;
           if(/field.*oe|magnetic.*field/i.test(c)) colMap.field=j;
@@ -260,7 +267,7 @@ function parseSQUID(text, filename){
 
     // データ行をパース
     if(headerIdx>=0 && i>headerIdx){
-      const parts=l.split(/[,\t]+/).map(s=>s.trim());
+      const parts=l.split(delim).map(s=>s.trim());
       if(parts.length<2) continue;
       const t=colMap.temp!==undefined?parseFloat(parts[colMap.temp]):NaN;
       const h=colMap.field!==undefined?parseFloat(parts[colMap.field]):NaN;
@@ -303,8 +310,8 @@ function parseSQUID(text, filename){
 function autoDetectMode(){
   if(fileList.length===0) return;
   const d=fileList[fileList.length-1];
-  const tempRange=Math.max(...d.temp)-Math.min(...d.temp);
-  const fieldRange=Math.max(...d.field)-Math.min(...d.field);
+  const tempRange=arrMax(d.temp)-arrMin(d.temp);
+  const fieldRange=arrMax(d.field)-arrMin(d.field);
   if(fieldRange>tempRange*100) setMode('mh');
   else setMode('mt');
 }
@@ -343,7 +350,7 @@ function updateUI(){
     if(!titleInput.value){
       const d=fileList[0];
       const tempVal=d.temp.length>0?d.temp[0]:0;
-      const isConstTemp=Math.max(...d.temp)-Math.min(...d.temp)<5;
+      const isConstTemp=arrMax(d.temp)-arrMin(d.temp)<5;
       if(currentMode==='mh'&&isConstTemp){
         titleInput.value=d.label.replace(/_/g,' ')+' M-H curve '+Math.round(tempVal)+'K';
       } else {
@@ -391,8 +398,8 @@ function removeFile(idx){
 function showInfo(){
   if(fileList.length===0) return;
   const d=fileList[fileList.length-1];
-  const tMin=Math.min(...d.temp).toFixed(1), tMax=Math.max(...d.temp).toFixed(1);
-  const hMin=Math.min(...d.field).toFixed(0), hMax=Math.max(...d.field).toFixed(0);
+  const tMin=arrMin(d.temp).toFixed(1), tMax=arrMax(d.temp).toFixed(1);
+  const hMin=arrMin(d.field).toFixed(0), hMax=arrMax(d.field).toFixed(0);
   const mMin=d.moment.reduce((a,b)=>Math.min(a,b)).toExponential(3);
   const mMax=d.moment.reduce((a,b)=>Math.max(a,b)).toExponential(3);
   document.getElementById('infoContent').innerHTML=
@@ -412,11 +419,15 @@ function getPlotData(f){
   } else if(currentMode==='mt'){
     x=f.temp.slice(); y=f.moment.slice();
   } else if(currentMode==='chi'){
-    x=f.temp.slice();
-    y=f.temp.map((t,j)=>f.field[j]!==0?f.moment[j]/f.field[j]:0);
+    // H=0の点はχが定義できない。0を入れると偽のゼロ落ちになるので点ごと除外
+    f.temp.forEach((t,j)=>{if(Math.abs(f.field[j])>1e-9){x.push(t);y.push(f.moment[j]/f.field[j]);}});
   } else { // invchi
-    x=f.temp.slice();
-    y=f.temp.map((t,j)=>{const chi=f.field[j]!==0?f.moment[j]/f.field[j]:0;return chi!==0?1/chi:0;});
+    f.temp.forEach((t,j)=>{
+      if(Math.abs(f.field[j])<=1e-9) return; // H=0は除外
+      const chi=f.moment[j]/f.field[j];
+      if(chi===0) return; // χ=0は1/χが発散するので除外
+      x.push(t);y.push(1/chi);
+    });
   }
   // 質量正規化
   if(f.mass>0 && (currentMode==='mh'||currentMode==='mt')){
@@ -429,7 +440,7 @@ function getPlotData(f){
 function autoUnitScale(values, mode, axis){
   // X軸（磁場）
   if(axis==='x' && mode==='mh'){
-    const maxAbs=Math.max(...values.map(Math.abs));
+    const maxAbs=arrMax(values.map(Math.abs));
     if(maxAbs>=50000) return {divisor:10000, label:'Field (10kOe)'};
     if(maxAbs>=5000) return {divisor:1000, label:'Field (kOe)'};
     if(maxAbs>=0.5&&maxAbs<10) return {divisor:1, label:'Field (T)'}; // already in T?
@@ -444,7 +455,7 @@ function autoUnitScale(values, mode, axis){
 
   const hasMass=fileList.some(f=>f.mass>0);
   const unit=hasMass?'emu/g':'emu';
-  const maxAbs=Math.max(...values.map(Math.abs));
+  const maxAbs=arrMax(values.map(Math.abs));
   if(maxAbs===0) return {divisor:1, label:'Magnetization ('+unit+')'};
 
   const exp=Math.floor(Math.log10(maxAbs));
@@ -524,15 +535,15 @@ function redraw(){
   // 範囲を対称にする（M-Hの場合）
   let xMin,xMax,yMin,yMax;
   if(currentMode==='mh'){
-    const xAbs=Math.max(...scaledAllX.map(Math.abs));
-    const yAbs=Math.max(...scaledAllY.map(Math.abs));
+    const xAbs=arrMax(scaledAllX.map(Math.abs));
+    const yAbs=arrMax(scaledAllY.map(Math.abs));
     xMin=-xAbs*1.1; xMax=xAbs*1.1;
     yMin=-yAbs*1.1; yMax=yAbs*1.1;
   } else {
-    xMin=Math.min(0,...scaledAllX);
-    xMax=Math.max(...scaledAllX)*1.05;
-    yMin=Math.min(0,...scaledAllY)*1.1;
-    yMax=Math.max(...scaledAllY)*1.1;
+    xMin=Math.min(0,arrMin(scaledAllX));
+    xMax=arrMax(scaledAllX)*1.05;
+    yMin=Math.min(0,arrMin(scaledAllY))*1.1;
+    yMax=arrMax(scaledAllY)*1.1;
   }
   if(xMax===xMin){xMax=xMin+1;}
   if(yMax===yMin){yMax=yMin+1;}

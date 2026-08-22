@@ -1,2 +1,13 @@
 .vercel
 .env*.local
+
+# macOS
+.DS_Store
+
+# 装置由来の生データ（このリポジトリは PUBLIC。未発表データを絶対に載せない）
+# 発表用に加工した図（png/svg/pdf）は個別に git add -f で明示的に追加すること。
+# 生データの保管場所は private リポジトリ skyrmion-vse2/data/uv/
+*.vspd
+*.ras
+*.raw
+*.dat

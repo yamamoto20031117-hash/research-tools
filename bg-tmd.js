@@ -727,10 +727,12 @@
 
   // === A-layer: real all-sky equirectangular background ====================
   // Drop a CC-BY equirectangular star map (e.g. Solar System Scope
-  // 8k_stars_milky_way.jpg) into research-tools/sky-equirect.jpg.
+  // 8k_stars_milky_way.jpg) into research-tools/sky-equirect.webp.
+  // 4096x2048 WebP (107KB). 8K JPEG (1.8MB) was 17x heavier for no visible
+  // gain at opacity 0.55 on a 280-radius sphere.
   // If the file is missing the scene still works — we just skip this layer.
   new THREE.TextureLoader().load(
-    '/sky-equirect.jpg',
+    '/sky-equirect.webp',
     tex => {
       if ('encoding' in tex) tex.encoding = THREE.sRGBEncoding;
       const skyGeo = new THREE.SphereGeometry(280, 64, 32);

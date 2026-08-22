@@ -229,9 +229,6 @@
 
 <footer>CFMS Plotter v1.0 — Cryogenic CFMS-5T — Research Tools</footer>
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyClK3vIE_SQ7SGdXWbmWzZ51MdeBappDKY",
@@ -243,12 +240,40 @@ const firebaseConfig = {
   appId: "1:359837086498:web:your_app_id"
 };
 
-let db = null, firebaseReady = false;
-try {
-  firebase.initializeApp(firebaseConfig);
-  db = firebase.database();
-  firebaseReady = true;
-} catch(e){ console.warn('Firebase init error', e); }
+// ===== Firebase 遅延ロード（自動受信ONで初めてCDNを読む: 約197KB gzip） =====
+let db = null, firebaseReady = false, fbLoading = null;
+
+function loadScript(src){
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('スクリプト読み込み失敗: ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+// 進行中のPromiseを保持して多重注入を防ぐ
+function ensureFirebase(){
+  if(firebaseReady) return Promise.resolve();
+  if(fbLoading) return fbLoading;
+  fbLoading = (async () => {
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js');
+    if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    firebaseReady = true;
+  })();
+  fbLoading.catch(() => { fbLoading = null; }); // 失敗時は次回リトライできるようにする
+  return fbLoading;
+}
+
+// 失敗をステータス欄に出す（「読み込み中...」で固まらせない）
+function showFirebaseError(e){
+  console.warn('Firebase error', e);
+  const el = document.getElementById('senderStatus');
+  if(el) el.innerHTML = '<span class="dot off"></span><span>接続失敗（オフライン / CDN遮断）</span>';
+}
 
 
 // ===== 全ファイルデータ管理 =====
@@ -261,16 +286,33 @@ let lastOnlineFiles = null;  // 最後に取得したファイル一覧を保持
 
 
 // ===== 自動受信 ON/OFF =====
-function toggleAutoReceive(){
+// inline onchange から呼ばれるので、失敗は必ず自分でUIに出す
+async function toggleAutoReceive(){
   autoReceive = document.getElementById('autoToggle').checked;
 
   if(autoReceive){
+    const el = document.getElementById('senderStatus');
+    el.innerHTML = '<span class="dot sending"></span><span>接続中...</span>';
+    try {
+      await ensureFirebase();
+    } catch(e){
+      // 読み込み失敗: トグルを元に戻してエラーを表示
+      autoReceive = false;
+      document.getElementById('autoToggle').checked = false;
+      showFirebaseError(e);
+      return;
+    }
+    // ロード待ちの間にOFFに戻された場合はリスナーを張らない
+    if(!autoReceive){ updateSenderStatusUI(); return; }
     startAutoReceive();
+    el.innerHTML = '<span class="dot on"></span><span>接続済み（sender待ち）</span>';
     // Firebase に ON を通知 → sender が再開し未送信データを送る
-    if(firebaseReady) db.ref('cfms/control').set({enabled: true, time: Date.now()});
+    db.ref('cfms/control').set({enabled: true, time: Date.now()})
+      .catch(e => console.warn('control 通知失敗', e));
   } else {
     stopAutoReceive();
-    if(firebaseReady) db.ref('cfms/control').set({enabled: false, time: Date.now()});
+    if(firebaseReady) db.ref('cfms/control').set({enabled: false, time: Date.now()})
+      .catch(e => console.warn('control 通知失敗', e));
   }
   updateSenderStatusUI();
 }
@@ -427,7 +469,8 @@ function toggleFolder(fid){
   arrow.classList.toggle('open', isOpen);
 }
 
-function loadOnlineFile(fileKey){
+// inline onclick から呼ばれるので、失敗は必ず自分でUIに出す
+async function loadOnlineFile(fileKey){
   // 既にロード済みならそっちを選択
   const existing = allFiles.findIndex(f => f.key === fileKey);
   if(existing >= 0){
@@ -436,15 +479,19 @@ function loadOnlineFile(fileKey){
     return;
   }
 
-  if(!firebaseReady) return;
-
   // Firebase からデータ取得
   const statusEl = document.getElementById('senderStatus');
   statusEl.innerHTML = '<span class="dot sending"></span><span>データ読み込み中...</span>';
 
-  db.ref(`cfms/files/${fileKey}/meta`).once('value').then(snap => {
+  try {
+    await ensureFirebase();
+
+    const snap = await db.ref(`cfms/files/${fileKey}/meta`).once('value');
     const meta = snap.val();
-    if(!meta) return;
+    if(!meta){
+      statusEl.innerHTML = '<span class="dot off"></span><span>データが見つかりません</span>';
+      return;
+    }
 
     const chunks = meta.chunks || 1;
     const promises = [];
@@ -452,28 +499,29 @@ function loadOnlineFile(fileKey){
       promises.push(db.ref(`cfms/files/${fileKey}/data/${i}`).once('value'));
     }
 
-    return Promise.all(promises).then(snaps => {
-      let data = [];
-      for(const s of snaps){
-        const chunk = s.val();
-        if(chunk && Array.isArray(chunk)) data = data.concat(chunk);
-        else if(chunk) data = data.concat(Object.values(chunk));
-      }
+    const snaps = await Promise.all(promises);
+    let data = [];
+    for(const s of snaps){
+      const chunk = s.val();
+      if(chunk && Array.isArray(chunk)) data = data.concat(chunk);
+      else if(chunk) data = data.concat(Object.values(chunk));
+    }
 
-      allFiles.push({name: meta.filename, data, source: 'online', key: fileKey, folder: meta.folder || ''});
-      activeFileIdx = allFiles.length - 1;
-      updateUI();
-      updateSenderStatusUI();
-      if(autoReceive) updateSenderStatusFromFirebase({status:'watching'});
-    });
-  });
+    allFiles.push({name: meta.filename, data, source: 'online', key: fileKey, folder: meta.folder || ''});
+    activeFileIdx = allFiles.length - 1;
+    updateUI();
+    updateSenderStatusUI();
+    if(autoReceive) updateSenderStatusFromFirebase({status:'watching'});
+  } catch(e){
+    showFirebaseError(e);
+  }
 }
 
 function clearOnlineData(){
   if(!confirm('Firebase上の全CFMSデータを削除しますか？')) return;
   if(firebaseReady){
-    db.ref('cfms/files').remove();
-    db.ref('cfms/file_list').remove();
+    db.ref('cfms/files').remove().catch(e => showFirebaseError(e));
+    db.ref('cfms/file_list').remove().catch(e => showFirebaseError(e));
   }
   // オンラインファイルを allFiles から除去
   allFiles = allFiles.filter(f => f.source !== 'online');
@@ -568,11 +616,12 @@ function updateUI(){
   }
 
   // オンラインファイルリストのアクティブ状態更新
-  if(autoReceive){
+  // firebaseReady を見ないと未ロード時に db が null で落ちる
+  if(autoReceive && firebaseReady){
     db.ref('cfms/file_list').once('value').then(snap => {
       const f = snap.val();
       if(f) renderOnlineFileList(f);
-    });
+    }).catch(e => console.warn('file_list 取得失敗', e));
   }
 }
 
@@ -831,13 +880,8 @@ function exportPNG(){
 // ===== 初期化 =====
 window.addEventListener('resize',()=>{if(allFiles.length>0&&activeFileIdx>=0)redrawChart();});
 
-// ページ読み込み時に既存のオンラインファイル一覧を表示（OFF状態でも）
-if(firebaseReady){
-  db.ref('cfms/file_list').once('value').then(snap => {
-    const files = snap.val();
-    if(files) renderOnlineFileList(files);
-  });
-}
+// 受信済みファイル一覧は自動受信をONにした時点で表示される
+// （ページ読み込み時に出すとFirebaseを毎回ロードすることになるため遅延させた）
 
 </script>
 </body>

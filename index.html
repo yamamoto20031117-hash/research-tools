@@ -170,7 +170,7 @@
   .tool-section[data-locked="true"].unlocking .chain-wrap{ opacity:0; }
   .tool-section[data-locked="true"] .chain-img{
     position:absolute;inset:0;
-    background:url('/lock-chain.png') no-repeat center center;
+    background:url('/lock-chain.webp') no-repeat center center;
     background-size:contain;
     filter: drop-shadow(0 0 14px rgba(252,211,77,0.5));
   }
@@ -1285,7 +1285,7 @@ function applyUnlockedState(){
   if(isUnlocked()) document.body.classList.add('rt-unlocked');
 }
 
-// Chain markup: 3 copies of the same lock-chain.png clip-pathed into
+// Chain markup: 3 copies of the same lock-chain.webp clip-pathed into
 // left half / right half / central padlock.
 const CHAIN_HTML = `<div class="chain-img"></div>`;
 
