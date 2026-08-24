@@ -324,6 +324,15 @@
   </div>
 </div>
 
+<!-- ===== 一時非表示（2026-08-23）=====================================
+     spin-texture / chirality-ciss の2カードを、本人の希望でサイト上に
+     出さないようにしている。ツール本体とルートは残してあるので
+     /spin-texture/ /chirality-ciss/ に直接アクセスすれば従来どおり動く。
+
+     復帰させるときは、この直下の <template> 開始タグと、対応する
+     </template> 終了タグの2行を消すだけでよい。
+     ================================================================== -->
+<template id="tools-hidden">
 <!-- ===== 磁気テクスチャ 3D ビューア ===== -->
 <div class="tool-section" data-tool="spin-texture">
   <div class="card">
@@ -359,6 +368,7 @@
     </div>
   </div>
 </div>
+</template>
 
 <!-- ===== XRD データプロッター ===== -->
 <div class="tool-section" data-tool="xrd-plotter">
